@@ -1,30 +1,53 @@
 # Vidux Doctrine
 
-> Six principles. Memorize them. Everything else follows.
+> The short form of the 9 principles in `SKILL.md`. Read this in 5 minutes; everything else follows.
+> Principles 7-9 (investigations, harnesses, subagents) live in `SKILL.md` — they apply only when the situation calls for them.
 
 ## 1. Plan is the store
-PLAN.md is the single source of truth. Code is a derived view.
-If the code is wrong, the plan is wrong.
+
+**PLAN.md is the single source of truth. Code is a derived view.**
+
+If the code is wrong, the plan is wrong. Fix the plan first, then fix the code. An agent that edits code without a corresponding plan entry is mutating the store outside the reducer — it makes the system unpredictable.
 
 ## 2. Unidirectional flow
-Gather -> Plan -> Execute -> Verify -> Checkpoint -> Gather.
-Never skip. Never code without a plan entry. To deviate, update the plan first.
 
-## 3. 50/30/20
-50% plan refinement. 30% code. 20% last mile.
-If you're coding more than planning, stop.
+**Gather -> Plan -> Execute -> Verify -> Checkpoint -> Gather. Never skip a step.**
+
+You never code without a plan entry. To change code in a way the plan does not specify, you MUST update the plan first. The cost of skipping a step is invisible in any single cycle but devastating over a multi-day project.
+
+## 3. 50/30/20 split
+
+**50% plan refinement. 30% code. 20% last mile. If you are coding more than planning, stop.**
+
+```
+┌──────────────────────────┬───────────────┬──────────┐
+│  50% PLAN REFINEMENT     │  30% CODE     │  20% LM  │
+│  gather evidence,        │  one task     │  build,  │
+│  synthesize, prune,      │  per cycle,   │  CI,     │
+│  update PLAN.md          │  derived      │  review  │
+└──────────────────────────┴───────────────┴──────────┘
+   ◄─── front-load thinking ────► ◄─ mechanical ─► ◄ tail ►
+```
+
+If your git history is >30% code commits, the plan was not good enough. Inverting this ratio causes rework that costs more than the planning overhead.
 
 ## 4. Evidence over instinct
-Every plan entry cites a source. No source = no entry.
-MCP queries, codebase greps, design docs, team conventions.
 
-## 5. Design for death
-Sessions die. Context is lost. Auth expires.
-State lives in files. Every cycle reads fresh. Any agent can resume.
+**Every plan entry cites a source. No source = no entry.**
+
+Sources are MCP queries, codebase greps with file:line, design doc quotes, or team conventions cited from PR review history. A plan entry without evidence is a guess. Guesses cause rework. Gathering evidence adds 2-5 minutes per task; a wrong assumption costs 15-60 minutes plus ripple effects.
+
+## 5. Design for completion
+
+**Dispatches end. Context is lost. Auth expires. The store persists.**
+
+State lives in files (PLAN.md, git branch), not in memory. Every cycle reads fresh from disk and never carries context forward. Checkpoints are structured, not freeform summaries. Any agent can resume from the last checkpoint. Tool state (`.claude/`, `.cursor/`) lives outside the working tree.
 
 ## 6. Process fixes > code fixes
-Every failure produces two things: a code fix and a process fix.
-The process fix (new constraint, test, hook, or skill update) is the valuable one.
+
+**Every failure produces two artifacts: a code fix and a process fix. The process fix is the valuable one.**
+
+The code fix is the immediate repair. The process fix is a new constraint, test, hook, or skill update — it makes the system smarter for next time. Without process fixes, the same class of error recurs across cycles and a single bad assumption propagates exponentially through dependent tasks.
 
 ---
 

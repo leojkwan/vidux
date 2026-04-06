@@ -30,10 +30,11 @@ while [[ $# -gt 0 ]]; do
 done
 
 # --- locate paths ----------------------------------------------------------- #
-VIDUX_ROOT="$SCRIPT_DIR/.."
+REPO="$(cd "$REPO" 2>/dev/null && pwd || echo "$REPO")"
+VIDUX_ROOT="$REPO"
 CONFIG="$VIDUX_ROOT/vidux.config.json"
 PROJECTS_DIR="$VIDUX_ROOT/projects"
-AUTOMATIONS_DIR="$REPO/automations"
+AUTOMATIONS_DIR="$VIDUX_ROOT/automations"
 
 # Read config overrides
 if [ -f "$CONFIG" ]; then
@@ -739,6 +740,87 @@ _check_plan_merge_conflicts() {
 }
 
 # ============================================================================ #
+# CHECK 11: Bimodal Runtime Quality (automation cycles)
+# ============================================================================ #
+_check_bimodal_runtime() {
+  TOTAL=$((TOTAL + 1))
+  local dead_zone="" count=0
+
+  # Parse Progress entries across all project PLANs for cycle timestamps.
+  # Good automations: <2 min (quick check) or >15 min (deep run).
+  # Dead zone: 3-8 min = "stick-rubbing" (no meaningful work).
+  if [[ -d "$PROJECTS_DIR" ]]; then
+    for plan in "$PROJECTS_DIR"/*/PLAN.md; do
+      [[ -f "$plan" ]] || continue
+      local project
+      project="$(basename "$(dirname "$plan")")"
+
+      # Extract timestamps from Progress section and compute durations
+      # Format: - [YYYY-MM-DD] Cycle N: ... or - [YYYY-MM-DD HH:MM] Cycle N: ...
+      local timestamps durations dead_count total_cycles median_min
+      timestamps="$(awk '/^## Progress/{found=1; next} found && /^## /{found=0} found{print}' "$plan" \
+        | grep -oE '\[20[0-9]{2}-[0-9]{2}-[0-9]{2}( [0-9]{2}:[0-9]{2})?\]' | tr -d '[]' | sort || true)"
+
+      [[ -z "$timestamps" ]] && continue
+
+      # Use git log on the plan file for more accurate per-cycle commit timestamps
+      durations="$(git -C "$REPO" log --format='%at' -- "$plan" 2>/dev/null | sort -n | awk '
+        NR > 1 {
+          delta = $1 - prev
+          if (delta > 30 && delta < 7200) print int(delta / 60)
+        }
+        { prev = $1 }
+      ' || true)"
+
+      [[ -z "$durations" ]] && continue
+
+      total_cycles="$(printf '%s\n' "$durations" | wc -l | tr -d ' ')"
+      [[ "$total_cycles" -lt 2 ]] && continue
+
+      # Count runs in dead zone (3-8 minutes)
+      dead_count="$(printf '%s\n' "$durations" | awk '$1 >= 3 && $1 <= 8' | wc -l | tr -d ' ')"
+
+      # Calculate median
+      median_min="$(printf '%s\n' "$durations" | sort -n | awk -v n="$total_cycles" '
+        NR == int((n+1)/2) { print $1 }
+      ')"
+
+      local dead_pct=0
+      [[ "$total_cycles" -gt 0 ]] && dead_pct=$((dead_count * 100 / total_cycles))
+
+      # Flag if >30% of runs are in dead zone
+      if [[ "$dead_pct" -gt 30 ]]; then
+        dead_zone="${dead_zone:+$dead_zone|}${project}:${dead_count}/${total_cycles}:${dead_pct}%:median=${median_min}m"
+        count=$((count + 1))
+      fi
+    done
+  fi
+
+  if [[ "$count" -gt 0 ]]; then
+    local summary=""
+    local details_json="["
+    local first=true
+    while IFS='|' read -ra entries; do
+      for entry in "${entries[@]}"; do
+        [[ -z "$entry" ]] && continue
+        IFS=':' read -r proj ratio pct med <<< "$entry"
+        summary="${summary:+$summary, }$proj ($ratio dead-zone runs, $pct, $med)"
+        [[ "$first" = true ]] && first=false || details_json="$details_json,"
+        details_json="$details_json{\"project\":\"$proj\",\"dead_zone_ratio\":\"$ratio\",\"dead_zone_pct\":\"$pct\",\"median\":\"$med\"}"
+      done
+    done <<< "$dead_zone"
+    details_json="$details_json]"
+
+    _warn "Bimodal dead zone: $summary"
+    _add_check "{\"id\":\"bimodal_runtime\",\"category\":\"quality\",\"status\":\"warn\",\"count\":$count,\"details\":$details_json}"
+  else
+    _ok "No automation runs stuck in 3-8 min dead zone"
+    PASS_COUNT=$((PASS_COUNT + 1))
+    _add_check "{\"id\":\"bimodal_runtime\",\"category\":\"quality\",\"status\":\"pass\",\"count\":0}"
+  fi
+}
+
+# ============================================================================ #
 # MAIN
 # ============================================================================ #
 if [[ "$JSON_MODE" = false ]]; then
@@ -778,6 +860,12 @@ fi
 _check_stale_in_progress
 _check_missing_active_worktrees
 _check_plan_merge_conflicts
+
+if [[ "$JSON_MODE" = false ]]; then
+  echo -e "\n${BOLD}== Quality ==${RESET}"
+fi
+
+_check_bimodal_runtime
 
 # --- summary ---------------------------------------------------------------- #
 WARN_COUNT=$((TOTAL - PASS_COUNT))

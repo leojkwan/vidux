@@ -29,6 +29,20 @@ USAGE
 PLAN="$1"
 [[ ! -f "$PLAN" ]] && { echo "Error: plan not found: $PLAN"; exit 1; }
 
+# Guard: ensure plan is inside a git repo
+if ! git -C "$(dirname "$PLAN")" rev-parse --show-toplevel &>/dev/null; then
+  echo "Error: $PLAN is not inside a git repository. Checkpoint requires git." >&2
+  exit 1
+fi
+
+# --- ledger integration (optional) ----------------------------------------- #
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+_LEDGER_LIB="$SCRIPT_DIR/lib/ledger-emit.sh"
+if [ -f "$_LEDGER_LIB" ]; then
+  # shellcheck source=lib/ledger-emit.sh
+  source "$_LEDGER_LIB" 2>/dev/null || true
+fi
+
 DATE=$(date +%Y-%m-%d)
 PLAN_DIR=$(dirname "$PLAN")
 
@@ -220,6 +234,13 @@ git add "$PLAN"
 if ! git commit -m "vidux: ${SUMMARY}"; then
   echo "Error: git commit failed — checkpoint not saved" >&2
   exit 1
+fi
+
+# --- emit ledger checkpoint event ------------------------------------------ #
+if type vidux_emit_checkpoint &>/dev/null 2>&1; then
+  _COMMIT_HASH=$(git -C "$PLAN_DIR" rev-parse HEAD 2>/dev/null || echo "")
+  _PROJECT_NAME="$(basename "$PLAN_DIR")"
+  vidux_emit_checkpoint "$_PROJECT_NAME" "$PLAN" "$_COMMIT_HASH" "$STATUS" 2>/dev/null || true
 fi
 
 echo "Checkpoint complete. Cycle ${CYCLE}: ${SUMMARY}${STATUS_NOTE}"

@@ -32,6 +32,29 @@ The analogy also explains why Vidux feels heavyweight for small tasks. Redux is 
 
 Vidux has exactly two data structures. Everything else is derived.
 
+```
+┌─────────────────────────┐         ┌─────────────────────────┐
+│  DOC TREE (the store)   │         │  WORK QUEUE (FIFO)      │
+│                         │         │                         │
+│  PLAN.md                │ ──edit─▶│  ┌───┬───┬───┬───┐      │
+│  evidence/              │         │  │ 1 │ 2 │ 3 │...│ hot  │
+│  constraints/           │         │  └───┴───┴───┴───┘      │
+│  decisions/             │         │  (last 30 items)        │
+│  investigations/        │         │  ──────────────         │
+│                         │◀──pop── │  cold: git history      │
+└─────────────────────────┘  result └─────────────────────────┘
+        ▲                                     │
+        │                                     ▼
+        │                          ┌─────────────────────────┐
+        └──── results write back ──│  Agent executes one     │
+                                   │  item, verifies, dies   │
+                                   └─────────────────────────┘
+```
+
+The doc tree is the persistent store. The work queue is derived: doc edits create
+queue items, agents pop them, execution results write back into the tree. Code is
+never written outside this loop.
+
 ### Documentation Tree (the store)
 
 A markdown-based tree of folders and docs. This is the single source of truth. All knowledge, plans, evidence, and decisions live here.
@@ -75,9 +98,9 @@ Agents never "just code." They either update docs (which creates queue items) or
 
 ---
 
-## 3. The Six Principles
+## 3. The Core Six Principles
 
-Non-negotiable doctrine. Each exists because a specific failure mode was observed in real multi-session AI coding projects.
+Non-negotiable doctrine. Each exists because a specific failure mode was observed in real multi-session AI coding projects. These six are the short form (also in `DOCTRINE.md`); `SKILL.md` adds three more (investigations, harnesses, subagents) that apply only when the situation calls for them.
 
 **1. Plan is the store.** PLAN.md is the single source of truth. Code is a derived view. If the code contradicts the plan, the plan needs fixing first. SlopCodeBench (arxiv 2603.24755) demonstrates that agent code degradation is monotonic -- agents drift, they do not suddenly break. By cycle 10, code bears little resemblance to the original intent. Making the plan the store forces reconciliation every cycle, catching drift before it compounds.
 
@@ -87,7 +110,7 @@ Non-negotiable doctrine. Each exists because a specific failure mode was observe
 
 **4. Evidence over instinct.** Every plan entry must cite at least one evidence source: MCP query, codebase grep, design doc, or team convention. No source means no entry. Gathering evidence adds 2-5 minutes per task. A wrong assumption costs 15-60 minutes of rework plus ripple effects. The evidence requirement front-loads cost where it is cheapest to pay.
 
-**5. Design for death.** Every session will die. Context will be lost. Auth will expire. Therefore: state lives in files, every cycle reads fresh, checkpoints are structured, and any agent can resume from the last checkpoint. Tool state (.claude/, .cursor/) never lives inside the repo. A 20-minute cron fire does not get to assume it will get a 21st minute. The checkpoint at the end of each cycle is not optional bookkeeping -- it is the only thing that survives.
+**5. Design for completion.** Every dispatch will end. Context will be lost. Auth will expire. But the store persists. Therefore: state lives in files, every cycle reads fresh, checkpoints are structured, and any agent can resume from the last checkpoint. Tool state (.claude/, .cursor/) never lives inside the repo. A 20-minute cron fire does not get to assume it will get a 21st minute. The checkpoint at the end of each cycle is not optional bookkeeping -- it is the only thing that survives.
 
 **6. Process fixes over code fixes.** Every failure produces two artifacts: a code fix (the immediate repair) and a process fix (a new constraint, test, hook, or skill update). The process fix is the valuable output because it makes the system smarter for next time. Research on multi-agent error propagation shows 17x error amplification when agents lack hierarchical correction -- a single bad assumption propagates through dependent tasks exponentially. Process fixes break this amplification chain by adding constraints that prevent the same class of error from recurring.
 
@@ -106,7 +129,7 @@ graph TD
     D -->|No| F[ACT: Refine plan - 15 min]
     E --> G[CHECKPOINT - 1 min]
     F --> G
-    G --> H[DIE]
+    G --> H[COMPLETE]
     H -.->|Next cron fire| A
 ```
 
@@ -139,7 +162,7 @@ graph TD
 
 Either refine the plan or execute one task. Never two. One task per cycle prevents half-finished work.
 
-### Checkpoint (1 min) then Die
+### Checkpoint (1 min) then Complete
 
 Structured commit: what changed, which task, what is next, blockers. Update PLAN.md Progress. Session ends. No state in memory. Next cron fire reads fresh.
 
@@ -183,6 +206,32 @@ graph TD
     B --> C
     C -.->|Findings feed back| B
 ```
+
+The shape of fan-out/fan-in is N independent files in, one merged file out, one critic on top:
+
+```
+            ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐
+  TIER 1    │ Agent A  │  │ Agent B  │  │ Agent C  │  │ Agent D  │
+  (parallel)│ team chat│  │ codebase │  │  rules   │  │  issues  │
+            └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘
+                 │             │             │             │
+                 ▼             ▼             ▼             ▼
+            evidence/A.md  arch/B.md   constraints/  tasks/D.md
+                 │             │           C.md            │
+                 └─────────────┴─────┬───────┴──────────────┘
+                                     ▼
+                             ┌───────────────┐
+  TIER 2 (serial)            │  Synthesizer  │  reads all 4
+                             │  -> PLAN.md   │  writes one
+                             └───────┬───────┘
+                                     ▼
+                             ┌───────────────┐
+  TIER 3 (serial)            │    Critic     │  challenges
+                             │  -> findings  │  assumptions
+                             └───────────────┘
+```
+
+Fan-out is parallel because the 4 research lanes never touch the same file. Fan-in is serial because merging conflicts requires one mind. Never have N agents write to the same file.
 
 **Tier 1: Research groups (4 groups, all parallel).** Each group writes to its own doc. No shared files. No coordination overhead.
 
@@ -231,7 +280,7 @@ graph TB
         W4[Companion skills<br/>Pilot, Ledger, Captain,<br/>build skill, review skill]
     end
     subgraph "Layer 1: Vidux Core (open-sourceable)"
-        C1[Doctrine - 6 principles]
+        C1[Doctrine - 9 principles]
         C2[Two data structures<br/>doc tree + work queue]
         C3[Loop mechanics<br/>stateless cycle, decision tree]
         C4[Failure protocol<br/>dual five-whys, three-strike gate]
@@ -269,10 +318,10 @@ The four hooks form a cascade with graduated pressure:
 
 | Hook | Lifecycle Point | Doctrine Enforced | Question Asked |
 |------|----------------|-------------------|----------------|
-| **SessionStart** | Session begins | Design for death | "Did you read the plan?" |
+| **SessionStart** | Session begins | Design for completion | "Did you read the plan?" |
 | **PreToolUse** | Before Write/Edit | Unidirectional flow | "Is this edit in the plan?" |
 | **PostToolUse** | After Write/Edit | Unidirectional flow | "Did this edit match the plan?" |
-| **Stop** | Session ends | Design for death | "Did you checkpoint?" |
+| **Stop** | Session ends | Design for completion | "Did you checkpoint?" |
 
 **Why the cascade works.** Each hook catches what the previous one missed. If the agent follows SessionStart (reads the plan, finds the current task), it rarely triggers PreToolUse because it already knows which files to edit. If it follows PreToolUse, it rarely triggers PostToolUse because the edit was planned. If all three hold, Stop is a formality.
 
@@ -295,11 +344,19 @@ The four hooks form a cascade with graduated pressure:
 | `commands/vidux.md` | Slash command `/vidux` -- entry point, activates the full orchestration loop. |
 | `commands/vidux-plan.md` | Slash command `/vidux-plan` -- plan-only mode, skips execution. |
 | `commands/vidux-status.md` | Slash command `/vidux-status` -- shows current plan state and progress. |
+| `commands/vidux-loop.md` | Slash command `/vidux-loop` -- create or refine a cron harness for unattended cycles. |
+| `commands/vidux-dashboard.md` | Slash command `/vidux-dashboard` -- multi-project overview across active missions. |
+| `commands/vidux-manager.md` | Slash command `/vidux-manager` -- top-level project management surface. |
+| `commands/vidux-version.md` | Slash command `/vidux-version` -- print the installed Vidux version. |
 | `hooks/hooks.json` | Hook configuration file for Claude Code integration. |
 | `scripts/install-hooks.sh` | Installs Vidux hooks into the local Claude Code settings. |
 | `scripts/vidux-checkpoint.sh` | Automates the checkpoint step (commit format, progress update). |
 | `scripts/vidux-gather.sh` | Runs the fan-out evidence gathering pattern. |
-| `scripts/vidux-loop.sh` | The cron driver. Runs the full Read, Assess, Act, Checkpoint, Die cycle. |
+| `scripts/vidux-loop.sh` | The cron driver. Runs the full Read, Assess, Act, Checkpoint, Complete cycle. |
+| `scripts/vidux-doctor.sh` | Read-only health check — worktrees, automation topology, stale plans, merge conflicts. |
+| `scripts/vidux-fleet-quality.sh` | Fleet-wide quality scan across active automations. |
+| `scripts/vidux-prune.sh` | Archive stale projects and prune cold storage. |
+| `scripts/vidux-install.sh` | Installer helper for the symlink + hook setup. |
 | `tests/test_vidux_contracts.py` | Contract tests verifying that Vidux documentation is internally consistent. |
 | `.claude-plugin/plugin.json` | Claude Code plugin manifest for skill discovery and activation. |
 
@@ -315,7 +372,7 @@ Vidux synthesizes 10 patterns from 26 surveyed open-source tools, selected for p
 | 2 | Three-document chain (spec-plan-tasks) | spec-kit | PLAN.md structure. Spec, plan, and task list collapsed into one file for simpler git sync. |
 | 3 | Stuck-loop detection + crash recovery | GSD | Three-strike escalation. Crash recovery via uncommitted work detection. |
 | 4 | Execute/Qualify/Unify loop | PAUL | Four escalation statuses. The UNIFY step (reconcile planned vs actual). |
-| 5 | Markdown-native coordination, git-backed state | tick-md | PLAN.md as a multi-agent task board. Git history as the persistence layer. Design for death. |
+| 5 | Markdown-native coordination, git-backed state | tick-md | PLAN.md as a multi-agent task board. Git history as the persistence layer. Design for completion. |
 | 6 | Multi-perspective review gate | claude-code-harness | Process fixes > code fixes. Ground reviews in real data (MCP queries), not generic checklists. |
 | 7 | One-agent-per-criterion + judge layer | opslane/verify | Fan-out decomposition. Readiness checklist as a spec-interpreter pattern. |
 | 8 | Dual-workflow routing | claude-code-spec-workflow | Vidux vs Pilot routing. Full orchestration for big work, lightweight mode for small work. |

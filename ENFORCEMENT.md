@@ -142,7 +142,7 @@ Same reasoning as Hook 1. Drift is a judgment call. The agent needs to compare t
 
 ## Hook 3: Stop — Checkpoint Enforcement
 
-**Doctrine enforced:** #5 (Design for death), #2 (Unidirectional flow)
+**Doctrine enforced:** #5 (Design for completion), #2 (Unidirectional flow)
 
 **Trigger:** When the agent session ends (user stops, timeout, or agent completes).
 
@@ -220,11 +220,11 @@ The command hook here is `async: true` — it prints a warning but does not bloc
 
 ## Hook 4: SessionStart — Resume Protocol
 
-**Doctrine enforced:** #5 (Design for death), #1 (Plan is the store)
+**Doctrine enforced:** #5 (Design for completion), #1 (Plan is the store)
 
 **Trigger:** When a new session starts.
 
-**What it does:** Injects a directive to read PLAN.md first and find where the previous session left off. This is the "design for death" principle in action: every session starts by reading the files, not by remembering anything.
+**What it does:** Injects a directive to read PLAN.md first and find where the previous session left off. This is the "design for completion" principle in action: every session starts by reading the files, not by remembering anything.
 
 ### Configuration
 
@@ -372,8 +372,8 @@ Each hook enforces one doctrine principle at one lifecycle point. They do not ov
 |------|-----------|----------|-----------------|
 | PreToolUse | Before edit | Unidirectional flow | "Is this edit in the plan?" |
 | PostToolUse | After edit | Unidirectional flow | "Did this edit match the plan?" |
-| Stop | Session end | Design for death | "Did you checkpoint?" |
-| SessionStart | Session begin | Design for death | "Did you read the plan?" |
+| Stop | Session end | Design for completion | "Did you checkpoint?" |
+| SessionStart | Session begin | Design for completion | "Did you read the plan?" |
 
 Together they form a closed loop: start from the plan, edit per the plan, verify against the plan, checkpoint for the next session, resume from the plan.
 

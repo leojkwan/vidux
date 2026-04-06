@@ -64,7 +64,7 @@ https://github.com/nickarellano/tick-md
 
 **What it does.** Uses a single TICK.md file as a multi-agent task board. All coordination happens through markdown checkboxes in a git-tracked file. No database, no API, no external state. Agents claim tasks by writing to the file and committing. Cross-session continuity comes from git history. Async handoff is built in because the file is the protocol.
 
-**How Vidux adopts it.** PLAN.md is structurally identical to TICK.md: markdown checkboxes as the work queue, git as the persistence layer, any agent reads the same file from the git branch. The "Design for Death" doctrine (SKILL.md, Doctrine 5) is tick-md's core insight repackaged: sessions die, but the file survives. PLAN.md's Progress section (timestamped cycle logs) serves the same handoff function as TICK.md's agent-stamped entries. Despite having only 18 stars, tick-md is the closest structural match to Vidux's coordination model.
+**How Vidux adopts it.** PLAN.md is structurally identical to TICK.md: markdown checkboxes as the work queue, git as the persistence layer, any agent reads the same file from the git branch. The "Design for completion" doctrine (SKILL.md, Doctrine 5) is tick-md's core insight repackaged: sessions end, but the file survives. PLAN.md's Progress section (timestamped cycle logs) serves the same handoff function as TICK.md's agent-stamped entries. Despite having only 18 stars, tick-md is the closest structural match to Vidux's coordination model.
 
 **What we do NOT adopt.** tick-md's flat task model. TICK.md has no hierarchy — all tasks are peers. Vidux adds dependency markers (`[Depends: Task N]`), parallelization flags (`[P]`), and the Evidence/Constraints/Decisions sections that give tasks context. tick-md is coordination-only; Vidux is coordination plus planning.
 
@@ -143,7 +143,7 @@ https://github.com/dmarx/adversarial-spec
 | 2 | Three-document chain (spec-plan-tasks) | spec-kit | 84K | SKILL.md | PLAN.md Structure |
 | 3 | Stuck-loop detection + crash recovery | GSD | 46K | LOOP.md | Stuck-Loop Detection |
 | 4 | Execute/Qualify/Unify + escalation statuses | PAUL | 603 | LOOP.md | Escalation Statuses, UNIFY Step |
-| 5 | Markdown-native coordination, git-backed state | tick-md | 18 | SKILL.md | Doctrine 5 (Design for death) |
+| 5 | Markdown-native coordination, git-backed state | tick-md | 18 | SKILL.md | Doctrine 5 (Design for completion) |
 | 6 | Multi-perspective review gate | claude-code-harness | 383 | SKILL.md | Doctrine 6 (Process fixes > code fixes) |
 | 7 | One-agent-per-criterion + judge layer | opslane/verify | 100 | LOOP.md | Fan-out pattern, Readiness checklist |
 | 8 | Dual-workflow routing (feature vs bugfix) | claude-code-spec-workflow | 3.6K | DOCTRINE.md | When Vidux vs When Pilot |
@@ -156,7 +156,7 @@ https://github.com/dmarx/adversarial-spec
 |------|-------|----------------|
 | anthropics/skills | 107K | SKILL.md frontmatter is infrastructure we use, not a pattern we adopt. It's the envelope, not the letter. |
 | cc-sdd | 3K | Cross-agent compatibility is a goal, not a pattern. Vidux achieves it through markdown + env vars. |
-| smart-ralph | 269 | Ralph loop + SDD + compaction. We use Ralph as a companion skill, not a pattern source. |
+| smart-ralph | 269 | Ralph loop + SDD + compaction. Queue contract absorbed into Vidux's PLAN.md task FSM. |
 | agent-teams-lite | 1.1K | Fresh-context sub-agents is subsumed by our fan-out pattern (patterns 7, 9). |
 | claude-orchestration | 201 | Workflow DSL (sequential/parallel/conditional) conflicts with our markdown-only constraint. |
 | metaswarm | 169 | Self-improving feedback loop is interesting but underspecified. Our Failure Protocol covers the same ground more concretely. |

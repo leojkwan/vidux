@@ -1,5 +1,26 @@
 # Vidux Quickstart
 
+## 60-Second Path
+
+Clone, symlink, run. That's it.
+
+```bash
+git clone git@github.com:leojkwan/vidux.git
+ln -sfn $(pwd)/vidux ~/.claude/skills/vidux     # Claude Code
+ln -sfn $(pwd)/vidux ~/.cursor/skills/vidux     # Cursor
+ln -sfn $(pwd)/vidux ~/.codex/skills/vidux      # Codex
+```
+
+Then in Claude Code, Cursor, or Codex:
+
+```
+/vidux "add offline caching to the feed"
+```
+
+That first cycle is **GATHER only** — no code is written. The agent fans out research (codebase, team chat, code reviews), synthesizes findings, and writes a `PLAN.md`. Read the plan, steer it, then run `/vidux` again to start executing tasks one cycle at a time.
+
+Skip ahead to [Your First /vidux Run](#your-first-vidux-run) if you want the step-by-step. Read [What Vidux Is](#what-vidux-is) for the why.
+
 ## What Vidux Is
 
 Here is the problem Vidux solves: you sit down with an AI agent, describe a big feature, and it starts coding immediately. Three hours later you have 2,000 lines of code, half of it wrong, built on assumptions nobody validated. You have no plan, no evidence trail, and no way for a different agent (or future-you) to pick up where this one left off. The code drifted from the spec because there was no spec. The agent was thinking and coding at the same time, which is like drawing a map while driving.
@@ -22,12 +43,12 @@ Vidux works the same way:
 
 This matters most for work that spans multiple sessions. Context dies between sessions. Auth expires. Machines change. But PLAN.md is a file in a git branch. Any agent can read it, understand the state of the world, and pick up exactly where the last one stopped. No databases, no running processes, no memory tricks.
 
-## Prerequisites
+## Installation Details
+
+### Prerequisites
 
 - `vidux` repo cloned locally
 - One of: Claude Code, Cursor, or Codex
-
-## Installation
 
 ### Symlink to your tools
 
@@ -36,7 +57,7 @@ Replace `/path/to/vidux` with your actual clone path.
 ```bash
 ln -sfn /path/to/vidux ~/.claude/skills/vidux
 ln -sfn /path/to/vidux ~/.cursor/skills/vidux
-ln -sfn /path/to/vidux ~/.agents/skills/vidux
+ln -sfn /path/to/vidux ~/.codex/skills/vidux
 ```
 
 ### Optional: install enforcement hooks
@@ -46,6 +67,29 @@ bash scripts/install-hooks.sh /path/to/your/project
 ```
 
 The hooks inject gentle reminders into the agent's context at key moments -- read PLAN.md before writing code, check file scope against the plan, checkpoint before exiting. They are training wheels, not guardrails. A well-practiced agent does these things naturally. Install them if you are new to Vidux or onboarding a teammate; skip them once the habits are internalized.
+
+### What you have after install
+
+```
+~/.claude/skills/vidux ──┐
+~/.cursor/skills/vidux  ──┼──▶  /path/to/vidux  (one clone, three symlinks)
+~/.codex/skills/vidux   ──┘
+                                 │
+                                 ├── SKILL.md          ← full contract (9 doctrine)
+                                 ├── DOCTRINE.md       ← short doctrine (6 core)
+                                 ├── LOOP.md           ← stateless cycle
+                                 ├── commands/         ← /vidux, /vidux-plan, /vidux-status
+                                 ├── scripts/          ← loop, checkpoint, gather, doctor
+                                 ├── hooks/            ← optional prompt hooks
+                                 ├── guides/vidux/     ← quickstart, architecture, best practices
+                                 └── projects/         ← per-project PLAN.md lives here
+                                       └── <my-mission>/
+                                             ├── PLAN.md
+                                             ├── evidence/
+                                             └── investigations/
+```
+
+One clone, multi-tool symlinks. Plans live in `projects/<mission>/`, never in the target repo's working tree.
 
 ## Your First /vidux Run
 
@@ -92,7 +136,7 @@ flowchart LR
     E --> V[VERIFY<br/>Build + test gate]
     P --> K[CHECKPOINT<br/>Structured commit]
     V --> K
-    K --> D[DIE<br/>Session ends cleanly]
+    K --> D[COMPLETE<br/>Store persists]
 ```
 
 **READ** (30 seconds). Open PLAN.md. Check `git log --oneline -10` for recent commits. Check `git diff --stat` for uncommitted work from a crashed session. If there is uncommitted work, commit it as crash recovery before doing anything else.
@@ -103,7 +147,7 @@ flowchart LR
 
 **CHECKPOINT** (30 seconds). Structured git commit: what changed, what is next, any blockers. Update the Progress section of PLAN.md. Git commit is the checkpoint, not git push. Push when ready.
 
-**DIE**. The session ends. The next agent that runs `/vidux` will read the same files and pick up from the checkpoint. This is the "design for death" principle -- you never rely on carried context, because there is none.
+**COMPLETE**. The dispatch completes. The store (PLAN.md) persists. The next agent that runs `/vidux` rehydrates from files and picks up from the checkpoint. This is the "design for completion" principle -- the store survives, the dispatch doesn't.
 
 ### The Decision Tree
 
@@ -132,6 +176,10 @@ Notice the ordering. Open questions are resolved before unevidenced tasks, which
 
 **`/vidux-status`** -- Read-only one-screen summary. Shows task completion percentage, current blockers, open questions, and the last few Progress entries. Use this to check in without triggering a cycle. Good for standups, or when you want to see where things are before deciding what to do next.
 
+**`/vidux-loop`** -- Set up or refine a cron harness for unattended cycles. The harness encodes the end goal and project DNA; PLAN.md holds the state. See `vidux-loop.md` for the full pattern.
+
+**`/vidux-dashboard`** -- Multi-project overview. Useful when you have several Vidux missions in flight and want one-screen visibility across all of them.
+
 ## The 50/30/20 Rule
 
 This is the most counterintuitive part of Vidux, and the most important.
@@ -156,7 +204,7 @@ bash scripts/vidux-loop.sh /path/to/your/project
 
 The loop script fires `/vidux` on an interval (default 20 minutes). Each cycle reads PLAN.md, picks the next action, executes it, checkpoints, and exits. The next cron fire is a completely new agent. It has never heard of the previous one. It just reads the files.
 
-This is the "design for death" principle made literal. There is no daemon, no long-running process, no state accumulating in memory. PLAN.md is the entire state of the world. Git is the bus. If an agent crashes mid-cycle, the next one will see the uncommitted work in `git diff`, commit it as crash recovery, and continue from there.
+This is the "design for completion" principle made literal. There is no daemon, no long-running process, no state accumulating in memory. PLAN.md is the entire state of the world. Git is the bus. If an agent crashes mid-cycle, the next one will see the uncommitted work in `git diff`, commit it as crash recovery, and continue from there.
 
 A solo computer workflow: kick off the loop before bed, review the Progress section in the morning. Each commit tells you what happened, what is next, and what is blocked. The plan file IS the debugger -- you can read exactly why the agent made every decision, because every decision cites its evidence.
 

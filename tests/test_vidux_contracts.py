@@ -1262,6 +1262,37 @@ class ViduxContractTests(unittest.TestCase):
             self.assertIn("status", check)
             self.assertIn(check["status"], ("pass", "warn", "block"))
 
+    def test_doctor_repo_flag_rescopes_project_scan(self):
+        """--repo must scan the target repo's projects/, not the script checkout's projects/."""
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = Path(tmpdir)
+            plan = repo / "projects" / "test-conflict" / "PLAN.md"
+            plan.parent.mkdir(parents=True)
+            plan.write_text(textwrap.dedent("""
+                # Conflict Plan
+
+                ## Tasks
+                <<<<<<< HEAD
+                - [pending] Task 1: A [Evidence: fixture]
+                =======
+                - [pending] Task 1: B [Evidence: fixture]
+                >>>>>>> feature
+            """).lstrip(), encoding="utf-8")
+
+            result = subprocess.run(
+                ["bash", str(self.SCRIPTS_DIR / "vidux-doctor.sh"), "--json", "--repo", str(repo)],
+                capture_output=True, text=True, timeout=15,
+            )
+            data = json.loads(result.stdout)
+            merge_check = next(
+                check for check in data["checks"] if check["id"] == "plan_merge_conflicts"
+            )
+
+            self.assertEqual(result.returncode, 1)
+            self.assertEqual(merge_check["status"], "block")
+
 
 if __name__ == "__main__":
     unittest.main()
