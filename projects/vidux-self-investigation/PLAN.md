@@ -24,12 +24,13 @@ Vidux investigates itself. Test whether the framework produces high-quality plan
 - [completed] Task 1: E2E plan quality test (NextJS) — 17/20 quality score. Created PLAN.md (79 lines), 1 evidence file, 1 investigation file. Compound task detection worked (DnD). [Evidence: `evidence/2026-04-06-e2e-plan-quality.md`] [P]
 - [completed] Task 2: E2E plan quality test (iOS) — 19/20 quality score. Created PLAN.md (82 lines), 4 evidence files, 1 investigation file. Receipt scanning correctly spawned compound investigation. [Evidence: `evidence/2026-04-06-e2e-plan-quality.md`] [P]
 - [completed] Task 3: Automation prompt quality audit — strongyes-release-train is 56 lines (73% restated doctrine). Lean version is 13 lines (100% project-specific). 14 automations hardcode stale path. [Evidence: `evidence/2026-04-06-prompt-quality-audit.md`, `evidence/2026-04-06-stale-path-audit.md`]
-- [pending] Task 4: Bimodal runtime simulation — create a mock automation run, verify the "keep working through queue" behavior produces either quick exits or sustained deep work. [Evidence: lkwan feedback on 5-min stick-rubbing]
+- [completed] Task 4: Bimodal runtime analysis — root cause identified ("smallest slice" language), fix validated ("keep working through queue"), enforcement added to vidux-doctor.sh CHECK 11 (flags >30% dead-zone runs). [Evidence: `evidence/2026-04-06-bimodal-runtime-analysis.md`]
 - [completed] Task 5: Regression test — contract tests 83/83 passing. Symlink fixed (was stale directory, now correct symlink). Doctor runs clean. [Evidence: baseline from this session]
 
 ## Open Questions
 - [ ] Q6: What specific metrics define "plan quality"? Proposal: evidence citation count, task specificity (no vague "implement feature"), investigation depth for compound tasks, constraint coverage. -> Action: define scoring rubric during Task 1.
 
 ## Progress
+- [2026-04-06] Cycle 2: Bimodal runtime analysis complete. Root cause: "smallest slice" language. Fix: "keep working through queue." Enforcement: vidux-doctor.sh CHECK 11. All 5/5 tasks COMPLETE. Self-investigation DONE.
 - [2026-04-06] Cycle 1: E2e results collected. NextJS scored 17/20, iOS scored 19/20. Both created compound task investigations (drag-and-drop, receipt scanning). Plan quality VALIDATED. 4/5 tasks complete. Next: bimodal runtime simulation (Task 4).
 - [2026-04-06] Cycle 0: Investigation created. Symlink fixed (was stale directory, now points to canonical repo). Phase 8 nearly complete. Swarming e2e tests next.

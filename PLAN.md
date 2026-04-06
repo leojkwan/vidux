@@ -95,7 +95,7 @@ Create a net-new plan-first orchestration system that makes quarter-long iOS pro
 - [in_progress] Retire `ai/skills/vidux/` — symlinks fixed (~/.claude/skills/vidux and ~/.codex/skills/vidux now point here). BUT 14 automation prompts hardcode `ai/skills/vidux/SKILL.md`, bypassing symlinks. Needs path fix in ai/ repo automations. [Evidence: `projects/vidux-self-investigation/evidence/2026-04-06-stale-path-audit.md`]
 
 ### Phase 9: Automation Quality — PLANNED
-- [ ] Add bimodal runtime enforcement to vidux-doctor.sh — flag automations stuck in 3-8 min range. [Evidence: automations should be < 2 min (quick check) or > 15 min (deep run)]
+- [completed] Add bimodal runtime enforcement to vidux-doctor.sh — CHECK 11: flags projects where >30% of runs fall in 3-8 min dead zone. Uses git commit timestamps. [Done: 2026-04-06]
 - [ ] Build automation quality inspector — read memory.md files, classify run durations, report fleet health.
 - [ ] Create example fleet configs for a reference project (writer + 2 radars + coordinator, staggered schedule).
 - [ ] End-to-end test: create a fresh project (NextJS or mobile), run /vidux from scratch, verify plan quality and subplan creation depth.
@@ -118,6 +118,7 @@ Create a net-new plan-first orchestration system that makes quarter-long iOS pro
 - [2026-04-06] Prompt quality audit: strongyes-release-train is 56 lines, 73% restated doctrine. resplit-nurse is ~120 lines. Lean version is 13 lines with 100% project-specific signal density.
 
 ## Progress
+- [2026-04-06] Cycle 21: Bimodal runtime enforcement added to vidux-doctor.sh (CHECK 11). Self-investigation 5/5 tasks COMPLETE. Phase 9 Task 1 done. 83/83 tests passing, 11/11 doctor checks. Next: Phase 9 remaining tasks (quality inspector, fleet configs, e2e test).
 - [2026-04-06] Cycle 20: E2e results collected. NextJS 17/20, iOS 19/20. Both created compound task investigations. Plan quality validated across web and mobile. Self-investigation 4/5 tasks complete. Committing all Phase 8 work. Next: bimodal runtime simulation, then Phase 9.
 - [2026-04-06] Cycle 19: Self-investigation launched. Fixed stale skill directory (was copy, now symlink). Discovered 14 automations hardcode old path. Prompt quality audit: most prompts 3-7x too long. E2e test agents swarming on NextJS and iOS — both creating compound task investigations (good). Next: collect e2e results, update investigation PLAN.md, fix automation paths.
 - [2026-04-06] Cycle 18: Canonical unification — restored full build history, brought over vidux-development evidence, retired ai/skills/vidux copy. This repo is now the single source of truth.
