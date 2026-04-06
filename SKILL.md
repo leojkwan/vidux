@@ -255,6 +255,68 @@ in `.codex/agents/`. Cursor: background agents. The pattern is tool-agnostic —
 with any tool that can spawn an isolated context window. If the tool cannot spawn
 subagents, the coordinator runs slices sequentially in fresh sessions instead.
 
+### 10. Run quick or run deep — never in between
+
+> **Healthy runs are bimodal: <2 min (nothing to do, checkpoint and exit) or 15+ min (real work, full e2e cycle). Mid-zone runs (3-8 min) are the disease.**
+
+This is the operational counterpart of Principle 5 (design for completion). Principle 5 says
+the dispatch must be safe to end; this principle says it must not end at the *wrong* moment.
+Agents have a learned closure bias: they hit the first natural milestone (a commit, a
+sub-task, a build pass) and invent reasons to quit — "context is getting tight," "this is
+a good stopping point." Claude Code issue #34238 documents the pattern; the bimodal
+distribution model in `scripts/lib/ledger-query.sh` measures it. Gastown's burst/watch
+research found the same shape: short watches that find nothing or long bursts that finish
+real work, with very little in between.
+
+**How to apply:** Every harness must say "if you checkpoint in under 5 minutes and
+pending work remains, you stopped too early — pick up the next task." Never write a
+harness that says "do one task and exit." Always say "keep working until the queue is
+empty or a hard external blocker stops you." Quick exits are healthy when nothing is
+pending; mid-zone exits are stuck agents masquerading as polite ones. The Stop hook
+pattern from #34238 (block premature exit when a keep-going marker is active) is the
+reference implementation.
+
+### 11. Self-extending plans with taste
+
+> **Don't wait for the user to enumerate work. Think N steps ahead, add tasks you spot, and apologize later if wrong.**
+
+This is the failure-mode counterpart of Principle 4 (evidence over instinct). Principle 4
+keeps you honest about what you *know*; this principle keeps you honest about what a
+human with taste would *do next*. Agents are good at functional code (Stripe wiring,
+schema migrations, build configs). They are bad at taste — anticipating what the user
+wants without being told, noticing the related polish on the same surface, thinking
+two or three steps past the current task. Vidux automations are meant to be the *amp*
+for product taste, not just a build runner.
+
+**How to apply:** Readers AND writers can self-extend the plan as they discover things.
+When you fix a bug, log the related bugs you saw on the same surface and queue them.
+When you add a feature, log the polish and edge-cases you spotted. Definition of done
+for UI work is a simulator screenshot or visual proof, never just "the build passes."
+Skills like `picasso`, `bigapple`, `xcodebuild`, `playwright` must be loaded for any
+automation that touches UI. If you are not extending the plan, you are not paying
+attention.
+
+### 12. Bounded recursion — know when good enough is good enough
+
+> **Self-extension without a brake becomes recursive optimization forever. A good automation knows when a surface is honestly good and stops adding work to its own queue.**
+
+This is the brake on Principle 11. If automations can self-extend plans, they can also
+spawn three polish tasks per fix, three micro-improvements per polish task, and a queue
+that never empties. Leo named this the "recursive overload of optimizing until it never
+ends." The bimodal model in `scripts/lib/ledger-query.sh` measures *runtime* health;
+this principle protects *queue* health from the same closure-bias pathology in reverse
+— instead of quitting too soon, the agent never quits because it keeps inventing new
+work on a surface it has already finished.
+
+**How to apply:** Every harness needs a "good enough" gate. When a fix has shipped and
+the user-visible UX is honestly good, stop adding polish tasks for that surface and move
+to the next mission gap. Don't optimize already-good surfaces. The mission honesty rule
+from `projects/resplit` applies fleet-wide: separate "current slice status," "release
+boundary," and "overall mission completion." If overall mission has gaps elsewhere,
+polish on a done surface is procrastination. Only re-extend plans when investigation
+reveals new *surfaces*, not when you find one more pixel to align on a surface you
+already touched.
+
 ---
 
 ## Advisors
@@ -799,7 +861,7 @@ auto-block write is skipped. No data is lost.
 Vidux core is company-agnostic. Zero references to any employer's internal tools.
 
 **Layer 1: Vidux Core (open-sourceable)**
-- Doctrine (9 principles)
+- Doctrine (12 principles)
 - Two data structures (doc tree + work queue)
 - Loop mechanics (stateless cycle)
 - Failure protocol (dual five-whys, three-strike gate)

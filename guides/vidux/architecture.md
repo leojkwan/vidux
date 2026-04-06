@@ -280,7 +280,7 @@ graph TB
         W4[Companion skills<br/>Pilot, Ledger, Captain,<br/>build skill, review skill]
     end
     subgraph "Layer 1: Vidux Core (open-sourceable)"
-        C1[Doctrine - 9 principles]
+        C1[Doctrine - 12 principles]
         C2[Two data structures<br/>doc tree + work queue]
         C3[Loop mechanics<br/>stateless cycle, decision tree]
         C4[Failure protocol<br/>dual five-whys, three-strike gate]
