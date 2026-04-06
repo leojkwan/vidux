@@ -164,7 +164,7 @@ install_hooks_to_settings() {
         "hooks": [
           {
             "type": "command",
-            "command": "echo 'Compaction imminent. Critical context should already be in files (PLAN.md, RALPH.md, .agent-ledger/). If working in a loop, ensure current iteration state is checkpointed to disk before compaction summarizes conversation history.'"
+            "command": "echo 'Compaction imminent. Critical context should already be in files (PLAN.md, .agent-ledger/). If working in a loop, ensure current iteration state is checkpointed to disk before compaction summarizes conversation history.'"
           }
         ]
       }
@@ -175,7 +175,7 @@ install_hooks_to_settings() {
         "hooks": [
           {
             "type": "command",
-            "command": "echo 'Context compacted. Rehydrate from repo files: PLAN.md, RALPH.md, CLAUDE.md, .agent-ledger/activity.jsonl. Do not rely on pre-compaction conversation details — they are lossy summaries now.'"
+            "command": "echo 'Context compacted. Rehydrate from repo files: PLAN.md, CLAUDE.md, .agent-ledger/activity.jsonl. Do not rely on pre-compaction conversation details — they are lossy summaries now.'"
           }
         ]
       }
@@ -206,8 +206,8 @@ SETTINGS
     jq '
       .env["CLAUDE_AUTOCOMPACT_PCT_OVERRIDE"] //= "50" |
       .env["CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS"] //= "1" |
-      .hooks.PreCompact //= [{"matcher":"","hooks":[{"type":"command","command":"echo '\''Compaction imminent. Critical context should already be in files (PLAN.md, RALPH.md, .agent-ledger/).'\''"}]}] |
-      .hooks.PostCompact //= [{"matcher":"","hooks":[{"type":"command","command":"echo '\''Context compacted. Rehydrate from repo files: PLAN.md, RALPH.md, CLAUDE.md, .agent-ledger/activity.jsonl.'\''"}]}]
+      .hooks.PreCompact //= [{"matcher":"","hooks":[{"type":"command","command":"echo '\''Compaction imminent. Critical context should already be in files (PLAN.md, .agent-ledger/).'\''"}]}] |
+      .hooks.PostCompact //= [{"matcher":"","hooks":[{"type":"command","command":"echo '\''Context compacted. Rehydrate from repo files: PLAN.md, CLAUDE.md, .agent-ledger/activity.jsonl.'\''"}]}]
     ' "$settings" > "$tmp" 2>/dev/null && mv "$tmp" "$settings"
     ok "Merged compaction hooks into ~/.claude/settings.json"
   fi

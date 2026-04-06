@@ -1,35 +1,138 @@
-# Vidux Public Plan
+# Vidux — Build Plan
 
 ## Purpose
-Open-source the portable Vidux core as a lightweight orchestration system for long-running AI work, with documentation, hooks, and scripts that can survive session death and keep agent work grounded in evidence.
+Create a net-new plan-first orchestration system that makes quarter-long iOS projects completable in a week via overnight cron loops. Vidux = Vibe + Redux. The plan is the store, code is the view.
 
 ## Evidence
-- [Source: `SKILL.md`] Vidux defines the plan as the store, code as the view, and separates Layer 1 core from Layer 2 project wiring.
-- [Source: `DOCTRINE.md`] The public doctrine already captures the Redux mapping and the 50/30/20 planning split.
-- [Source: `LOOP.md`] The core loop is stateless and file-backed, which makes it open-sourceable without private runtime infrastructure.
-- [Source: `guides/vidux/quickstart.md`] The install and first-run story can be documented from repo-root paths without relying on Leo's private `ai` super-repo layout.
+- [Source: 9 research agents, 2026-03-31] SDD (Spec-Driven Development) is 2025-2026's defining practice. Plan-first improves success by ~33%.
+- [Source: SlopCodeBench, arxiv 2603.24755] Agent code degradation is monotonic. Erosion in 80% of trajectories. "Coding while thinking" is empirically bad.
+- [Source: OpenAI harness engineering] "The harness is the 80% factor." Swapping models = 10-15% change. Swapping harness = works or doesn't.
+- [Source: Martin Fowler on SDD tools] "Agents frequently don't follow instructions." Enforcement gap is real.
+- [Source: Gastown v0.13.0, 13.3K stars] Git-backed state + persistent agent identity + multi-tool support is production-proven at 20-30 agent scale.
+- [Source: Jeffrey Lee-Chan /harness PR #265] Dual five-whys + three-strike gate + contract tests is a working plugin in production.
+- [Source: swiftify-v4 session] Combine rework happened because plan didn't capture team conventions. 50/30/20 would have caught it.
+- [Source: Factory.ai] Anchored iterative summarization (structured > freeform) scores 3.70 vs 3.44.
+- [Source: Arize pattern] Planning-as-tool-calls with hard finish gate. Can't mark done with pending tasks.
+- [Source: Multi-agent research] Coordination gains plateau at ~4 agents. 17x error amplification beyond that without hierarchy.
+- [Source: Anthropic] "Agents plan by doing" for simple tasks. "Scale effort to complexity" for big ones. Both modes needed.
+- [Source: lkwan feedback] "We're not planning enough. We're coding while thinking." Vidux doctrine is the response.
+- [Source: open source survey, 26 tools] Key ingredients: PAUL's Execute/Qualify/Unify loop (603 stars), tick-md's markdown-native coordination (18 stars but exact pattern match), spec-kit's three-doc chain (84K stars), GSD's stuck-loop detection (46K stars), opslane/verify's one-agent-per-AC model (100 stars), adversarial-spec's multi-LLM debate (517 stars).
+- [Source: superpowers, 128K stars] Dominant skill framework. Chains: brainstorm -> plan -> execute -> verify. Subagent dispatch model. Already installed in our env.
+- [Source: Chachamaru127/claude-code-harness, 383 stars] 5-verb workflow: Setup -> Plan -> Work -> Review -> Release. TypeScript guardrail engine. 4-perspective review (Security, Performance, Quality, A11y).
 
 ## Constraints
-- ALWAYS: keep the public repo Layer 1 and company-agnostic.
-- ALWAYS: make scripts and docs work from this repo root.
-- ASK FIRST: accept external pull requests or major doctrine rewrites.
-- NEVER: publish private project evidence, local machine paths, or repo-specific product plans.
-- NEVER: turn the public repo into a dump of internal automation state.
+- ALWAYS: Work on Claude Code, Cursor, AND Codex (model/tool interop is #1 priority)
+- ALWAYS: Simple to install and debug (one command bootstrap)
+- ALWAYS: Keep existing skills untouched (Vidux is additive, not a rewrite)
+- ALWAYS: Company-agnostic — no references to any employer's internal tools
+- ASK FIRST: Before changing Captain's bootstrap or sync scripts
+- NEVER: Typed YAML schemas (user feedback: natural language markdown only)
+- NEVER: More than 4 coding agents in parallel (research: diminishing returns)
+- Reviewer preference (lkwan): Sports analogies (point guard, ref), not political ones (mayor)
 
 ## Decisions
-- [2026-04-06] Decision: publish the portable Vidux core in its own public repo instead of exposing the entire `ai` skills repo. Alternatives: keep Vidux private, or publish the whole skills tree. Rationale: the core is reusable, while the surrounding repo carries personal and project-specific wiring. Evidence: `SKILL.md`, `DOCTRINE.md`, `guides/vidux/architecture.md`.
-- [2026-04-06] Decision: use Issues for public feedback and decline outside PR contributions for now. Alternatives: accept open PRs immediately, or disable public feedback entirely. Rationale: feedback is useful for shaping the doctrine, but maintaining review quality on unsolicited code is not the current goal. Evidence: `README.md`, `CONTRIBUTING.md`.
+- [2026-03-31] Decision: Vidux is a skill first, plugin packaging later. Rationale: Skills work NOW across all tools. Plugins are Claude-only. Can wrap in plugin manifest later.
+- [2026-03-31] Decision: PLAN.md lives in the branch, not globally. Rationale: Travels with code, visible in PRs, any machine gets it on git fetch.
+- [2026-03-31] Decision: Fan-out/fan-in for plan refinement, not 20 agents editing one file. Rationale: Research shows 17x error amplification. 4-agent groups with one synthesizer is the sweet spot.
+- [2026-03-31] Decision: Two modes — Pilot for Mode A (small), Vidux for Mode B (quarter-long). Don't try to make one system do both.
+- [2026-03-31] Decision: Channel Yegge (git-backed state, propulsion) and jlee (harness, dual five-whys) as advisor philosophies. Not literal framework adoption.
+- [2026-04-06] Decision: Publish the portable Vidux core in its own public repo (`leojkwan/vidux`) instead of exposing the entire `ai` skills repo. Rationale: the core is reusable, while `ai/` carries personal and project-specific wiring.
+- [2026-04-06] Decision: This repo is the canonical home for Vidux. The copy in `ai/skills/vidux/` is retired. All framework development happens here.
 
 ## Tasks
-- [completed] Task 1: Export the portable Vidux core into a dedicated public repo with docs, commands, scripts, hooks, and tests. [Evidence: `SKILL.md`, `LOOP.md`, `guides/vidux/quickstart.md`] [Depends: none]
-- [pending] Task 2: Add a public example mission under `projects/` that shows a clean external-plan workflow without private repo references. [Evidence: `guides/vidux/quickstart.md`, `commands/vidux.md`] [Depends: Task 1]
-- [pending] Task 3: Harden the generic install and doctor helpers against more non-Leo layouts and validate them on a clean checkout. [Evidence: `scripts/vidux-install.sh`, `scripts/vidux-doctor.sh`] [Depends: Task 1]
+
+### Phase 1: Core Doctrine — COMPLETE
+- [x] Write this PLAN.md (meta: Vidux plans itself)
+- [x] Write DOCTRINE.md — standalone principles doc (the 60%) for quick reference
+- [x] Set up hourly cron to iterate on these docs
+- [x] Survey 26 open source skills/plugins for ingredients [Evidence: research agent]
+- [x] Write LOOP.md — detailed loop mechanics (the 30%) with examples [Done: 2026-03-31]
+- [x] Write INGREDIENTS.md — top 10 open source patterns to adopt with attribution [Done: 2026-03-31]
+
+### Phase 2: Loop Implementation — COMPLETE
+- [x] Write `vidux-loop.sh` — stateless cycle script (113 lines, JSON output, 7 edge cases) [Done: 2026-04-01]
+- [x] Write `vidux-gather.sh` — fan-out research template generator [Done: 2026-04-01]
+- [x] Write `vidux-checkpoint.sh` — structured checkpoint writer (81 lines, idempotent) [Done: 2026-04-01]
+- [x] Test one full cycle: gather -> plan -> execute -> verify -> checkpoint [Depends: all above] [Done: 2026-04-01]
+
+### Phase 3: Enforcement — COMPLETE
+- [x] Add PreToolUse hook guidance + full ENFORCEMENT.md (389 lines, 4 hooks, three-strike gate) [Done: 2026-04-01]
+- [x] Add /harness integration for failure protocol (three-strike gate in ENFORCEMENT.md) [Done: 2026-04-01] [Evidence: Jeffrey's PR #265]
+- [x] Add contract tests (10 tests, all passing) [Done: 2026-04-01] [Evidence: Jeffrey's pattern]
+
+### Phase 4: Plugin Packaging — COMPLETE
+- [x] Create .claude-plugin/plugin.json manifest [Done: 2026-04-01]
+- [x] Create /vidux command wrapper [Done: 2026-04-01]
+- [x] Create /vidux-plan command (plan-only mode) [Done: 2026-04-01]
+- [x] Create /vidux-status command (quick status check) [Done: 2026-04-01]
+
+### Phase 5: Integration
+- [x] Wire ledger lifecycle events (AGENT_LANE, mission_id) — DONE on main via pilot-ledger-emit.sh [Done: 2026-04-01]
+- [x] Wire project-specific build recipe — DONE on main [Done: 2026-04-01]
+- [x] Wire Captain install — no changes needed, auto-installs via symlinks. Added install-hooks.sh for optional enforcement. [Done: 2026-04-01]
+- [x] [P2 — deferred] Cross-tool and cross-machine testing moved to future scope. Solo-computer, source-controlled is the v1 contract. [Done: 2026-04-01]
+
+### Phase 6: V1 Finalization — Harness + Guides
+- [x] Expand harness: contract tests for scripts (executable, valid JSON), commands (frontmatter), hooks (valid JSON), ENFORCEMENT.md (4 hooks), INGREDIENTS.md (10 items) [Evidence: Jeffrey's contract-test-as-harness pattern from PR #265] [Done: 2026-04-01]
+- [x] Write quickstart guide: guides/vidux/quickstart.md — activation, installation, first /vidux run [Done: 2026-04-01]
+- [x] Write architecture guide: guides/vidux/architecture.md — two data structures, unidirectional flow, Layer 1 vs Layer 2, Redux analogy [Done: 2026-04-01]
+- [x] Write best practices guide: guides/vidux/best-practices.md — PLAN.md writing, overnight cron, fan-out, common mistakes, Vidux vs Pilot [Done: 2026-04-01]
+- [x] End-to-end verification: run expanded harness, verify all scripts, verify symlinks, checkpoint [Depends: all Phase 6 above] [Done: 2026-04-01]
+
+### Phase 7: Open Source Publication — COMPLETE
+- [x] Export the portable Vidux core into its own public repo with docs, commands, scripts, hooks, and tests. [Done: 2026-04-06]
+- [x] Add README, LICENSE, CONTRIBUTING, .github templates. [Done: 2026-04-06]
+- [x] Rewire all paths from `skills/vidux/` to repo-root. [Done: 2026-04-06]
+
+### Phase 8: Canonical Unification — IN PROGRESS
+- [x] Restore full build history PLAN.md to public repo. [Done: 2026-04-06]
+- [x] Bring over vidux-development project evidence (v230, endurance, stress-test). [Done: 2026-04-06]
+- [x] Bring over ARCHIVE.md and SETUP_NEW_MACHINE.md. [Done: 2026-04-06]
+- [x] Build /vidux-loop command — fleet creation, lean prompts, staggered schedules, coordinator pattern, bimodal quality enforcement. [Done: 2026-04-06]
+- [x] Fix "smallest slice" language in /vidux command — agents keep working through queue until real boundary. [Done: 2026-04-06]
+- [x] Absorb Ralph into vidux core — Ralph had no hooks, no commands, just a SKILL.md. Queue contract is PLAN.md task FSM. Removed all references. [Done: 2026-04-06]
+- [ ] Integrate ledger into this repo. [Evidence: ledger is 6.4K lines, 12 scripts, 8 tests, 3 CLI tools. Architecturally portable (JSONL, bash+jq), but ~20 hardcoded `~/Development/ai/` paths need updating. Hook scripts in ai/hooks/ need to move here.]
+- [in_progress] Retire `ai/skills/vidux/` — symlinks fixed (~/.claude/skills/vidux and ~/.codex/skills/vidux now point here). BUT 14 automation prompts hardcode `ai/skills/vidux/SKILL.md`, bypassing symlinks. Needs path fix in ai/ repo automations. [Evidence: `projects/vidux-self-investigation/evidence/2026-04-06-stale-path-audit.md`]
+
+### Phase 9: Automation Quality — PLANNED
+- [ ] Add bimodal runtime enforcement to vidux-doctor.sh — flag automations stuck in 3-8 min range. [Evidence: automations should be < 2 min (quick check) or > 15 min (deep run)]
+- [ ] Build automation quality inspector — read memory.md files, classify run durations, report fleet health.
+- [ ] Create example fleet configs for a reference project (writer + 2 radars + coordinator, staggered schedule).
+- [ ] End-to-end test: create a fresh project (NextJS or mobile), run /vidux from scratch, verify plan quality and subplan creation depth.
 
 ## Open Questions
-- [ ] Q1: Should the public repo ship example automation harnesses, or stay focused on the skill and loop contract first? -> Action: gather feedback from Issues after first publish.
+- [x] Q1: EARS for acceptance criteria only, not tasks/constraints/evidence. Add optional `[Done-When: EARS statement]` per task or phase-level acceptance criteria blocks. Current task format (checkbox + evidence + depends) is better for agent execution. Kiro validates: EARS for specs, free-form for tasks. [Done: 2026-04-01]
+- [x] Q2: Plan readiness = 10-point checklist in LOOP.md. 5 required gates + 5 quality points. Score >= 7 to code, < 7 means refine the plan. [Done: 2026-04-01]
+- [x] Q3: SKILL.md alone is sufficient for all 3 tools (agentskills.io open standard). Plugin manifests are for marketplace distribution only, not cross-tool compat. Captain symlinks handle discovery. [Done: 2026-04-01]
+- [x] Q4: Agent subagents (not Teams) for fan-out. Teams persist across sessions (violates stateless doctrine), add coordination overhead, and risk orphaned state if cron dies. Subagents are fire-and-forget, perfect for embarrassingly parallel research. Teams reserved for future multi-turn critic debates. [Done: 2026-04-01]
+- [ ] Q5: Should the public repo ship example automation harnesses, or stay focused on the skill and loop contract first? -> Action: gather feedback from Issues after first publish.
 
 ## Surprises
-- [2026-04-06] The first scaffold pass accidentally mirrored internal root plan files. Impact: public repo would have leaked the wrong story. Plan update: replace them with a public-facing root plan and keep private project history out of this repo.
+- [2026-03-31] obra/superpowers (128K stars) already installed in our env. Its brainstorm->plan->execute->verify chain is close to Vidux's gather->plan->execute->verify. Could be a companion rather than competitor.
+- [2026-03-31] tick-md (18 stars) uses a single TICK.md file as Git-backed multi-agent task board — structurally identical to what Vidux PLAN.md does. Low stars but exact pattern match.
+- [2026-03-31] PAUL (603 stars) has Execute/Qualify/Unify loop with escalation statuses (DONE, DONE_WITH_CONCERNS, NEEDS_CONTEXT, BLOCKED). The UNIFY step (reconcile planned vs actual) is a gap in our design — should add.
+- [2026-04-01] Previous session already landed pilot-ledger-emit.sh + project build recipe + env vars on main (commit 1c8c0f9). Merged into vidux branch. Phase 5 integration is partially done for free.
+- [2026-04-01] All 5 swarm agents completed successfully in parallel. Phase 1 + Phase 2 + contract tests all done in one burst. 10/10 tests passing.
+- [2026-04-06] The first scaffold pass accidentally mirrored internal root plan files. Impact: public repo would have leaked the wrong story.
+- [2026-04-06] Self-investigation revealed: ~/.claude/skills/vidux was a stale DIRECTORY copy, not a symlink. Fixed. But 14 automation prompts hardcode `ai/skills/vidux/SKILL.md`, bypassing all symlinks. Every automation run loads stale vidux with Ralph, old paths, and "smallest slice" language.
+- [2026-04-06] Prompt quality audit: strongyes-release-train is 56 lines, 73% restated doctrine. resplit-nurse is ~120 lines. Lean version is 13 lines with 100% project-specific signal density.
 
 ## Progress
-- [2026-04-06] Cycle 1: Seeded the public repo with the portable Vidux docs, commands, hooks, scripts, and contract tests, then rewired the docs to repo-root paths and added a feedback-only public policy. outcome=useful. Next: Task 2. Blocker: none.
+- [2026-04-06] Cycle 20: E2e results collected. NextJS 17/20, iOS 19/20. Both created compound task investigations. Plan quality validated across web and mobile. Self-investigation 4/5 tasks complete. Committing all Phase 8 work. Next: bimodal runtime simulation, then Phase 9.
+- [2026-04-06] Cycle 19: Self-investigation launched. Fixed stale skill directory (was copy, now symlink). Discovered 14 automations hardcode old path. Prompt quality audit: most prompts 3-7x too long. E2e test agents swarming on NextJS and iOS — both creating compound task investigations (good). Next: collect e2e results, update investigation PLAN.md, fix automation paths.
+- [2026-04-06] Cycle 18: Canonical unification — restored full build history, brought over vidux-development evidence, retired ai/skills/vidux copy. This repo is now the single source of truth.
+- [2026-04-06] Cycle 17.5: Published open source repo (leojkwan/vidux). Added README, LICENSE, CONTRIBUTING, guides, .github templates. Rewired all paths to standalone.
+- [2026-04-01] Cycle 17: Final session wrap. Hot/cold window in loop script. Archive mode in checkpoint. Tagline aligned. 4-agent audit fixed 12 mismatches. Backed up to lkwan/ai (PR #1). 34/34 tests. V1 COMPLETE.
+- [2026-04-01] Cycle 16: V1 finalization complete. Expanded harness (10 -> 34 tests, all passing). 3 guides written (quickstart 88 lines, architecture 181 lines, best practices 187 lines). All 4 scripts verified working. Symlinks verified across 3 tool mounts. Phase 6 complete. Next: cross-tool test (human-blocked). Blocker: none.
+- [2026-04-01] Cycle 15: Test cycle: verified scripts work. Next: Add PreToolUse hook guidance: check if target file is in PLAN.md [Evidence: needed]. Blocker: none.
+- [2026-03-31 20:15] Cycle 0: Initial SKILL.md + PLAN.md + DOCTRINE.md created. 9 research agents completed. Doctrine established. Cron set up.
+- [2026-03-31 20:45] Cycle 1: Open source survey complete (26 tools). Top ingredients identified. Evidence + surprises added to plan. Next: LOOP.md.
+- [2026-04-01 00:15] Cycle 2: Architecture refined (two data structures: doc tree + work queue). Company-agnostic layer separation added.
+- [2026-04-01 00:30] Cycle 3: 5-agent swarm completed Phase 1 + Phase 2 + contract tests. INGREDIENTS.md, vidux-loop.sh, vidux-checkpoint.sh, vidux-gather.sh, test_vidux_contracts.py all landed. Merged main (pilot improvements). 10/10 tests pass. Next: Phase 3 enforcement + Phase 4 plugin packaging.
+- [2026-04-01 01:00] Cycle 4: 3-agent swarm for Phase 3+4. Plugin packaging landed (manifest + 3 commands + hooks.json). ENFORCEMENT.md landed (389 lines, 4 hooks, three-strike gate, enforcement gradient). E2E tests 5/5 pass. Phase 1-4 COMPLETE. Next: Phase 5 integration (Captain install, cross-tool test).
+- [2026-04-01 05:07] Cycle 5: Captain install wiring. Surprise: no Captain changes needed — auto-installs via existing symlinks. Added install-hooks.sh (optional enforcement). Next: cross-tool test. Blocker: none.
+- [2026-04-01 06:07] Cycle 6: Answered Q2 — plan readiness checklist. Upgraded LOOP.md with 10-point scoring system (5 required + 5 quality). Threshold: 7/10 to code, below = refine plan. Next: Q3 (plugin format).
+- [2026-04-01 07:07] Cycle 7: Answered Q3 — SKILL.md alone is the cross-tool format (agentskills.io standard). Plugin manifests NOT needed for interop. Surprise: Phase 4 was over-engineered. Next: Q4.
+- [2026-04-01 08:07] Cycle 8: Answered Q4 — Agent subagents beat Teams for cron fan-out. Teams violate stateless doctrine. Next: Q1 (EARS notation).
+- [2026-04-01 09:07] Cycle 9: Answered Q1 — EARS for acceptance criteria only (Done-When tags). All 4 open questions now answered. All 5 phases complete except 2 human-blocked tasks. Vidux 1.0 autonomous build is DONE. Remaining: Leo tests cross-tool and cross-machine manually.
+<!-- 1 tasks archived to ARCHIVE.md -->

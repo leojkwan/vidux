@@ -156,7 +156,7 @@ https://github.com/dmarx/adversarial-spec
 |------|-------|----------------|
 | anthropics/skills | 107K | SKILL.md frontmatter is infrastructure we use, not a pattern we adopt. It's the envelope, not the letter. |
 | cc-sdd | 3K | Cross-agent compatibility is a goal, not a pattern. Vidux achieves it through markdown + env vars. |
-| smart-ralph | 269 | Ralph loop + SDD + compaction. We use Ralph as a companion skill, not a pattern source. |
+| smart-ralph | 269 | Ralph loop + SDD + compaction. Queue contract absorbed into Vidux's PLAN.md task FSM. |
 | agent-teams-lite | 1.1K | Fresh-context sub-agents is subsumed by our fan-out pattern (patterns 7, 9). |
 | claude-orchestration | 201 | Workflow DSL (sequential/parallel/conditional) conflicts with our markdown-only constraint. |
 | metaswarm | 169 | Self-improving feedback loop is interesting but underspecified. Our Failure Protocol covers the same ground more concretely. |

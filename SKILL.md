@@ -800,7 +800,7 @@ Vidux core is company-agnostic. Zero references to any employer's internal tools
 - MCP tools (XcodeBuildMCP, Figma, PostHog, etc.)
 - Build system (Tuist, fastlane, npm, etc.)
 - Team conventions (reviewer preferences, architecture rules)
-- Companion skills (Pilot, Ledger, Captain, Ralph, etc.)
+- Companion skills (Pilot, Ledger, Captain, etc.)
 
 The wiring layer imports the core layer. Layer 1 is portable across any project.
 
@@ -815,5 +815,5 @@ Vidux orchestrates but doesn't replace these skills. It loads them as needed:
 | **pilot** | Entry router and compatibility layer. Pilot activates Vidux for expedition-scale, plan-first work, then steps out of the way instead of running a second loop. |
 | **ledger** | Lifecycle events, cross-session state, worktree GC (`ledger --gc --report` during READ step) |
 | **captain** | Installation, multi-tool symlinks, health checks |
-| **ralph** | Queue-driven task iteration (Vidux refines the loop) |
+| **vidux-loop** | Fleet creation and management — automation schedules, lean prompts, coordinator pattern, bimodal quality enforcement |
 | **vidux-doctor.sh** | Runtime health checks — worktree hygiene, automation topology, stale plans, merge conflicts. Run at session start or whenever you need a read-only health pass. |

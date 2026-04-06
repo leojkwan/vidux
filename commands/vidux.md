@@ -70,13 +70,18 @@ Use the readiness check in `LOOP.md`. Score below `7/10` means this cycle is pla
 
 ### 3. ACT
 
-Do exactly one owned lane this cycle.
+Keep working through the queue until you hit a real boundary:
+- Context window limit approaching
+- Genuine external blocker (waiting on deploy, API key, human decision)
+- All pending tasks completed
 
-**For atomic tasks:**
-- Scope the files from the task description.
-- Make the change.
-- Run the stated gate.
-- Update the task status.
+Do NOT stop after one task. Do NOT "land the smallest verified slice." If the queue has work and you have context budget, keep going.
+
+**For each task:**
+- Set it to `[in_progress]`.
+- Full e2e: ideate the approach, plan the change, write the code, run tests, QA the result, commit cleanly.
+- Update the task status to `[completed]` and move to the next one.
+- If the task creates sub-work, add it to the plan as a new task or compound investigation.
 
 **For compound bug tasks:**
 Before code, make sure the investigation contains:
@@ -88,18 +93,19 @@ Before code, make sure the investigation contains:
 6. Regression Tests
 7. Gate
 
-If the Fix Spec is missing, this cycle is investigation only.
+If the Fix Spec is missing, this task is investigation only — fill it in, then move to the next task.
 
 ### 4. CHECKPOINT
 
-Always leave a durable checkpoint.
+Always leave a durable checkpoint when stopping.
 - Update `## Progress` with what changed, what is next, and any blocker.
 - Use `vidux-checkpoint.sh --status done|done_with_concerns|blocked` when the outcome is not a clean success.
 - Commit the plan/doc/code delta that represents the cycle boundary.
 
 ### 5. DIE
 
-Stop after the checkpoint. The next run rehydrates from files.
+Stop only when you've hit a real boundary — context budget, blocker, or empty queue.
+The next run rehydrates from files. Leave enough in Progress for it to pick up immediately.
 
 ## Reminders
 
