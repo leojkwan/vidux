@@ -21,6 +21,13 @@ if [ -f "$CONFIG" ]; then
   CONTEXT_WARNING_LINES=$(python3 -c "import json;print(json.load(open('$CONFIG')).get('defaults',{}).get('context_warning_lines',200))" 2>/dev/null || echo 200)
 fi
 
+# --- ledger integration (optional) ----------------------------------------- #
+_LEDGER_LIB="$SCRIPT_DIR/lib/ledger-emit.sh"
+if [ -f "$_LEDGER_LIB" ]; then
+  # shellcheck source=lib/ledger-emit.sh
+  source "$_LEDGER_LIB" 2>/dev/null || true
+fi
+
 die()  { echo "{\"error\": \"$1\"}" >&2; exit 1; }
 json() { printf '%s\n' "$1"; }
 json_escape() {
@@ -56,6 +63,12 @@ if [ ! -f "$PLAN" ]; then
   json '{"error": "no plan found", "action": "create_plan"}'; exit 0
 fi
 PLAN_DIR="$(cd "$(dirname "$PLAN")" && pwd)"
+PROJECT_NAME="$(basename "$PLAN_DIR")"
+
+# --- emit loop start event ------------------------------------------------- #
+if type vidux_emit_loop_start &>/dev/null; then
+  vidux_emit_loop_start "$PROJECT_NAME" "$PLAN" "" 2>/dev/null || true
+fi
 
 # --- hot/cold window (read-only context budget awareness) ----------------- #
 # HOT = pending + in_progress (v1 and v2)
@@ -300,8 +313,27 @@ if [ "$MODE" = "--checkpoint" ]; then
     sedi "/^## Progress/a\\
 $PROGRESS" "$PLAN"
   fi
+  # Emit checkpoint event
+  if type vidux_emit_checkpoint &>/dev/null; then
+    local_commit=$(git -C "$PLAN_DIR" rev-parse HEAD 2>/dev/null || echo "")
+    vidux_emit_checkpoint "$PROJECT_NAME" "$PLAN" "$local_commit" "done" 2>/dev/null || true
+  fi
   json "{\"checkpoint\": true, \"cycle\": $NEXT_CYCLE, \"task\": \"$(json_escape "$TASK_DESC")\", \"status\": \"done\"}"
   exit 0
+fi
+
+# --- ledger conflict check ------------------------------------------------- #
+LEDGER_CONFLICTS=""; LEDGER_CONFLICT_COUNT=0
+if type ledger_conflict_check &>/dev/null 2>&1; then
+  # Source query lib (emit already sourced config)
+  _QUERY_LIB="$SCRIPT_DIR/lib/ledger-query.sh"
+  [ -f "$_QUERY_LIB" ] && source "$_QUERY_LIB" 2>/dev/null || true
+  if type ledger_conflict_check &>/dev/null 2>&1; then
+    _REPO_NAME="$(basename "$(git -C "$PLAN_DIR" rev-parse --show-toplevel 2>/dev/null || echo "$PLAN_DIR")")"
+    _CONFLICT_JSON=$(ledger_conflict_check "$_REPO_NAME" "[\"$PLAN\"]" 2 2>/dev/null || echo '[]')
+    LEDGER_CONFLICT_COUNT=$(printf '%s' "$_CONFLICT_JSON" | jq 'length' 2>/dev/null || echo 0)
+    [ "$LEDGER_CONFLICT_COUNT" -gt 0 ] && LEDGER_CONFLICTS="$_CONFLICT_JSON"
+  fi
 fi
 
 # --- output ---------------------------------------------------------------- #
@@ -332,6 +364,8 @@ cat <<ENDJSON
   "decision_log_entries": "$(json_escape "$DL_ENTRIES")",
   "contradiction_warning": $CONTRADICTION_WARNING,
   "contradiction_matches": "$(json_escape "$CONTRADICTION_MATCHES")",
-  "contradicts_tag": "$(json_escape "$CONTRADICTS_TAG")"
+  "contradicts_tag": "$(json_escape "$CONTRADICTS_TAG")",
+  "ledger_available": $([ "${LEDGER_AVAILABLE:-false}" = "true" ] && echo true || echo false),
+  "ledger_conflicts": ${LEDGER_CONFLICT_COUNT:-0}
 }
 ENDJSON

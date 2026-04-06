@@ -45,15 +45,22 @@ Full AI-powered diagnostic of a project's vidux health. READ-ONLY — never modi
    ```
    Capture the full JSON output. Parse pass/warn/block counts and individual check results.
 
-2. **🔍 GATHER — Parse bimodal quality.**
+2. **🔍 GATHER — Parse bimodal quality from ledger.**
    ```bash
-   bash scripts/vidux-fleet-quality.sh --json
+   source scripts/lib/ledger-query.sh
+   ledger_fleet_health "<repo>" 24
    ```
+   The ledger query layer reads real automation data from `~/.agent-ledger/activity.jsonl`.
    Classify each automation's recent runs into the bimodal buckets:
    - **Quick (< 2 min):** Healthy — nothing actionable, checkpoint and exit.
    - **Deep (15+ min):** Healthy — real work, full e2e cycle.
    - **Mid (3-8 min):** Stuck in the middle — investigate.
    Show the distribution as a histogram. Flag any automation with 3+ mid-zone runs.
+   
+   Also run handoff gap detection:
+   ```bash
+   ledger_handoff_gaps "<repo>" 4
+   ```
 
 3. **📐 PLAN — Audit prompt discipline.**
    Scan all automation prompts for the project (Codex `automation.toml`, Claude triggers, local `automations/`):
@@ -74,8 +81,10 @@ Full AI-powered diagnostic of a project's vidux health. READ-ONLY — never modi
    ```
    Vidux Diagnostic Report: <project>
    ────────────────────────────────────
+   Ledger:     ✓ 3205 entries (4.9M)
    Doctor:     12/14 pass, 2 warn, 0 block
-   Bimodal:    8 quick, 5 deep, 1 mid ⚠
+   Bimodal:    74% (8 quick, 5 deep, 1 mid ⚠) target: >85%
+   Handoffs:   1 gap (ux-radar → writer, 3 cycles)
    Prompts:    4/5 clean, 1 over 15 lines
    Doctrine:   3% restatement (target: 0%)
    Memory:     2 handoff gaps, 0 stale
@@ -236,10 +245,16 @@ Bimodal distribution monitoring and fleet effectiveness report. READ-ONLY.
 
 ### Steps
 
-1. **🔍 GATHER — Collect fleet data.**
-   - Run `bash scripts/vidux-fleet-quality.sh --json` for the target project(s).
-   - Read `fleet.json` if it exists in the project's automation directory.
-   - Read the last 5 `memory.md` entries per automation.
+1. **🔍 GATHER — Collect fleet data from ledger.**
+   ```bash
+   source scripts/lib/ledger-query.sh
+   ledger_fleet_health "<repo>" 24    # full fleet health JSON
+   ledger_automation_runs "<repo>" 24 # per-automation breakdown
+   ledger_handoff_gaps "<repo>" 4     # radar→writer lag detection
+   ```
+   The ledger at `~/.agent-ledger/activity.jsonl` is the single source of truth for all
+   automation activity across Claude Code, Cursor, and Codex. No separate fleet scripts needed.
+   Also read the last 5 `memory.md` entries per automation for qualitative analysis.
 
 2. **📐 PLAN — Assess bimodal distribution.**
    This is non-negotiable: every fleet report shows the quick/deep/stuck distribution.
