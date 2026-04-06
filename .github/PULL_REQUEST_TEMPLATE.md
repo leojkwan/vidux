@@ -7,4 +7,3 @@ External pull requests are not being accepted at this stage. Please open an Issu
 - any example files or screenshots
 
 Unsolicited PRs may be closed without review.
-

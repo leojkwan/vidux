@@ -33,4 +33,3 @@ Open-source the portable Vidux core as a lightweight orchestration system for lo
 
 ## Progress
 - [2026-04-06] Cycle 1: Seeded the public repo with the portable Vidux docs, commands, hooks, scripts, and contract tests, then rewired the docs to repo-root paths and added a feedback-only public policy. outcome=useful. Next: Task 2. Blocker: none.
-
