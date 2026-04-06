@@ -1,7 +1,7 @@
 # Vidux Doctrine
 
-> The short form of the 9 principles in `SKILL.md`. Read this in 5 minutes; everything else follows.
-> Principles 7-9 (investigations, harnesses, subagents) live in `SKILL.md` — they apply only when the situation calls for them.
+> The short form of the 12 principles in `SKILL.md`. Read this in 5 minutes; everything else follows.
+> Principles 7-12 (investigations, harnesses, subagents, loop discipline) live in `SKILL.md` — they apply when the situation calls for them.
 
 ## 1. Plan is the store
 
@@ -48,6 +48,14 @@ State lives in files (PLAN.md, git branch), not in memory. Every cycle reads fre
 **Every failure produces two artifacts: a code fix and a process fix. The process fix is the valuable one.**
 
 The code fix is the immediate repair. The process fix is a new constraint, test, hook, or skill update — it makes the system smarter for next time. Without process fixes, the same class of error recurs across cycles and a single bad assumption propagates exponentially through dependent tasks.
+
+---
+
+## Loop Discipline
+
+**Run quick or run deep, never in between. Self-extend the plan with taste. Stop when good enough is good enough.**
+
+Healthy automation runs are bimodal: under 2 minutes (nothing pending, checkpoint and exit) or 15+ minutes (real work, full e2e cycle). Mid-zone exits are stuck agents quitting at the first natural milestone. Inside a long run, the agent should self-extend the plan as it spots related bugs, polish, and edge-cases — don't wait for the user to enumerate work. But self-extension needs a brake: when a surface is honestly good, stop adding polish tasks for it and move to the next mission gap. See `SKILL.md` principles 10, 11, 12 for full text, evidence, and harness language.
 
 ---
 
