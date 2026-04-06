@@ -18,9 +18,9 @@ If you're coding more than planning, stop.
 Every plan entry cites a source. No source = no entry.
 MCP queries, codebase greps, design docs, team conventions.
 
-## 5. Design for death
-Sessions die. Context is lost. Auth expires.
-State lives in files. Every cycle reads fresh. Any agent can resume.
+## 5. Design for completion
+Dispatches end. Context is lost. Auth expires.
+The store persists. State lives in files. Every cycle reads fresh. Any agent can resume.
 
 ## 6. Process fixes > code fixes
 Every failure produces two things: a code fix and a process fix.

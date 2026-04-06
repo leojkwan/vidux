@@ -32,7 +32,7 @@ Code changes are SECONDARY — they are derived from doc changes.
 
 - Vidux is not a second universal router. Pilot is the entrypoint; Vidux is the expedition-scale plan/store loop.
 - When both `pilot` and `vidux` are present, Pilot does stack detection, stage detection, and read-the-room once, then Vidux owns the plan, queue, and checkpoint cycle.
-- Quick hits, small bug fixes, and generic repo nursing stay in Pilot unless the user explicitly asks for Vidux or an existing Vidux plan already governs the work.
+- Quick hits, small bug fixes, and generic repo maintenance stay in Pilot unless the user explicitly asks for Vidux or an existing Vidux plan already governs the work.
 - Do not run a second Pilot-owned orchestration loop on top of an active Vidux plan. One store, one queue, one checkpoint chain.
 
 ### 2. Work Queue (FIFO, sliding window)
@@ -106,10 +106,10 @@ Every plan entry MUST cite at least one evidence source:
 
 A plan entry without evidence is a guess. Guesses cause rework.
 
-### 5. Design for death
+### 5. Design for completion
 
-Every session will die. Context will be lost. Auth will expire. **Compaction will fire.**
-Therefore:
+Every dispatch will end. Context will be lost. Auth will expire. **Compaction will fire.**
+The store persists. The dispatch doesn't. Therefore:
 - State lives in files (PLAN.md, git branch), not in memory
 - Every cycle reads fresh from files, never carries context forward
 - Checkpoints are structured (not freeform summaries)
@@ -304,7 +304,7 @@ PLAN.md each cycle — it never carries state forward in the prompt.
 2. **ASSESS** — Is the plan ready for code? Or does it need more evidence/refinement?
 3. **ACT** — Either refine the plan (gather + synthesize) OR execute one task from the plan.
 4. **CHECKPOINT** — Structured commit with: what changed, what's next, any blockers.
-5. **DIE** — Session ends. Next cycle reads fresh.
+5. **COMPLETE** — Cycle complete. Store persists. Next dispatch reads fresh.
 
 ### When to plan vs when to code
 

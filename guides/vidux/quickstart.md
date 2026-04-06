@@ -92,7 +92,7 @@ flowchart LR
     E --> V[VERIFY<br/>Build + test gate]
     P --> K[CHECKPOINT<br/>Structured commit]
     V --> K
-    K --> D[DIE<br/>Session ends cleanly]
+    K --> D[COMPLETE<br/>Store persists]
 ```
 
 **READ** (30 seconds). Open PLAN.md. Check `git log --oneline -10` for recent commits. Check `git diff --stat` for uncommitted work from a crashed session. If there is uncommitted work, commit it as crash recovery before doing anything else.
@@ -103,7 +103,7 @@ flowchart LR
 
 **CHECKPOINT** (30 seconds). Structured git commit: what changed, what is next, any blockers. Update the Progress section of PLAN.md. Git commit is the checkpoint, not git push. Push when ready.
 
-**DIE**. The session ends. The next agent that runs `/vidux` will read the same files and pick up from the checkpoint. This is the "design for death" principle -- you never rely on carried context, because there is none.
+**COMPLETE**. The dispatch completes. The store (PLAN.md) persists. The next agent that runs `/vidux` rehydrates from files and picks up from the checkpoint. This is the "design for completion" principle -- the store survives, the dispatch doesn't.
 
 ### The Decision Tree
 

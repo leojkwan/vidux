@@ -92,13 +92,32 @@ Create a net-new plan-first orchestration system that makes quarter-long iOS pro
 - [x] Fix "smallest slice" language in /vidux command — agents keep working through queue until real boundary. [Done: 2026-04-06]
 - [x] Absorb Ralph into vidux core — Ralph had no hooks, no commands, just a SKILL.md. Queue contract is PLAN.md task FSM. Removed all references. [Done: 2026-04-06]
 - [ ] Integrate ledger into this repo. [Evidence: ledger is 6.4K lines, 12 scripts, 8 tests, 3 CLI tools. Architecturally portable (JSONL, bash+jq), but ~20 hardcoded `~/Development/ai/` paths need updating. Hook scripts in ai/hooks/ need to move here.]
-- [in_progress] Retire `ai/skills/vidux/` — symlinks fixed (~/.claude/skills/vidux and ~/.codex/skills/vidux now point here). BUT 14 automation prompts hardcode `ai/skills/vidux/SKILL.md`, bypassing symlinks. Needs path fix in ai/ repo automations. [Evidence: `projects/vidux-self-investigation/evidence/2026-04-06-stale-path-audit.md`]
+- [completed] Retire `ai/skills/vidux/` — all 9 automation.toml files updated to canonical path. Ralph + vidux-amp dead refs removed. ai/skills/vidux symlink removed. [Done: 2026-04-06] [Evidence: `projects/vidux-self-investigation/evidence/2026-04-06-stale-path-audit.md`]
 
-### Phase 9: Automation Quality — PLANNED
+### Phase 9: Automation Quality — COMPLETE
 - [completed] Add bimodal runtime enforcement to vidux-doctor.sh — CHECK 11: flags projects where >30% of runs fall in 3-8 min dead zone. Uses git commit timestamps. [Done: 2026-04-06]
 - [completed] Build automation quality inspector — vidux-fleet-quality.sh reads memory.md files, classifies runs (quick/deep/mid/normal), reports per-automation and fleet-wide bimodal quality. [Done: 2026-04-06]
 - [completed] Create example fleet configs for a reference project (writer + 2 radars + coordinator, staggered schedule). [Done: 2026-04-06] [Evidence: examples/fleet-reference/]
 - [completed] End-to-end test: ran /vidux from scratch on NextJS (17/20) and iOS (19/20). Both created compound task investigations. Plan quality validated. [Done: 2026-04-06] [Evidence: projects/vidux-self-investigation/evidence/2026-04-06-e2e-plan-quality.md]
+
+### Phase 10: Visibility, Intelligence & Health — IN PROGRESS
+
+**Goal:** Make vidux self-aware, visible, and self-healing. Clear stage indicators, cross-tool dashboard, ledger-powered coordination, backpressure, and a manager that can diagnose and test itself.
+
+[Evidence: 5-agent fan-out research synthesis at `projects/vidux-self-investigation/evidence/2026-04-06-phase10-research-synthesis.md`]
+
+- [completed] **10.1 Stage indicators** — 6 primary stages (🔍 GATHER, 📐 PLAN, ⚡ EXECUTE, ✅ VERIFY, 📌 CHECKPOINT, 🏁 COMPLETE) + 3 meta-stages + depth tracking [L1/L2/L3]. Embedded in /vidux command. "DIE" renamed to "COMPLETE" across 9 files. "Design for yield" renamed to "Design for completion." [Done: 2026-04-06]
+- [ ] **10.2 vidux.config.json extensions** — Add `plan_storage_root`, `external_plan_roots[]`, `dashboard.*`, `ledger.*`, `pruning.*`, `backpressure.*` config sections. Foundation for all Phase 10 features.
+- [ ] **10.3 Ledger integration** — Portable `scripts/lib/ledger-config.sh`. Emit AGENT_LANE, CHECKPOINT, PLAN_MODIFIED, LOOP_START/LOOP_END events from vidux-loop.sh and vidux-checkpoint.sh. Read ledger at loop start for conflict detection. Graceful degradation if no ledger. [Depends: 10.2] [Evidence: ledger is 6.4K lines, 12 scripts, ~20 hardcoded paths need portability fix]
+- [completed] **10.4 /vidux-dashboard command** — 3-source plan discovery (local projects/, ~/.codex/automations/, ~/.claude/ + external roots). Tree view with status, health, last activity. JSON mode. 205 lines. [Done: 2026-04-06]
+- [completed] **10.5 vidux-prune.sh** — Subcommands: plans, worktrees, ledger, all, pressure. Plan archival at threshold. Worktree lifecycle. Ledger compaction. Circuit breaker. Pressure scoring 0-10. Dry-run mode. 387 lines. [Done: 2026-04-06]
+- [completed] **10.6 /vidux-manager command** — 4 modes: diagnose, test, investigate, fleet-health. Stage indicators integrated. Quality scoring against 17-19/20 baseline. 312 lines. [Done: 2026-04-06]
+- [ ] **10.7 Contract tests** — Cover all new scripts (ledger-config.sh, vidux-prune.sh), commands (vidux-dashboard.md, vidux-manager.md), and config schema validation. [Depends: 10.1-10.6]
+
+### Phase 10 Open Questions
+- [ ] Q6: Max plan nesting depth — research says 3, stage indicators support 4. Decision: 3 enforced by dashboard, 4th level allowed but flagged as "consider splitting."
+- [ ] Q7: Dashboard refresh — real-time (tail -f) vs polling (5s interval) vs on-demand only? Start with on-demand for simplicity, add watch mode later.
+- [ ] Q8: Ledger as vendored dependency or external install? Start vendored (scripts/lib/), extract to separate package if community adopts.
 
 ## Open Questions
 - [x] Q1: EARS for acceptance criteria only, not tasks/constraints/evidence. Add optional `[Done-When: EARS statement]` per task or phase-level acceptance criteria blocks. Current task format (checkbox + evidence + depends) is better for agent execution. Kiro validates: EARS for specs, free-form for tasks. [Done: 2026-04-01]
@@ -116,8 +135,21 @@ Create a net-new plan-first orchestration system that makes quarter-long iOS pro
 - [2026-04-06] The first scaffold pass accidentally mirrored internal root plan files. Impact: public repo would have leaked the wrong story.
 - [2026-04-06] Self-investigation revealed: ~/.claude/skills/vidux was a stale DIRECTORY copy, not a symlink. Fixed. But 14 automation prompts hardcode `ai/skills/vidux/SKILL.md`, bypassing all symlinks. Every automation run loads stale vidux with Ralph, old paths, and "smallest slice" language.
 - [2026-04-06] Prompt quality audit: strongyes-release-train is 56 lines, 73% restated doctrine. resplit-nurse is ~120 lines. Lean version is 13 lines with 100% project-specific signal density.
+- [2026-04-06] Ralph skill was never deleted in Phase 8 — stale copies persisted at ~/.claude/skills/ralph/ and ~/.codex/skills/ralph/ (6157 bytes each, dated Mar 28). Also found resplit-nurse codex automation (7816 bytes, ACTIVE, runs every 20min) still referencing RALPH.md.
+- [2026-04-06] vidux-checkpoint.sh had no git repo guard — running on a plan outside a git repo produced raw git `fatal:` error (exit 128). Fixed with rev-parse check.
+- [2026-04-06] Claude Code has 3 tiers of scheduling: /loop (ephemeral, 1min), Desktop Scheduled Tasks (persistent, local, 1min), Cloud Scheduled Tasks (Anthropic infra, 1hr). Desktop tasks are the Claude equivalent of Codex automations.
+
+## Decision Log
+- [DIRECTION] [2026-04-06] Stage indicators use emoji prefixes (🔍📐⚡✅📌) not color-only. Reason: works in terminal, IDE, CI, and copy-paste. Do not switch to color-only.
+- [DIRECTION] [2026-04-06] Max plan nesting depth = 3, with L4 allowed but flagged. Reason: research shows 17x error amplification beyond 4 agents; 3-deep keeps coordination manageable.
+- [DIRECTION] [2026-04-06] Ledger is centralized at ~/.agent-ledger/ (not per-project). Reason: single source of truth for cross-tool, cross-worktree coordination. Dashboard reads one location.
+- [DIRECTION] [2026-04-06] Dashboard index is machine-local (not git-backed). Reason: plans travel with code via git; dashboard aggregation is local concern. No pollution of repos.
+- [DIRECTION] [2026-04-06] vidux-prune.sh has dry-run (--simulate) by default for destructive ops. Reason: pruning completed plans is irreversible without git history spelunking.
 
 ## Progress
+- [2026-04-06] Cycle 26: ⚡ EXECUTE → ✅ VERIFY — Phase 8 retirement complete. Fixed 9 automation.toml files (old ai/skills/vidux path → canonical /Users/leokwan/Development/vidux). Removed dead ralph refs from orchestrator, dead vidux-amp from media-studio, converted resplit-android relative paths to absolute. Symlink at ai/skills/vidux removed. Next: Phase 10 remaining tasks (10.2, 10.3, 10.7).
+- [2026-04-06] Cycle 25: ⚡ EXECUTE → ✅ VERIFY — Phase 10 Tasks 10.1, 10.4, 10.5, 10.6 complete. Stage indicators embedded in /vidux command (6 stages + 3 meta + depth). "DIE" → "COMPLETE" across 9 files. Dashboard command (205 lines), manager command (312 lines), prune script (387 lines) all delivered by team agents. Ralph skill deleted from ~/.claude and ~/.codex. "nursing" → "maintenance" in SKILL.md. Checkpoint.sh git guard added. 83/83 tests pass. 11 agents fanned out total. Next: 10.2 config extensions, 10.3 ledger integration, 10.7 contract tests.
+- [2026-04-06] Cycle 24: 📐 PLAN — Phase 10 designed via 5-agent fan-out. Stage indicators, dashboard, ledger integration, backpressure, vidux-manager all specified. 7 tasks, 3 open questions. Evidence synthesis written. 7 additional research agents launched (audit, platform comparison, radar-writer architecture, plan store protection).
 - [2026-04-06] Cycle 23: Fleet quality inspector built (vidux-fleet-quality.sh). Scans 15 automations, classifies run durations, reports bimodal verdict. Phase 9 Tasks 1+2+3 done. Next: Phase 9 Task 4 (e2e test) — already validated via self-investigation.
 - [2026-04-06] Cycle 22: Example fleet configs created (examples/fleet-reference/). 4 automations: writer + 2 radars + coordinator, staggered slots, lean prompts. Phase 9 Tasks 1+3 done. Next: quality inspector and e2e test.
 - [2026-04-06] Cycle 21: Bimodal runtime enforcement added to vidux-doctor.sh (CHECK 11). Self-investigation 5/5 tasks COMPLETE. Phase 9 Task 1 done. 83/83 tests passing, 11/11 doctor checks. Next: Phase 9 remaining tasks (quality inspector, fleet configs, e2e test).

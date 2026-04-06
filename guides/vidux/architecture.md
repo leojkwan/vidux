@@ -87,7 +87,7 @@ Non-negotiable doctrine. Each exists because a specific failure mode was observe
 
 **4. Evidence over instinct.** Every plan entry must cite at least one evidence source: MCP query, codebase grep, design doc, or team convention. No source means no entry. Gathering evidence adds 2-5 minutes per task. A wrong assumption costs 15-60 minutes of rework plus ripple effects. The evidence requirement front-loads cost where it is cheapest to pay.
 
-**5. Design for death.** Every session will die. Context will be lost. Auth will expire. Therefore: state lives in files, every cycle reads fresh, checkpoints are structured, and any agent can resume from the last checkpoint. Tool state (.claude/, .cursor/) never lives inside the repo. A 20-minute cron fire does not get to assume it will get a 21st minute. The checkpoint at the end of each cycle is not optional bookkeeping -- it is the only thing that survives.
+**5. Design for completion.** Every dispatch will end. Context will be lost. Auth will expire. But the store persists. Therefore: state lives in files, every cycle reads fresh, checkpoints are structured, and any agent can resume from the last checkpoint. Tool state (.claude/, .cursor/) never lives inside the repo. A 20-minute cron fire does not get to assume it will get a 21st minute. The checkpoint at the end of each cycle is not optional bookkeeping -- it is the only thing that survives.
 
 **6. Process fixes over code fixes.** Every failure produces two artifacts: a code fix (the immediate repair) and a process fix (a new constraint, test, hook, or skill update). The process fix is the valuable output because it makes the system smarter for next time. Research on multi-agent error propagation shows 17x error amplification when agents lack hierarchical correction -- a single bad assumption propagates through dependent tasks exponentially. Process fixes break this amplification chain by adding constraints that prevent the same class of error from recurring.
 
@@ -106,7 +106,7 @@ graph TD
     D -->|No| F[ACT: Refine plan - 15 min]
     E --> G[CHECKPOINT - 1 min]
     F --> G
-    G --> H[DIE]
+    G --> H[COMPLETE]
     H -.->|Next cron fire| A
 ```
 

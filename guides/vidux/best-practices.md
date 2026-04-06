@@ -131,8 +131,8 @@ Subagents are fire-and-forget.
 
 ## 4. Running Overnight Cron Loops
 
-Each cycle is stateless: read PLAN.md, assess, act, checkpoint, die. The next
-cycle is a fresh agent that knows nothing except what is in the files.
+Each cycle is stateless: gather, plan, execute, verify, checkpoint, complete. The next
+cycle is a fresh dispatch that knows nothing except what is in the store.
 
 **Hourly > 20-minute for overnight.** Twenty-minute cycles create thrashing --
 the agent barely finishes reading context before checkpoint time. Hourly gives

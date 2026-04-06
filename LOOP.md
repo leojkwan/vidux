@@ -303,7 +303,7 @@ CHECKPOINT:
   Commit: "vidux: Task 4 — boundary shell (APIClientFeature)"
   Plan: Task 4 complete. Next: Task 5 (entry-point wiring).
 
-DIE.
+COMPLETE.
 ```
 
 ## Timing Budget

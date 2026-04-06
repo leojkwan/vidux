@@ -29,6 +29,12 @@ USAGE
 PLAN="$1"
 [[ ! -f "$PLAN" ]] && { echo "Error: plan not found: $PLAN"; exit 1; }
 
+# Guard: ensure plan is inside a git repo
+if ! git -C "$(dirname "$PLAN")" rev-parse --show-toplevel &>/dev/null; then
+  echo "Error: $PLAN is not inside a git repository. Checkpoint requires git." >&2
+  exit 1
+fi
+
 DATE=$(date +%Y-%m-%d)
 PLAN_DIR=$(dirname "$PLAN")
 
