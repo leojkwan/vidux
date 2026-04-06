@@ -7,7 +7,7 @@
 Every cron fire is a fresh context. No memory. No carried state. Just files.
 
 ```
-[Cron fires] -> [Read PLAN.md] -> [Assess] -> [Act] -> [Checkpoint] -> [Die]
+[Cron fires] -> [Read PLAN.md] -> [Assess] -> [Act] -> [Checkpoint] -> [Complete]
 ```
 
 ```mermaid
@@ -31,7 +31,7 @@ sequenceDiagram
     end
     Agent->>Plan: update Progress
     Agent->>Git: CHECKPOINT commit
-    Agent->>Agent: DIE (no state carried)
+    Agent->>Agent: COMPLETE (no state carried)
     Note over Cron,Git: Next fire = brand new agent reading fresh from files
 ```
 
@@ -204,7 +204,7 @@ Use `--status` to distinguish outcomes:
 
 Git failures propagate — a checkpoint script exit code > 0 means the commit did not land.
 
-## Step 5: Die
+## Step 5: Complete
 
 The cycle is done. Exit cleanly. The next cron fire will read fresh from files.
 

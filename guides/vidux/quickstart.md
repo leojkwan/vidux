@@ -1,5 +1,26 @@
 # Vidux Quickstart
 
+## 60-Second Path
+
+Clone, symlink, run. That's it.
+
+```bash
+git clone git@github.com:leojkwan/vidux.git
+ln -sfn $(pwd)/vidux ~/.claude/skills/vidux     # Claude Code
+ln -sfn $(pwd)/vidux ~/.cursor/skills/vidux     # Cursor
+ln -sfn $(pwd)/vidux ~/.codex/skills/vidux      # Codex
+```
+
+Then in Claude Code, Cursor, or Codex:
+
+```
+/vidux "add offline caching to the feed"
+```
+
+That first cycle is **GATHER only** — no code is written. The agent fans out research (codebase, team chat, code reviews), synthesizes findings, and writes a `PLAN.md`. Read the plan, steer it, then run `/vidux` again to start executing tasks one cycle at a time.
+
+Skip ahead to [Your First /vidux Run](#your-first-vidux-run) if you want the step-by-step. Read [What Vidux Is](#what-vidux-is) for the why.
+
 ## What Vidux Is
 
 Here is the problem Vidux solves: you sit down with an AI agent, describe a big feature, and it starts coding immediately. Three hours later you have 2,000 lines of code, half of it wrong, built on assumptions nobody validated. You have no plan, no evidence trail, and no way for a different agent (or future-you) to pick up where this one left off. The code drifted from the spec because there was no spec. The agent was thinking and coding at the same time, which is like drawing a map while driving.
@@ -22,12 +43,12 @@ Vidux works the same way:
 
 This matters most for work that spans multiple sessions. Context dies between sessions. Auth expires. Machines change. But PLAN.md is a file in a git branch. Any agent can read it, understand the state of the world, and pick up exactly where the last one stopped. No databases, no running processes, no memory tricks.
 
-## Prerequisites
+## Installation Details
+
+### Prerequisites
 
 - `vidux` repo cloned locally
 - One of: Claude Code, Cursor, or Codex
-
-## Installation
 
 ### Symlink to your tools
 
@@ -36,7 +57,7 @@ Replace `/path/to/vidux` with your actual clone path.
 ```bash
 ln -sfn /path/to/vidux ~/.claude/skills/vidux
 ln -sfn /path/to/vidux ~/.cursor/skills/vidux
-ln -sfn /path/to/vidux ~/.agents/skills/vidux
+ln -sfn /path/to/vidux ~/.codex/skills/vidux
 ```
 
 ### Optional: install enforcement hooks
@@ -52,10 +73,10 @@ The hooks inject gentle reminders into the agent's context at key moments -- rea
 ```
 ~/.claude/skills/vidux ──┐
 ~/.cursor/skills/vidux  ──┼──▶  /path/to/vidux  (one clone, three symlinks)
-~/.agents/skills/vidux  ──┘
+~/.codex/skills/vidux   ──┘
                                  │
-                                 ├── SKILL.md          ← full contract
-                                 ├── DOCTRINE.md       ← 6 principles
+                                 ├── SKILL.md          ← full contract (9 doctrine)
+                                 ├── DOCTRINE.md       ← short doctrine (6 core)
                                  ├── LOOP.md           ← stateless cycle
                                  ├── commands/         ← /vidux, /vidux-plan, /vidux-status
                                  ├── scripts/          ← loop, checkpoint, gather, doctor
@@ -155,6 +176,10 @@ Notice the ordering. Open questions are resolved before unevidenced tasks, which
 
 **`/vidux-status`** -- Read-only one-screen summary. Shows task completion percentage, current blockers, open questions, and the last few Progress entries. Use this to check in without triggering a cycle. Good for standups, or when you want to see where things are before deciding what to do next.
 
+**`/vidux-loop`** -- Set up or refine a cron harness for unattended cycles. The harness encodes the end goal and project DNA; PLAN.md holds the state. See `vidux-loop.md` for the full pattern.
+
+**`/vidux-dashboard`** -- Multi-project overview. Useful when you have several Vidux missions in flight and want one-screen visibility across all of them.
+
 ## The 50/30/20 Rule
 
 This is the most counterintuitive part of Vidux, and the most important.
@@ -179,7 +204,7 @@ bash scripts/vidux-loop.sh /path/to/your/project
 
 The loop script fires `/vidux` on an interval (default 20 minutes). Each cycle reads PLAN.md, picks the next action, executes it, checkpoints, and exits. The next cron fire is a completely new agent. It has never heard of the previous one. It just reads the files.
 
-This is the "design for death" principle made literal. There is no daemon, no long-running process, no state accumulating in memory. PLAN.md is the entire state of the world. Git is the bus. If an agent crashes mid-cycle, the next one will see the uncommitted work in `git diff`, commit it as crash recovery, and continue from there.
+This is the "design for completion" principle made literal. There is no daemon, no long-running process, no state accumulating in memory. PLAN.md is the entire state of the world. Git is the bus. If an agent crashes mid-cycle, the next one will see the uncommitted work in `git diff`, commit it as crash recovery, and continue from there.
 
 A solo computer workflow: kick off the loop before bed, review the Progress section in the morning. Each commit tells you what happened, what is next, and what is blocked. The plan file IS the debugger -- you can read exactly why the agent made every decision, because every decision cites its evidence.
 
