@@ -30,10 +30,11 @@ while [[ $# -gt 0 ]]; do
 done
 
 # --- locate paths ----------------------------------------------------------- #
-VIDUX_ROOT="$SCRIPT_DIR/.."
+REPO="$(cd "$REPO" 2>/dev/null && pwd || echo "$REPO")"
+VIDUX_ROOT="$REPO"
 CONFIG="$VIDUX_ROOT/vidux.config.json"
 PROJECTS_DIR="$VIDUX_ROOT/projects"
-AUTOMATIONS_DIR="$REPO/automations"
+AUTOMATIONS_DIR="$VIDUX_ROOT/automations"
 
 # Read config overrides
 if [ -f "$CONFIG" ]; then
