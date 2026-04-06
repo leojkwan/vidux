@@ -14,6 +14,18 @@ Never skip. Never code without a plan entry. To deviate, update the plan first.
 50% plan refinement. 30% code. 20% last mile.
 If you're coding more than planning, stop.
 
+```
+┌──────────────────────────┬───────────────┬──────────┐
+│  50% PLAN REFINEMENT     │  30% CODE     │  20% LM  │
+│  gather evidence,        │  one task     │  build,  │
+│  synthesize, prune,      │  per cycle,   │  CI,     │
+│  update PLAN.md          │  derived      │  review  │
+└──────────────────────────┴───────────────┴──────────┘
+   ◄─── front-load thinking ────► ◄─ mechanical ─► ◄ tail ►
+```
+
+If your git history is >30% code commits, the plan was not good enough.
+
 ## 4. Evidence over instinct
 Every plan entry cites a source. No source = no entry.
 MCP queries, codebase greps, design docs, team conventions.

@@ -85,6 +85,15 @@ GATHER evidence (MCP, team chat, code reviews, issue tracker, knowledge base, co
           -> loop back to GATHER
 ```
 
+```mermaid
+flowchart LR
+    G[🔍 GATHER<br/>evidence] --> P[📐 PLAN<br/>synthesize]
+    P --> E[⚡ EXECUTE<br/>one task]
+    E --> V[✅ VERIFY<br/>build + test]
+    V --> C[📌 CHECKPOINT<br/>structured commit]
+    C -.->|next cycle| G
+```
+
 You NEVER skip steps. You never code without a plan entry. To change code in a way
 the plan doesn't specify, you MUST update the plan first.
 

@@ -10,6 +10,31 @@ Every cron fire is a fresh context. No memory. No carried state. Just files.
 [Cron fires] -> [Read PLAN.md] -> [Assess] -> [Act] -> [Checkpoint] -> [Die]
 ```
 
+```mermaid
+sequenceDiagram
+    participant Cron
+    participant Agent as Fresh Agent
+    participant Plan as PLAN.md
+    participant Git
+    participant Build
+
+    Cron->>Agent: fire (no memory)
+    Agent->>Plan: READ (30s)
+    Agent->>Git: git log + diff
+    Agent->>Agent: ASSESS (score 0-10)
+    alt score >= 7
+        Agent->>Agent: ACT — execute one task
+        Agent->>Build: verify gate
+        Build-->>Agent: pass / fail
+    else score < 7
+        Agent->>Plan: ACT — refine plan
+    end
+    Agent->>Plan: update Progress
+    Agent->>Git: CHECKPOINT commit
+    Agent->>Agent: DIE (no state carried)
+    Note over Cron,Git: Next fire = brand new agent reading fresh from files
+```
+
 The agent that wakes up next time is a different agent. It knows nothing except what's in the files. Design for this. Always.
 
 ## Step 1: Read (30 seconds)

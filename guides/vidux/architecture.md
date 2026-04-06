@@ -32,6 +32,29 @@ The analogy also explains why Vidux feels heavyweight for small tasks. Redux is 
 
 Vidux has exactly two data structures. Everything else is derived.
 
+```
+┌─────────────────────────┐         ┌─────────────────────────┐
+│  DOC TREE (the store)   │         │  WORK QUEUE (FIFO)      │
+│                         │         │                         │
+│  PLAN.md                │ ──edit─▶│  ┌───┬───┬───┬───┐      │
+│  evidence/              │         │  │ 1 │ 2 │ 3 │...│ hot  │
+│  constraints/           │         │  └───┴───┴───┴───┘      │
+│  decisions/             │         │  (last 30 items)        │
+│  investigations/        │         │  ──────────────         │
+│                         │◀──pop── │  cold: git history      │
+└─────────────────────────┘  result └─────────────────────────┘
+        ▲                                     │
+        │                                     ▼
+        │                          ┌─────────────────────────┐
+        └──── results write back ──│  Agent executes one     │
+                                   │  item, verifies, dies   │
+                                   └─────────────────────────┘
+```
+
+The doc tree is the persistent store. The work queue is derived: doc edits create
+queue items, agents pop them, execution results write back into the tree. Code is
+never written outside this loop.
+
 ### Documentation Tree (the store)
 
 A markdown-based tree of folders and docs. This is the single source of truth. All knowledge, plans, evidence, and decisions live here.
@@ -183,6 +206,32 @@ graph TD
     B --> C
     C -.->|Findings feed back| B
 ```
+
+The shape of fan-out/fan-in is N independent files in, one merged file out, one critic on top:
+
+```
+            ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐
+  TIER 1    │ Agent A  │  │ Agent B  │  │ Agent C  │  │ Agent D  │
+  (parallel)│ team chat│  │ codebase │  │  rules   │  │  issues  │
+            └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘
+                 │             │             │             │
+                 ▼             ▼             ▼             ▼
+            evidence/A.md  arch/B.md   constraints/  tasks/D.md
+                 │             │           C.md            │
+                 └─────────────┴─────┬───────┴──────────────┘
+                                     ▼
+                             ┌───────────────┐
+  TIER 2 (serial)            │  Synthesizer  │  reads all 4
+                             │  -> PLAN.md   │  writes one
+                             └───────┬───────┘
+                                     ▼
+                             ┌───────────────┐
+  TIER 3 (serial)            │    Critic     │  challenges
+                             │  -> findings  │  assumptions
+                             └───────────────┘
+```
+
+Fan-out is parallel because the 4 research lanes never touch the same file. Fan-in is serial because merging conflicts requires one mind. Never have N agents write to the same file.
 
 **Tier 1: Research groups (4 groups, all parallel).** Each group writes to its own doc. No shared files. No coordination overhead.
 

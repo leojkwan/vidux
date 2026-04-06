@@ -1,29 +1,30 @@
 # Vidux
 
-The Redux of planned vibe coding.
+**The Redux of planned vibe coding.**
 
-Vidux is a lightweight orchestration system for long-running AI work. The core rule is simple:
+Vidux is a lightweight orchestration system for AI coding work that spans multiple sessions, agents, or days. It has exactly two data structures:
 
-- The plan is the store.
-- Code is the view.
-- Every change flows through evidence -> plan -> execution -> verification -> checkpoint.
+- **PLAN.md** — the store. The single source of truth. Every change flows through it.
+- **A FIFO work queue** — the dispatch. Doc edits create work items; agents pop them and execute.
 
-Vidux is built for work that spans multiple sessions, multiple agents, or multiple days. Instead of hiding state in chat history, it keeps state in files that any fresh agent can rehydrate from.
+If you know Redux, you already know Vidux. The plan is the store. Code is the view. You never "just code" — you either update the plan (which creates work) or pop a work item (which was created by a plan update). That unidirectional flow is the whole trick.
 
-## What Ships Here
+```mermaid
+flowchart LR
+    DOC[Doc Tree<br/>PLAN.md + evidence/]
+    QUEUE[Work Queue<br/>FIFO sliding window]
+    AGENT[Fresh Agent<br/>stateless cycle]
+    CODE[Code Change<br/>verified + checkpointed]
 
-- `SKILL.md` — the full Vidux contract
-- `DOCTRINE.md` — the short doctrine
-- `LOOP.md` — the stateless cycle
-- `commands/` — `/vidux`, `/vidux-plan`, `/vidux-status`
-- `scripts/` — loop, checkpoint, gather, doctor, install helpers
-- `hooks/` — prompt-hook nudges for plan discipline
-- `guides/vidux/` — quickstart, architecture, best practices
-- `tests/` — contract tests for the public surface
+    DOC -->|doc edit creates| QUEUE
+    QUEUE -->|agent pops item| AGENT
+    AGENT -->|executes one task| CODE
+    CODE -->|results feed back| DOC
+```
+
+Every change moves through five steps: **Gather evidence -> Plan -> Execute -> Verify -> Checkpoint.** No step is skippable. If the code is wrong, the plan is wrong — fix the plan first. The store persists across sessions; each dispatch dies. Any fresh agent can rehydrate from files and continue.
 
 ## Install
-
-Clone the repo anywhere, then symlink it into your tool:
 
 ```bash
 git clone git@github.com:leojkwan/vidux.git
@@ -32,7 +33,9 @@ ln -sfn /path/to/vidux ~/.cursor/skills/vidux
 ln -sfn /path/to/vidux ~/.codex/skills/vidux
 ```
 
-Optional hook install for a target repo:
+Then run `/vidux "your project description"` in Claude Code, Cursor, or Codex. The first cycle gathers evidence and writes a `PLAN.md`. No code is written until the plan is ready.
+
+Optional enforcement hooks for a target repo:
 
 ```bash
 bash scripts/install-hooks.sh /path/to/your/project
@@ -47,7 +50,19 @@ Most agent failures are state failures:
 - a later session could not tell what was intentional
 - the same bug got "fixed" three different ways
 
-Vidux solves that by making documentation the control plane.
+Vidux solves that by making documentation the control plane. State lives in markdown files in a git branch — no databases, no daemons, no memory tricks. Any agent can read the files, understand the world, and pick up where the last one stopped.
+
+## What Ships Here
+
+- `SKILL.md` — the full Vidux contract (architecture, doctrine, loop, PLAN.md template)
+- `DOCTRINE.md` — the short doctrine (~5 minute read)
+- `LOOP.md` — the stateless cycle mechanics
+- `ENFORCEMENT.md` — Claude Code hook configuration
+- `INGREDIENTS.md` — design lineage (10 patterns from 26 surveyed tools)
+- `commands/` — `/vidux`, `/vidux-plan`, `/vidux-status`, `/vidux-loop`
+- `scripts/` — loop driver, checkpoint, gather, doctor, install helpers
+- `hooks/` — prompt-hook nudges for plan discipline
+- `guides/vidux/` — quickstart, architecture, best practices
 
 ## Public Policy
 

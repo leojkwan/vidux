@@ -47,6 +47,29 @@ bash scripts/install-hooks.sh /path/to/your/project
 
 The hooks inject gentle reminders into the agent's context at key moments -- read PLAN.md before writing code, check file scope against the plan, checkpoint before exiting. They are training wheels, not guardrails. A well-practiced agent does these things naturally. Install them if you are new to Vidux or onboarding a teammate; skip them once the habits are internalized.
 
+### What you have after install
+
+```
+~/.claude/skills/vidux ──┐
+~/.cursor/skills/vidux  ──┼──▶  /path/to/vidux  (one clone, three symlinks)
+~/.agents/skills/vidux  ──┘
+                                 │
+                                 ├── SKILL.md          ← full contract
+                                 ├── DOCTRINE.md       ← 6 principles
+                                 ├── LOOP.md           ← stateless cycle
+                                 ├── commands/         ← /vidux, /vidux-plan, /vidux-status
+                                 ├── scripts/          ← loop, checkpoint, gather, doctor
+                                 ├── hooks/            ← optional prompt hooks
+                                 ├── guides/vidux/     ← quickstart, architecture, best practices
+                                 └── projects/         ← per-project PLAN.md lives here
+                                       └── <my-mission>/
+                                             ├── PLAN.md
+                                             ├── evidence/
+                                             └── investigations/
+```
+
+One clone, multi-tool symlinks. Plans live in `projects/<mission>/`, never in the target repo's working tree.
+
 ## Your First /vidux Run
 
 Run `/vidux "your project description"` in Claude Code (or Cursor/Codex). Here is what happens step by step.
