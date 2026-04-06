@@ -1,0 +1,25 @@
+{
+  "version": "1.0",
+  "plan_store": {
+    "mode": "external",
+    "path": "projects",
+    "_comment": "external = plans live in this Vidux repo. inline = plans live on a feature branch in the target project."
+  },
+  "defaults": {
+    "archive_threshold": 30,
+    "context_warning_lines": 200,
+    "max_worktrees": 5,
+    "stale_in_progress_days": 3,
+    "max_browser_processes": 7,
+    "max_codex_active_threads": 400,
+    "max_codex_active_automation_threads": 250,
+    "max_codex_avg_title_chars": 2000,
+    "min_system_memory_free_pct": 15
+  },
+  "guidelines": {
+    "cron_interval_minutes": 60,
+    "max_parallel_agents": 4,
+    "_comment": "Guidelines for agents reading this config. Not enforced by scripts."
+  }
+}
+

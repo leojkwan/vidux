@@ -1,0 +1,25 @@
+{
+  "hooks": [
+    {
+      "name": "vidux-pre-commit",
+      "event": "pre-commit",
+      "description": "Validates that code changes have a corresponding PLAN.md task entry. Prevents unplanned code from being committed.",
+      "enabled": true,
+      "script": "hooks/pre-commit-plan-check.sh"
+    },
+    {
+      "name": "vidux-checkpoint",
+      "event": "post-commit",
+      "description": "Updates PLAN.md Progress section with a checkpoint entry after each commit.",
+      "enabled": false,
+      "script": "hooks/post-commit-checkpoint.sh"
+    },
+    {
+      "name": "vidux-three-strike",
+      "event": "post-build-failure",
+      "description": "Tracks consecutive failures on the same surface. After 3 failures, escalates to move up one abstraction layer.",
+      "enabled": false,
+      "script": "hooks/three-strike-gate.sh"
+    }
+  ]
+}

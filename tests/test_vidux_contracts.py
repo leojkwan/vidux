@@ -1,0 +1,1267 @@
+"""
+Contract tests for Vidux documentation and tooling.
+
+Inspired by Jeffrey Lee-Chan's /harness plugin contract tests.
+The tests ARE the spec. If they fail, fix the docs — not the tests.
+
+Expanded for v1: covers docs, scripts, commands, hooks, enforcement, ingredients.
+Runs on stdlib unittest — zero-bootstrap, no pip install needed.
+"""
+
+import json
+import os
+import re
+import subprocess
+import textwrap
+import unittest
+from pathlib import Path
+
+# Root = repo root (two levels up from this test file)
+ROOT = Path(__file__).resolve().parent.parent
+
+SKILL = ROOT / "SKILL.md"
+DOCTRINE = ROOT / "DOCTRINE.md"
+PLAN = ROOT / "PLAN.md"
+LOOP = ROOT / "LOOP.md"
+ENFORCEMENT = ROOT / "ENFORCEMENT.md"
+INGREDIENTS = ROOT / "INGREDIENTS.md"
+
+
+def _read(path: Path) -> str:
+    return path.read_text(encoding="utf-8")
+
+
+# Valid task line patterns (v1 checkbox + v2 FSM)
+TASK_LINE_RE = re.compile(
+    r"^- \[( |x|pending|in_progress|completed|blocked)\]"
+)
+
+
+class ViduxContractTests(unittest.TestCase):
+
+    # -----------------------------------------------------------------------
+    # SKILL.md contracts
+    # -----------------------------------------------------------------------
+
+    def test_skill_has_eight_doctrine_principles(self):
+        """SKILL.md must contain all 8 numbered doctrine principles."""
+        text = _read(SKILL)
+        for n in range(1, 9):
+            self.assertRegex(
+                text, rf"###\s+{n}\.",
+                f"SKILL.md missing doctrine principle #{n}",
+            )
+
+    def test_skill_has_two_data_structures(self):
+        """SKILL.md must mention both core data structures."""
+        text = _read(SKILL)
+        self.assertIn("Documentation Tree", text, "SKILL.md missing 'Documentation Tree'")
+        self.assertIn("Work Queue", text, "SKILL.md missing 'Work Queue'")
+
+    def test_skill_has_advisors(self):
+        """SKILL.md must reference both advisor philosophies."""
+        text = _read(SKILL)
+        self.assertIn("Steve Yegge", text, "SKILL.md missing Steve Yegge advisor")
+        self.assertIn("Jeffrey Lee-Chan", text, "SKILL.md missing Jeffrey Lee-Chan advisor")
+
+    def test_skill_is_company_agnostic_layer1(self):
+        """Doctrine + architecture sections must have zero company-specific terms."""
+        text = _read(SKILL)
+        internal_terms = ["Phantom", "Bazel", "snap-bridge", "COF"]
+        sections = text.split("## Advisors")
+        layer1 = sections[0] if sections else text
+        for term in internal_terms:
+            hits = [
+                (i + 1, line)
+                for i, line in enumerate(layer1.splitlines())
+                if term in line
+            ]
+            self.assertEqual(
+                len(hits), 0,
+                f"Company-specific term '{term}' found in Layer 1: {hits}",
+            )
+
+    def test_skill_has_layer_separation(self):
+        """SKILL.md must explicitly separate Layer 1 and Layer 2."""
+        text = _read(SKILL)
+        self.assertIn("Layer 1", text)
+        self.assertIn("Layer 2", text)
+        self.assertTrue(
+            "company-agnostic" in text.lower()
+            or "open-sourceable" in text
+            or "Layer 1 vs Layer 2" in text,
+            "SKILL.md missing layer separation marker",
+        )
+
+    def test_skill_has_activation_criteria(self):
+        """SKILL.md must define when Vidux activates and when it does NOT."""
+        text = _read(SKILL)
+        self.assertTrue(
+            "activates when" in text.lower() or "## Activation" in text,
+            "SKILL.md missing activation criteria",
+        )
+        self.assertTrue(
+            "does NOT activate" in text or "does not activate" in text.lower(),
+            "SKILL.md missing negative activation criteria",
+        )
+
+    def test_skill_has_failure_protocol(self):
+        """SKILL.md must contain the failure protocol with dual five-whys."""
+        text = _read(SKILL)
+        self.assertIn("Failure Protocol", text)
+        self.assertTrue(
+            "Five Whys" in text or "five-whys" in text.lower(),
+            "SKILL.md missing Five Whys",
+        )
+        self.assertTrue(
+            "three-strike" in text.lower() or "Three-strike" in text,
+            "SKILL.md missing three-strike gate",
+        )
+        has_dual = bool(
+            re.search(r"(?:dual|two).*(?:five-whys|Five Whys)", text, re.IGNORECASE)
+            or re.search(r"(?:five-whys|Five Whys).*(?:dual|two)", text, re.IGNORECASE)
+        )
+        self.assertTrue(has_dual, "SKILL.md failure protocol missing 'dual' near 'five-whys'")
+
+    # -----------------------------------------------------------------------
+    # DOCTRINE.md contracts
+    # -----------------------------------------------------------------------
+
+    def test_doctrine_has_redux_analogy(self):
+        """DOCTRINE.md must contain the Redux comparison table."""
+        text = _read(DOCTRINE)
+        self.assertIn("| Redux", text)
+        self.assertIn("| Vidux", text)
+
+    def test_doctrine_has_pilot_routing(self):
+        """DOCTRINE.md must contain the Vidux vs Pilot decision table."""
+        text = _read(DOCTRINE)
+        self.assertIn("Pilot", text)
+        self.assertTrue("Mode A" in text or "Mode B" in text)
+
+    # -----------------------------------------------------------------------
+    # PLAN.md contracts
+    # -----------------------------------------------------------------------
+
+    REQUIRED_PLAN_SECTIONS = [
+        "Purpose", "Evidence", "Constraints", "Decisions",
+        "Tasks", "Open Questions", "Surprises", "Progress",
+    ]
+
+    def test_plan_has_required_sections(self):
+        """PLAN.md must have all 8 required sections."""
+        text = _read(PLAN)
+        for section in self.REQUIRED_PLAN_SECTIONS:
+            self.assertTrue(
+                re.search(rf"^##\s+{re.escape(section)}", text, re.MULTILINE),
+                f"PLAN.md missing required section: {section}",
+            )
+
+    def test_plan_evidence_has_citations(self):
+        """Every Evidence bullet must contain a [Source: ...] marker."""
+        text = _read(PLAN)
+        in_evidence = False
+        for lineno, line in enumerate(text.splitlines(), 1):
+            if re.match(r"^##\s+Evidence", line):
+                in_evidence = True
+                continue
+            if in_evidence and re.match(r"^##\s+", line):
+                break
+            if in_evidence and line.startswith("- "):
+                self.assertIn(
+                    "[Source:", line,
+                    f"PLAN.md Evidence line {lineno} missing [Source:] citation",
+                )
+
+    def test_plan_tasks_have_valid_status(self):
+        """Every task line must use v1 checkboxes or v2 FSM states."""
+        text = _read(PLAN)
+        in_tasks = False
+        for lineno, line in enumerate(text.splitlines(), 1):
+            if re.match(r"^##\s+Tasks", line):
+                in_tasks = True
+                continue
+            if in_tasks and re.match(r"^##\s+", line):
+                break
+            if in_tasks and line.startswith("- "):
+                self.assertRegex(
+                    line, TASK_LINE_RE,
+                    f"PLAN.md Tasks line {lineno} not a valid task: {line!r}",
+                )
+
+    def test_plan_constraints_have_always_never(self):
+        """PLAN.md Constraints must have at least one ALWAYS and one NEVER."""
+        text = _read(PLAN)
+        in_constraints = False
+        has_always = has_never = False
+        for line in text.splitlines():
+            if re.match(r"^##\s+Constraints", line):
+                in_constraints = True
+                continue
+            if in_constraints and re.match(r"^##\s+", line):
+                break
+            if in_constraints:
+                if "ALWAYS" in line:
+                    has_always = True
+                if "NEVER" in line:
+                    has_never = True
+        self.assertTrue(has_always, "PLAN.md Constraints missing ALWAYS rule")
+        self.assertTrue(has_never, "PLAN.md Constraints missing NEVER rule")
+
+    # -----------------------------------------------------------------------
+    # LOOP.md contracts
+    # -----------------------------------------------------------------------
+
+    def test_loop_has_five_steps(self):
+        """LOOP.md must contain Step 1 through Step 5."""
+        text = _read(LOOP)
+        for n in range(1, 6):
+            self.assertRegex(text, rf"##\s+Step\s+{n}", f"LOOP.md missing Step {n}")
+
+    def test_loop_has_unify_step(self):
+        """LOOP.md must mention UNIFY or 'planned vs actual'."""
+        text = _read(LOOP)
+        self.assertTrue(
+            "UNIFY" in text.upper() or "planned vs actual" in text.lower(),
+            "LOOP.md missing UNIFY step",
+        )
+
+    def test_loop_has_readiness_checklist(self):
+        """LOOP.md must have the 10-point plan readiness checklist."""
+        text = _read(LOOP)
+        self.assertTrue(
+            "7/10" in text or "7 to" in text or "Minimum 7" in text,
+            "LOOP.md missing 7/10 readiness threshold",
+        )
+        readiness_match = re.search(r"###\s+Q1.*?(?=###\s+Q2)", text, re.DOTALL)
+        self.assertIsNotNone(readiness_match, "LOOP.md missing Q1 readiness section")
+        checkboxes = re.findall(r"^- \[ \]", readiness_match.group(), re.MULTILINE)
+        self.assertGreaterEqual(len(checkboxes), 5)
+
+    def test_loop_has_escalation_statuses(self):
+        """LOOP.md must define all 4 escalation statuses."""
+        text = _read(LOOP)
+        for status in ["DONE", "DONE_WITH_CONCERNS", "NEEDS_CONTEXT", "BLOCKED"]:
+            self.assertIn(status, text, f"LOOP.md missing escalation status: {status}")
+
+    def test_loop_has_stuck_detection(self):
+        """LOOP.md must have stuck-loop detection with a 3-cycle threshold."""
+        text = _read(LOOP)
+        self.assertTrue("stuck" in text.lower() or "Stuck" in text)
+        has_three = bool(
+            re.search(r"3.*(?:stuck|consecutive)", text, re.IGNORECASE)
+            or re.search(r"(?:stuck|consecutive).*3", text, re.IGNORECASE)
+        )
+        self.assertTrue(has_three, "LOOP.md stuck detection missing '3' threshold")
+
+    # -----------------------------------------------------------------------
+    # ENFORCEMENT.md contracts
+    # -----------------------------------------------------------------------
+
+    def test_enforcement_has_four_hooks(self):
+        """ENFORCEMENT.md must define all 4 lifecycle hooks."""
+        text = _read(ENFORCEMENT)
+        for hook in ["PreToolUse", "PostToolUse", "Stop", "SessionStart"]:
+            self.assertIn(hook, text, f"ENFORCEMENT.md missing hook: {hook}")
+
+    def test_enforcement_hooks_are_prompt_type(self):
+        """All Vidux hooks must be type: prompt (nudge, not block)."""
+        text = _read(ENFORCEMENT)
+        type_matches = re.findall(r'"type":\s*"(\w+)"', text)
+        self.assertGreaterEqual(len(type_matches), 4)
+        for t in type_matches:
+            self.assertIn(t, ("prompt", "command"), f"Unexpected hook type: {t}")
+
+    def test_enforcement_has_gradient(self):
+        """ENFORCEMENT.md must describe the enforcement gradient."""
+        text = _read(ENFORCEMENT)
+        for label in ["Orientation", "Friction", "Reflection", "Obligation"]:
+            self.assertIn(label, text, f"Missing gradient label: {label}")
+
+    # -----------------------------------------------------------------------
+    # INGREDIENTS.md contracts
+    # -----------------------------------------------------------------------
+
+    def test_ingredients_has_ten_patterns(self):
+        """INGREDIENTS.md must list 10 adopted patterns."""
+        text = _read(INGREDIENTS)
+        pattern_headers = re.findall(r"^##\s+\d+\.", text, re.MULTILINE)
+        self.assertGreaterEqual(len(pattern_headers), 10)
+
+    def test_ingredients_has_adoption_details(self):
+        """Each ingredient must explain what Vidux adopts AND what it does not."""
+        text = _read(INGREDIENTS)
+        adopt_count = text.lower().count("how vidux adopts")
+        not_adopt_count = text.lower().count("what we do not adopt")
+        self.assertGreaterEqual(adopt_count, 10)
+        self.assertGreaterEqual(not_adopt_count, 10)
+
+    def test_ingredients_has_summary_table(self):
+        """INGREDIENTS.md must have a summary table."""
+        text = _read(INGREDIENTS)
+        self.assertTrue("Summary Table" in text or "| # |" in text)
+
+    # -----------------------------------------------------------------------
+    # Scripts contracts
+    # -----------------------------------------------------------------------
+
+    SCRIPTS_DIR = ROOT / "scripts"
+
+    def test_scripts_exist_and_executable(self):
+        """All 4 vidux scripts must exist and be executable."""
+        expected = [
+            "vidux-loop.sh", "vidux-checkpoint.sh",
+            "vidux-gather.sh", "install-hooks.sh",
+        ]
+        for name in expected:
+            script = self.SCRIPTS_DIR / name
+            self.assertTrue(script.exists(), f"Script missing: {name}")
+            self.assertTrue(os.access(script, os.X_OK), f"Script not executable: {name}")
+
+    def test_vidux_loop_produces_json(self):
+        """vidux-loop.sh must produce valid JSON output."""
+        result = subprocess.run(
+            ["bash", str(self.SCRIPTS_DIR / "vidux-loop.sh"), str(PLAN)],
+            capture_output=True, text=True, timeout=10,
+        )
+        self.assertEqual(result.returncode, 0, f"vidux-loop.sh failed: {result.stderr}")
+        data = json.loads(result.stdout)
+        self.assertTrue("cycle" in data or "error" in data)
+
+    def test_vidux_loop_no_plan_produces_json(self):
+        """vidux-loop.sh with nonexistent plan must produce valid JSON."""
+        result = subprocess.run(
+            ["bash", str(self.SCRIPTS_DIR / "vidux-loop.sh"), "/tmp/nonexistent-plan.md"],
+            capture_output=True, text=True, timeout=10,
+        )
+        self.assertEqual(result.returncode, 0)
+        data = json.loads(result.stdout)
+        self.assertTrue(data.get("action") == "create_plan" or "error" in data)
+
+    def test_vidux_gather_produces_output(self):
+        """vidux-gather.sh must produce non-empty output with tier structure."""
+        result = subprocess.run(
+            ["bash", str(self.SCRIPTS_DIR / "vidux-gather.sh"), "test topic"],
+            capture_output=True, text=True, timeout=10,
+        )
+        self.assertEqual(result.returncode, 0, f"vidux-gather.sh failed: {result.stderr}")
+        self.assertIn("Tier 1", result.stdout)
+        self.assertIn("Tier 2", result.stdout)
+        self.assertIn("Tier 3", result.stdout)
+
+    # -----------------------------------------------------------------------
+    # Commands contracts
+    # -----------------------------------------------------------------------
+
+    COMMANDS_DIR = ROOT / "commands"
+
+    def test_commands_exist(self):
+        """All 3 vidux commands must exist."""
+        for name in ["vidux.md", "vidux-plan.md", "vidux-status.md"]:
+            self.assertTrue((self.COMMANDS_DIR / name).exists(), f"Command missing: {name}")
+
+    def test_commands_have_frontmatter(self):
+        """Each command file must have YAML frontmatter with name and description."""
+        for name in ["vidux.md", "vidux-plan.md", "vidux-status.md"]:
+            text = _read(self.COMMANDS_DIR / name)
+            self.assertTrue(text.startswith("---"), f"{name} missing frontmatter")
+            end = text.index("---", 3)
+            frontmatter = text[3:end]
+            self.assertIn("name:", frontmatter, f"{name} frontmatter missing name")
+            self.assertIn("description:", frontmatter, f"{name} frontmatter missing description")
+
+    # -----------------------------------------------------------------------
+    # Hooks contracts
+    # -----------------------------------------------------------------------
+
+    def test_hooks_json_valid(self):
+        """hooks/hooks.json must be valid JSON with a hooks array."""
+        hooks_file = ROOT / "hooks" / "hooks.json"
+        self.assertTrue(hooks_file.exists(), "hooks/hooks.json missing")
+        data = json.loads(hooks_file.read_text())
+        self.assertIn("hooks", data)
+        self.assertIsInstance(data["hooks"], list)
+        self.assertGreaterEqual(len(data["hooks"]), 3)
+
+    # -----------------------------------------------------------------------
+    # Plugin manifest contracts
+    # -----------------------------------------------------------------------
+
+    def test_plugin_manifest_valid(self):
+        """plugin.json must be valid JSON with required fields."""
+        manifest = ROOT / ".claude-plugin" / "plugin.json"
+        self.assertTrue(manifest.exists())
+        data = json.loads(manifest.read_text())
+        for field in ["name", "version", "description"]:
+            self.assertIn(field, data)
+        self.assertEqual(data["name"], "vidux")
+        self.assertEqual(data["version"], "1.0.0")
+
+    # -----------------------------------------------------------------------
+    # Structural integrity
+    # -----------------------------------------------------------------------
+
+    def test_all_core_docs_exist(self):
+        """All 6 core documentation files must exist."""
+        for doc in [SKILL, DOCTRINE, PLAN, LOOP, ENFORCEMENT, INGREDIENTS]:
+            self.assertTrue(doc.exists(), f"Core doc missing: {doc.name}")
+
+    def test_skill_mentions_all_core_docs(self):
+        """SKILL.md should reference all companion documents."""
+        text = _read(SKILL)
+        self.assertTrue("DOCTRINE" in text or "doctrine" in text.lower())
+        self.assertTrue("LOOP" in text or "loop" in text.lower())
+        self.assertIn("PLAN.md", text)
+
+    # -----------------------------------------------------------------------
+    # Cross-doc consistency
+    # -----------------------------------------------------------------------
+
+    def test_skill_has_fifty_thirty_twenty(self):
+        """SKILL.md must contain the 50/30/20 split."""
+        text = _read(SKILL)
+        self.assertIn("50%", text)
+        self.assertIn("30%", text)
+        self.assertIn("20%", text)
+
+    def test_doctrine_principles_match_skill(self):
+        """DOCTRINE.md and SKILL.md must agree on key principle wording."""
+        doctrine = _read(DOCTRINE)
+        skill = _read(SKILL)
+        d_p1 = re.search(r"##\s+1\.\s+Plan.*?(?=^##\s+2\.)", doctrine, re.DOTALL | re.MULTILINE)
+        s_p1 = re.search(r"###\s+1\.\s+Plan.*?(?=^###\s+2\.)", skill, re.DOTALL | re.MULTILINE)
+        self.assertIsNotNone(d_p1)
+        self.assertIsNotNone(s_p1)
+        self.assertIn("Plan is the store", d_p1.group())
+        self.assertIn("Plan is the store", s_p1.group())
+        d_p6 = re.search(r"##\s+6\..*?(?=^---|^$|\Z)", doctrine, re.DOTALL | re.MULTILINE)
+        s_p6 = re.search(r"###\s+6\..*?(?=^---|^###|\Z)", skill, re.DOTALL | re.MULTILINE)
+        self.assertIsNotNone(d_p6)
+        self.assertIsNotNone(s_p6)
+        self.assertIn("Process fixes", d_p6.group())
+        self.assertIn("Process fixes", s_p6.group())
+
+    def test_hooks_scripts_exist(self):
+        """Every script referenced in hooks/hooks.json must exist on disk."""
+        hooks_file = ROOT / "hooks" / "hooks.json"
+        data = json.loads(hooks_file.read_text())
+        for hook in data["hooks"]:
+            script_path = hook.get("script")
+            self.assertTrue(script_path, f"Hook '{hook.get('name')}' missing 'script'")
+            full_path = ROOT / script_path
+            self.assertTrue(full_path.exists(), f"Hook script not found: {script_path}")
+
+    def test_checkpoint_script_is_portable(self):
+        """vidux-checkpoint.sh must use sedi() and never raw 'sed -i'."""
+        text = _read(self.SCRIPTS_DIR / "vidux-checkpoint.sh")
+        self.assertIn("sedi()", text)
+        lines = text.splitlines()
+        raw_sed_hits = []
+        for i, line in enumerate(lines, 1):
+            stripped = line.lstrip()
+            if "sedi()" in line or stripped.startswith("#"):
+                continue
+            if re.search(r"\bsed\s+-i\b", line):
+                raw_sed_hits.append((i, line.strip()))
+        self.assertEqual(len(raw_sed_hits), 0, f"Raw 'sed -i' found: {raw_sed_hits}")
+
+    def test_no_internal_terms_in_layer1_docs(self):
+        """Layer 1 docs must not contain company-specific terms."""
+        internal_terms = ["Phantom", "Bazel", "snap-bridge", "COF", "CameraMusicFeature"]
+        layer1_docs = {"LOOP.md": LOOP, "ENFORCEMENT.md": ENFORCEMENT, "DOCTRINE.md": DOCTRINE}
+        for doc_name, doc_path in layer1_docs.items():
+            text = _read(doc_path)
+            for term in internal_terms:
+                hits = [
+                    (i + 1, line) for i, line in enumerate(text.splitlines()) if term in line
+                ]
+                self.assertEqual(len(hits), 0, f"'{term}' found in {doc_name}: {hits}")
+
+    # -----------------------------------------------------------------------
+    # Config, loop output, project structure, and handoff contracts
+    # -----------------------------------------------------------------------
+
+    REPO_ROOT = ROOT.parent.parent
+
+    def test_config_exists_and_valid(self):
+        """vidux.config.json must exist and have required keys."""
+        config_path = ROOT / "vidux.config.json"
+        self.assertTrue(config_path.exists())
+        data = json.loads(config_path.read_text(encoding="utf-8"))
+        for key in ("version", "plan_store", "defaults"):
+            self.assertIn(key, data)
+        defaults = data["defaults"]
+        self.assertIn("archive_threshold", defaults)
+        self.assertIn("context_warning_lines", defaults)
+        self.assertIsInstance(defaults["archive_threshold"], int)
+        self.assertIsInstance(defaults["context_warning_lines"], int)
+
+    def test_vidux_loop_outputs_hot_cold_fields(self):
+        """vidux-loop.sh JSON output must contain hot/cold and context fields."""
+        result = subprocess.run(
+            ["bash", str(self.SCRIPTS_DIR / "vidux-loop.sh"), str(PLAN)],
+            capture_output=True, text=True, timeout=10,
+        )
+        self.assertEqual(result.returncode, 0)
+        data = json.loads(result.stdout)
+        for key in ("hot_tasks", "cold_tasks", "context_warning", "context_note"):
+            self.assertIn(key, data)
+        self.assertIsInstance(data["hot_tasks"], int)
+        self.assertIsInstance(data["cold_tasks"], int)
+        self.assertIsInstance(data["context_warning"], bool)
+        self.assertIsInstance(data["context_note"], str)
+
+    def test_vidux_loop_outputs_decision_log_fields(self):
+        """vidux-loop.sh JSON output must contain decision_log_count, decision_log_warning, decision_log_entries."""
+        result = subprocess.run(
+            ["bash", str(self.SCRIPTS_DIR / "vidux-loop.sh"), str(PLAN)],
+            capture_output=True, text=True, timeout=10,
+        )
+        self.assertEqual(result.returncode, 0)
+        data = json.loads(result.stdout)
+        for key in ("decision_log_count", "decision_log_warning", "decision_log_entries"):
+            self.assertIn(key, data, f"Missing field: {key}")
+        self.assertIsInstance(data["decision_log_count"], int)
+        self.assertIsInstance(data["decision_log_warning"], bool)
+        self.assertIsInstance(data["decision_log_entries"], str)
+
+    def test_vidux_loop_decision_log_parsed_from_plan(self):
+        """decision_log_count must equal the number of tagged entries when Decision Log section exists."""
+        import tempfile, os
+        plan_with_dl = textwrap.dedent("""\
+            # Test Plan
+            ## Decision Log
+            - [DIRECTION] [2026-01-01] Do X not Y.
+            - [DELETION] [2026-01-02] Removed Z. Reason: no longer needed.
+            - [RATE-LIMIT] [2026-01-03] Limit to 3/day.
+            ## Tasks
+            - [pending] Task 1: do something [Evidence: source]
+            ## Progress
+        """)
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
+            f.write(plan_with_dl)
+            tmp = f.name
+        try:
+            result = subprocess.run(
+                ["bash", str(self.SCRIPTS_DIR / "vidux-loop.sh"), tmp],
+                capture_output=True, text=True, timeout=10,
+            )
+            self.assertEqual(result.returncode, 0)
+            data = json.loads(result.stdout)
+            self.assertEqual(data["decision_log_count"], 3)
+            self.assertTrue(data["decision_log_warning"])
+            self.assertIn("DIRECTION", data["decision_log_entries"])
+            self.assertIn("DELETION", data["decision_log_entries"])
+            self.assertIn("RATE-LIMIT", data["decision_log_entries"])
+        finally:
+            os.unlink(tmp)
+
+    def test_vidux_loop_decision_log_zero_when_absent(self):
+        """decision_log_count must be 0 and warning false when no Decision Log section exists."""
+        import tempfile, os
+        plan_no_dl = textwrap.dedent("""\
+            # Test Plan
+            ## Tasks
+            - [pending] Task 1: do something [Evidence: source]
+            ## Progress
+        """)
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
+            f.write(plan_no_dl)
+            tmp = f.name
+        try:
+            result = subprocess.run(
+                ["bash", str(self.SCRIPTS_DIR / "vidux-loop.sh"), tmp],
+                capture_output=True, text=True, timeout=10,
+            )
+            self.assertEqual(result.returncode, 0)
+            data = json.loads(result.stdout)
+            self.assertEqual(data["decision_log_count"], 0)
+            self.assertFalse(data["decision_log_warning"])
+            self.assertEqual(data["decision_log_entries"], "")
+        finally:
+            os.unlink(tmp)
+
+    def test_vidux_loop_stuck_when_progress_has_3_entries(self):
+        """stuck must be true when Progress section has 3+ entries for the task."""
+        import tempfile, os
+        # Progress entries must include the full TASK_DESC (with [Evidence:]) because
+        # the checkpoint script writes TASK_DESC verbatim — that's what TASK_SHORT matches.
+        plan_stuck = textwrap.dedent("""\
+            # Test Plan
+            ## Tasks
+            - [pending] Task 1: do something specific here [Evidence: source]
+            ## Progress
+            - [2026-01-01] Cycle 1: Done: Task 1: do something specific here [Evidence: source]. Next: check plan.
+            - [2026-01-02] Cycle 2: Done: Task 1: do something specific here [Evidence: source]. Next: check plan.
+            - [2026-01-03] Cycle 3: Done: Task 1: do something specific here [Evidence: source]. Next: check plan.
+        """)
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
+            f.write(plan_stuck)
+            tmp = f.name
+        try:
+            result = subprocess.run(
+                ["bash", str(self.SCRIPTS_DIR / "vidux-loop.sh"), tmp],
+                capture_output=True, text=True, timeout=10,
+            )
+            self.assertEqual(result.returncode, 0)
+            data = json.loads(result.stdout)
+            self.assertTrue(data["stuck"], "Expected stuck=true for task with 3+ Progress entries")
+            self.assertEqual(data["action"], "stuck")
+            self.assertIn("3", data["context"])
+        finally:
+            os.unlink(tmp)
+
+    def test_vidux_loop_not_stuck_when_progress_has_2_entries(self):
+        """stuck must be false when Progress section has only 2 entries for the task."""
+        import tempfile, os
+        plan_two = textwrap.dedent("""\
+            # Test Plan
+            ## Tasks
+            - [pending] Task 1: do something specific here [Evidence: source]
+            ## Progress
+            - [2026-01-01] Cycle 1: Done: Task 1: do something specific here [Evidence: source]. Next: check plan.
+            - [2026-01-02] Cycle 2: Done: Task 1: do something specific here [Evidence: source]. Next: check plan.
+        """)
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
+            f.write(plan_two)
+            tmp = f.name
+        try:
+            result = subprocess.run(
+                ["bash", str(self.SCRIPTS_DIR / "vidux-loop.sh"), tmp],
+                capture_output=True, text=True, timeout=10,
+            )
+            self.assertEqual(result.returncode, 0)
+            data = json.loads(result.stdout)
+            self.assertFalse(data["stuck"], "Expected stuck=false for task with only 2 Progress entries")
+        finally:
+            os.unlink(tmp)
+
+    def test_vidux_loop_not_stuck_when_no_progress_section(self):
+        """stuck must be false when plan has no Progress section."""
+        import tempfile, os
+        plan_no_prog = textwrap.dedent("""\
+            # Test Plan
+            ## Tasks
+            - [pending] Task 1: do something specific here [Evidence: source]
+        """)
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
+            f.write(plan_no_prog)
+            tmp = f.name
+        try:
+            result = subprocess.run(
+                ["bash", str(self.SCRIPTS_DIR / "vidux-loop.sh"), tmp],
+                capture_output=True, text=True, timeout=10,
+            )
+            self.assertEqual(result.returncode, 0)
+            data = json.loads(result.stdout)
+            self.assertFalse(data["stuck"], "Expected stuck=false when no Progress section")
+        finally:
+            os.unlink(tmp)
+
+    # -----------------------------------------------------------------------
+    # vidux-checkpoint.sh FSM + status contracts
+    # -----------------------------------------------------------------------
+
+    def _make_git_plan(self, tmpdir: str, content: str) -> str:
+        """Create a minimal git repo with PLAN.md committed; return plan path."""
+        import os
+        plan = os.path.join(tmpdir, "PLAN.md")
+        Path(plan).write_text(content, encoding="utf-8")
+        subprocess.run(["git", "init"], cwd=tmpdir, capture_output=True)
+        subprocess.run(["git", "config", "user.email", "test@test.com"], cwd=tmpdir, capture_output=True)
+        subprocess.run(["git", "config", "user.name", "Test User"], cwd=tmpdir, capture_output=True)
+        subprocess.run(["git", "add", "PLAN.md"], cwd=tmpdir, capture_output=True)
+        subprocess.run(["git", "commit", "-m", "init"], cwd=tmpdir, capture_output=True)
+        return plan
+
+    def test_checkpoint_handles_v2_pending_task(self):
+        """checkpoint.sh must mark [pending] tasks [completed], not just v1 [ ]."""
+        import tempfile
+        task = "Task 1: do something specific [Evidence: source]"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            plan = self._make_git_plan(tmpdir, textwrap.dedent(f"""\
+                # Test Plan
+                ## Tasks
+                - [pending] {task}
+                ## Progress
+            """))
+            result = subprocess.run(
+                ["bash", str(self.SCRIPTS_DIR / "vidux-checkpoint.sh"), plan, task, "done the thing"],
+                capture_output=True, text=True, timeout=10, cwd=tmpdir,
+            )
+            self.assertEqual(result.returncode, 0, f"checkpoint failed: {result.stderr}")
+            content = Path(plan).read_text(encoding="utf-8")
+            self.assertIn("[completed]", content)
+            self.assertNotIn("- [pending]", content)
+
+    def test_checkpoint_handles_v2_in_progress_task(self):
+        """checkpoint.sh must mark [in_progress] tasks [completed]."""
+        import tempfile
+        task = "Task 1: do something specific [Evidence: source]"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            plan = self._make_git_plan(tmpdir, textwrap.dedent(f"""\
+                # Test Plan
+                ## Tasks
+                - [in_progress] {task}
+                ## Progress
+            """))
+            result = subprocess.run(
+                ["bash", str(self.SCRIPTS_DIR / "vidux-checkpoint.sh"), plan, task, "done the thing"],
+                capture_output=True, text=True, timeout=10, cwd=tmpdir,
+            )
+            self.assertEqual(result.returncode, 0, f"checkpoint failed: {result.stderr}")
+            content = Path(plan).read_text(encoding="utf-8")
+            self.assertIn("[completed]", content)
+            self.assertNotIn("- [in_progress]", content)
+
+    def test_checkpoint_status_blocked_marks_task_blocked(self):
+        """checkpoint.sh --status blocked must set task to [blocked], not [completed]."""
+        import tempfile
+        task = "Task 1: do something specific [Evidence: source]"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            plan = self._make_git_plan(tmpdir, textwrap.dedent(f"""\
+                # Test Plan
+                ## Tasks
+                - [in_progress] {task}
+                ## Progress
+            """))
+            result = subprocess.run(
+                ["bash", str(self.SCRIPTS_DIR / "vidux-checkpoint.sh"), plan, task,
+                 "blocked on external dep", "--status", "blocked", "--blocker", "waiting for API"],
+                capture_output=True, text=True, timeout=10, cwd=tmpdir,
+            )
+            self.assertEqual(result.returncode, 0, f"checkpoint failed: {result.stderr}")
+            content = Path(plan).read_text(encoding="utf-8")
+            self.assertIn("- [blocked]", content)
+            self.assertNotIn("[completed]", content)
+            self.assertIn("[BLOCKED]", content)
+
+    def test_checkpoint_status_done_with_concerns_adds_progress_note(self):
+        """checkpoint.sh --status done_with_concerns must add [concerns noted] to Progress."""
+        import tempfile
+        task = "Task 1: do something specific [Evidence: source]"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            plan = self._make_git_plan(tmpdir, textwrap.dedent(f"""\
+                # Test Plan
+                ## Tasks
+                - [pending] {task}
+                ## Progress
+            """))
+            result = subprocess.run(
+                ["bash", str(self.SCRIPTS_DIR / "vidux-checkpoint.sh"), plan, task,
+                 "done but concern", "--status", "done_with_concerns"],
+                capture_output=True, text=True, timeout=10, cwd=tmpdir,
+            )
+            self.assertEqual(result.returncode, 0, f"checkpoint failed: {result.stderr}")
+            content = Path(plan).read_text(encoding="utf-8")
+            self.assertIn("[completed]", content)
+            self.assertIn("[concerns noted]", content)
+
+    def test_checkpoint_next_task_detects_v2_pending(self):
+        """checkpoint.sh output must identify the next [pending] task (v2 FSM format)."""
+        import tempfile
+        task1 = "Task 1: first task [Evidence: source]"
+        task2 = "Task 2: second task [Evidence: source]"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            plan = self._make_git_plan(tmpdir, textwrap.dedent(f"""\
+                # Test Plan
+                ## Tasks
+                - [pending] {task1}
+                - [pending] {task2}
+                ## Progress
+            """))
+            result = subprocess.run(
+                ["bash", str(self.SCRIPTS_DIR / "vidux-checkpoint.sh"), plan, task1, "done task 1"],
+                capture_output=True, text=True, timeout=10, cwd=tmpdir,
+            )
+            self.assertEqual(result.returncode, 0, f"checkpoint failed: {result.stderr}")
+            self.assertIn("Task 2", result.stdout)
+
+    def test_checkpoint_idempotent_for_v2_completed(self):
+        """checkpoint.sh must skip silently if task is already [completed] (v2)."""
+        import tempfile
+        task = "Task 1: do something specific [Evidence: source]"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            plan = self._make_git_plan(tmpdir, textwrap.dedent(f"""\
+                # Test Plan
+                ## Tasks
+                - [completed] {task} [Done: 2026-01-01]
+                ## Progress
+            """))
+            result = subprocess.run(
+                ["bash", str(self.SCRIPTS_DIR / "vidux-checkpoint.sh"), plan, task, "already done"],
+                capture_output=True, text=True, timeout=10, cwd=tmpdir,
+            )
+            self.assertEqual(result.returncode, 0)
+            self.assertIn("terminal state", result.stdout)
+
+    # -----------------------------------------------------------------------
+    # Task 12: FSM parsing, Q-gating, malformed config, archive idempotency
+    # -----------------------------------------------------------------------
+
+    def test_vidux_loop_is_resuming_true_for_in_progress(self):
+        """vidux-loop.sh must set is_resuming=true when an [in_progress] task exists."""
+        import tempfile, os
+        plan_ip = textwrap.dedent("""\
+            # Test Plan
+            ## Tasks
+            - [in_progress] Task 1: do something specific [Evidence: source]
+            ## Progress
+        """)
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
+            f.write(plan_ip)
+            tmp = f.name
+        try:
+            result = subprocess.run(
+                ["bash", str(self.SCRIPTS_DIR / "vidux-loop.sh"), tmp],
+                capture_output=True, text=True, timeout=10,
+            )
+            self.assertEqual(result.returncode, 0, f"vidux-loop.sh failed: {result.stderr}")
+            data = json.loads(result.stdout)
+            self.assertTrue(data.get("is_resuming"), "Expected is_resuming=true for [in_progress] task")
+            self.assertEqual(data.get("action"), "execute")
+        finally:
+            os.unlink(tmp)
+
+    def test_vidux_loop_q_gating_blocks_task_with_open_qref(self):
+        """action must be 'refine' when task desc cites an open Q-ref."""
+        import tempfile, os
+        plan_q = textwrap.dedent("""\
+            # Test Plan
+            ## Tasks
+            - [pending] Task 1: implement something, see Q1 [Evidence: source.md:1]
+            ## Open Questions
+            - [ ] Q1: Which API version should we target?
+            ## Progress
+        """)
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
+            f.write(plan_q)
+            tmp = f.name
+        try:
+            result = subprocess.run(
+                ["bash", str(self.SCRIPTS_DIR / "vidux-loop.sh"), tmp],
+                capture_output=True, text=True, timeout=10,
+            )
+            self.assertEqual(result.returncode, 0, f"vidux-loop.sh failed: {result.stderr}")
+            data = json.loads(result.stdout)
+            self.assertEqual(data.get("action"), "refine",
+                             f"Expected action=refine but got {data.get('action')}")
+            self.assertGreater(data.get("task_open_questions", 0), 0)
+        finally:
+            os.unlink(tmp)
+
+    def test_vidux_loop_q_gating_does_not_block_unrelated_qs(self):
+        """action must be 'execute' when open Qs exist but are NOT cited in the task desc."""
+        import tempfile, os
+        plan_unrelated = textwrap.dedent("""\
+            # Test Plan
+            ## Tasks
+            - [pending] Task 1: implement the feature [Evidence: source.md:1]
+            ## Open Questions
+            - [ ] Q1: Some global question not referenced in tasks
+            ## Progress
+        """)
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
+            f.write(plan_unrelated)
+            tmp = f.name
+        try:
+            result = subprocess.run(
+                ["bash", str(self.SCRIPTS_DIR / "vidux-loop.sh"), tmp],
+                capture_output=True, text=True, timeout=10,
+            )
+            self.assertEqual(result.returncode, 0, f"vidux-loop.sh failed: {result.stderr}")
+            data = json.loads(result.stdout)
+            self.assertEqual(data.get("action"), "execute",
+                             f"Unrelated open Q should not gate task; got action={data.get('action')}")
+            self.assertEqual(data.get("task_open_questions", 0), 0)
+        finally:
+            os.unlink(tmp)
+
+    def test_vidux_loop_malformed_config_uses_defaults(self):
+        """vidux-loop.sh must produce valid JSON and warn on stderr when config is malformed."""
+        import tempfile, shutil, os
+        with tempfile.TemporaryDirectory() as tmpdir:
+            scripts_subdir = os.path.join(tmpdir, "scripts")
+            os.makedirs(scripts_subdir)
+            script_copy = os.path.join(scripts_subdir, "vidux-loop.sh")
+            shutil.copy(str(self.SCRIPTS_DIR / "vidux-loop.sh"), script_copy)
+            os.chmod(script_copy, 0o755)
+            # Malformed config at ../vidux.config.json relative to scripts/
+            config_path = os.path.join(tmpdir, "vidux.config.json")
+            with open(config_path, "w") as f:
+                f.write("{ not valid json !!!")
+            plan_path = os.path.join(tmpdir, "PLAN.md")
+            with open(plan_path, "w") as f:
+                f.write("# Test\n## Tasks\n- [pending] Task 1: do something [Evidence: s]\n## Progress\n")
+            result = subprocess.run(
+                ["bash", script_copy, plan_path],
+                capture_output=True, text=True, timeout=10,
+            )
+            self.assertEqual(result.returncode, 0, f"script failed: {result.stderr}")
+            data = json.loads(result.stdout)
+            self.assertIn("cycle", data, "Must still produce valid cycle output with defaults")
+            self.assertIn("WARNING", result.stderr, "Must emit WARNING to stderr on malformed config")
+
+    def test_checkpoint_archive_idempotent(self):
+        """Running --archive twice must not double-archive or corrupt PLAN.md."""
+        import tempfile, os
+        tasks = "\n".join([
+            f"- [completed] Task {i}: something [Done: 2026-01-{i:02d}]"
+            for i in range(1, 36)
+        ])
+        with tempfile.TemporaryDirectory() as tmpdir:
+            plan = self._make_git_plan(tmpdir, f"# Test Plan\n## Tasks\n{tasks}\n## Progress\n")
+            archive = os.path.join(tmpdir, "ARCHIVE.md")
+            # First run
+            r1 = subprocess.run(
+                ["bash", str(self.SCRIPTS_DIR / "vidux-checkpoint.sh"), plan, "--archive"],
+                capture_output=True, text=True, timeout=10, cwd=tmpdir,
+            )
+            self.assertEqual(r1.returncode, 0, f"First archive failed: {r1.stderr}")
+            content_after_first = Path(plan).read_text(encoding="utf-8")
+            archive_size_after_first = Path(archive).stat().st_size if os.path.exists(archive) else 0
+            # Second run
+            r2 = subprocess.run(
+                ["bash", str(self.SCRIPTS_DIR / "vidux-checkpoint.sh"), plan, "--archive"],
+                capture_output=True, text=True, timeout=10, cwd=tmpdir,
+            )
+            self.assertEqual(r2.returncode, 0, f"Second archive failed: {r2.stderr}")
+            content_after_second = Path(plan).read_text(encoding="utf-8")
+            archive_size_after_second = Path(archive).stat().st_size if os.path.exists(archive) else 0
+            self.assertEqual(content_after_first, content_after_second,
+                             "PLAN.md changed on second --archive run (not idempotent)")
+            self.assertEqual(archive_size_after_first, archive_size_after_second,
+                             "ARCHIVE.md grew on second --archive run (double-archived)")
+            idempotent_signals = ["Already archived", "Nothing to archive"]
+            self.assertTrue(
+                any(sig in r2.stdout for sig in idempotent_signals),
+                f"Expected idempotent message in second run, got: {r2.stdout!r}"
+            )
+
+    def test_checkpoint_archive_counts_v2_completed_tasks(self):
+        """archive mode must include [completed] (v2) tasks in archive count, not just [x] (v1)."""
+        import tempfile, os
+        tasks = "\n".join([
+            f"- [completed] Task {i}: something [Done: 2026-01-{i:02d}]"
+            for i in range(1, 36)
+        ])
+        with tempfile.TemporaryDirectory() as tmpdir:
+            plan = self._make_git_plan(tmpdir, f"# Test Plan\n## Tasks\n{tasks}\n## Progress\n")
+            result = subprocess.run(
+                ["bash", str(self.SCRIPTS_DIR / "vidux-checkpoint.sh"), plan, "--archive"],
+                capture_output=True, text=True, timeout=10, cwd=tmpdir,
+            )
+            self.assertEqual(result.returncode, 0, f"archive failed: {result.stderr}")
+            self.assertIn("Archived 5", result.stdout)
+            self.assertTrue(os.path.exists(os.path.join(tmpdir, "ARCHIVE.md")))
+
+    def test_skill_has_configuration_section(self):
+        """SKILL.md must have a Configuration section."""
+        text = _read(SKILL)
+        self.assertIn("## Configuration", text)
+        self.assertIn("external", text)
+        self.assertIn("inline", text)
+
+    def test_projects_directory_exists(self):
+        """projects/ must exist and be a directory."""
+        projects = ROOT / "projects"
+        self.assertTrue(projects.exists())
+        self.assertTrue(projects.is_dir())
+
+    def test_checkpoint_outcome_useful_appears_in_progress(self):
+        """checkpoint.sh --outcome useful must write 'outcome=useful' into the Progress entry."""
+        import tempfile
+        task = "Task 1: do something specific [Evidence: source]"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            plan = self._make_git_plan(tmpdir, f"# Test Plan\n## Tasks\n- [pending] {task}\n## Progress\n")
+            result = subprocess.run(
+                ["bash", str(self.SCRIPTS_DIR / "vidux-checkpoint.sh"), plan, task,
+                 "task done", "--outcome", "useful"],
+                capture_output=True, text=True, timeout=10, cwd=tmpdir,
+            )
+            self.assertEqual(result.returncode, 0, f"checkpoint failed: {result.stderr}")
+            with open(plan) as f:
+                content = f.read()
+            self.assertIn("outcome=useful", content)
+
+    def test_checkpoint_outcome_invalid_rejects_with_nonzero_exit(self):
+        """checkpoint.sh --outcome <invalid> must exit non-zero."""
+        import tempfile
+        task = "Task 1: do something specific [Evidence: source]"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            plan = self._make_git_plan(tmpdir, f"# Test Plan\n## Tasks\n- [pending] {task}\n## Progress\n")
+            result = subprocess.run(
+                ["bash", str(self.SCRIPTS_DIR / "vidux-checkpoint.sh"), plan, task,
+                 "task done", "--outcome", "invalid_value"],
+                capture_output=True, text=True, timeout=10, cwd=tmpdir,
+            )
+            self.assertNotEqual(result.returncode, 0, "expected non-zero exit for invalid --outcome")
+
+
+    # ===== v2.3.0 NEW TESTS: Dependency Matcher Fixes ===== #
+
+    def _run_loop_on(self, plan_text):
+        """Helper: write plan_text to a temp file, run vidux-loop.sh, return parsed JSON."""
+        import tempfile, os
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
+            f.write(textwrap.dedent(plan_text))
+            tmp = f.name
+        try:
+            result = subprocess.run(
+                ["bash", str(self.SCRIPTS_DIR / "vidux-loop.sh"), tmp],
+                capture_output=True, text=True, timeout=10,
+            )
+            self.assertEqual(result.returncode, 0, f"vidux-loop.sh failed: {result.stderr}")
+            return json.loads(result.stdout)
+        finally:
+            os.unlink(tmp)
+
+    def test_dep_none_does_not_block(self):
+        """[Depends: none] must not block — fixes false-positive on 'none' sentinel."""
+        data = self._run_loop_on("""\
+            # Test Plan
+            ## Tasks
+            - [pending] Task 1: Build feature X [Evidence: src] [Depends: none]
+            - [pending] Task 2: Build feature Y [Evidence: src] [Depends: none]
+            ## Progress
+        """)
+        self.assertFalse(data["blocked"])
+
+    def test_dep_none_case_insensitive(self):
+        """[Depends: None] and [Depends: NONE] must not block."""
+        for variant in ["None", "NONE"]:
+            data = self._run_loop_on(f"""\
+                # Test Plan
+                ## Tasks
+                - [pending] Task 1: Build feature [Evidence: src] [Depends: {variant}]
+                ## Progress
+            """)
+            self.assertFalse(data["blocked"], f"[Depends: {variant}] incorrectly blocked")
+
+    def test_dep_self_match_excluded(self):
+        """Task must not self-match on its own [Depends:] text."""
+        data = self._run_loop_on("""\
+            # Test Plan
+            ## Tasks
+            - [completed] Task 1: Setup infrastructure
+            - [pending] Task 2: Build widget [Evidence: src] [Depends: Task 1]
+            ## Progress
+        """)
+        self.assertFalse(data["blocked"])
+
+    def test_dep_numeric_partial_match_safe(self):
+        """[Depends: 1.4] must not match Task 14 or text containing '2.4'."""
+        data = self._run_loop_on("""\
+            # Test Plan
+            ## Tasks
+            - [completed] Task 1.4: Build payment gateway
+            - [pending] Task 2: Scale to 2.4x [Evidence: src] [Depends: 1.4]
+            - [pending] Task 14: Unrelated work
+            ## Progress
+        """)
+        self.assertFalse(data["blocked"])
+
+    def test_dep_legitimate_blocking(self):
+        """Task with pending dependency must be blocked."""
+        data = self._run_loop_on("""\
+            # Test Plan
+            ## Tasks
+            - [pending] Task 1: Setup infrastructure
+            - [pending] Task 2: Build on infra [Evidence: src] [Depends: 1]
+            ## Progress
+        """)
+        # Task 1 is first pending, so it gets selected (not Task 2)
+        self.assertIn("Task 1", data["task"])
+
+    def test_dep_dotted_id_blocking(self):
+        """[Depends: 0.3] must correctly block when Task 0.3 is pending."""
+        data = self._run_loop_on("""\
+            # Test Plan
+            ## Tasks
+            - [pending] Task 0.7: Review all designs [Evidence: src] [Depends: 0.3]
+            - [pending] Task 0.3: Design the matcher [Evidence: src]
+            ## Progress
+        """)
+        self.assertTrue(data["blocked"])
+        self.assertIn("0.3", data["context"])
+
+    def test_dep_multi_dep_partial_resolution(self):
+        """Multi-dep list must block if any dep is unresolved."""
+        data = self._run_loop_on("""\
+            # Test Plan
+            ## Tasks
+            - [completed] Task 0.3: Design dep matcher
+            - [completed] Task 0.5: Design hygiene
+            - [completed] Task 0.6: Design D6
+            - [pending] Task 0.7: Review all [Evidence: src] [Depends: 0.3, 0.4, 0.5, 0.6]
+            - [pending] Task 0.4: Design contradiction
+            ## Progress
+        """)
+        self.assertTrue(data["blocked"])
+        self.assertIn("0.4", data["context"])
+
+    def test_dep_unstructured_tasks_degrade_gracefully(self):
+        """Tasks without 'Task N:' prefix must not false-block."""
+        data = self._run_loop_on("""\
+            # Test Plan
+            ## Tasks
+            - [completed] Fix the login bug
+            - [pending] Add password reset [Evidence: src] [Depends: Fix the login bug]
+            ## Progress
+        """)
+        self.assertFalse(data["blocked"])
+
+    def test_dep_v1_checkbox_compat(self):
+        """v1 [x] completed tasks must be excluded from pending set."""
+        data = self._run_loop_on("""\
+            # Test Plan
+            ## Tasks
+            - [x] Task 1: Setup infrastructure
+            - [ ] Task 2: Build widget [Evidence: src] [Depends: 1]
+            ## Progress
+        """)
+        self.assertFalse(data["blocked"])
+
+    # ===== v2.3.0 NEW TESTS: DL-STUCK-TAG-BLIND Fix ===== #
+
+    def test_dl_stuck_entries_parsed(self):
+        """[STUCK] entries must appear in decision_log_count and decision_log_entries."""
+        data = self._run_loop_on("""\
+            # Test Plan
+            ## Decision Log
+            - [STUCK] [2026-04-05] Task stuck for 3+ cycles. Auto-blocked.
+            - [DIRECTION] [2026-04-05] Do not skip planning.
+            ## Tasks
+            - [pending] Task 1: Build feature [Evidence: src]
+            ## Progress
+        """)
+        self.assertEqual(data["decision_log_count"], 2)
+        self.assertTrue(data["decision_log_warning"])
+        self.assertIn("STUCK", data["decision_log_entries"])
+        self.assertIn("DIRECTION", data["decision_log_entries"])
+
+    # ===== v2.3.0 NEW TESTS: Contradiction Detection ===== #
+
+    def test_contradiction_fields_present(self):
+        """JSON output must contain contradiction_warning, contradiction_matches, contradicts_tag."""
+        data = self._run_loop_on("""\
+            # Test Plan
+            ## Tasks
+            - [pending] Task 1: Build feature [Evidence: src]
+            ## Progress
+        """)
+        self.assertIn("contradiction_warning", data)
+        self.assertIn("contradiction_matches", data)
+        self.assertIn("contradicts_tag", data)
+
+    def test_contradiction_keyword_overlap_fires(self):
+        """Keyword overlap >=2 with DELETION entry must set contradiction_warning=true."""
+        data = self._run_loop_on("""\
+            # Test Plan
+            ## Decision Log
+            - [DELETION] [2026-04-05] Removed legacy --verbose flag. Do not re-add.
+            ## Tasks
+            - [pending] Task 1: Re-add --verbose flag [Evidence: src]
+            ## Progress
+        """)
+        self.assertTrue(data["contradiction_warning"])
+        self.assertIn("verbose", data["contradiction_matches"].lower())
+        self.assertIn("flag", data["contradiction_matches"].lower())
+
+    def test_contradiction_no_overlap_below_threshold(self):
+        """0-1 keyword overlap must not trigger contradiction_warning."""
+        data = self._run_loop_on("""\
+            # Test Plan
+            ## Decision Log
+            - [DELETION] [2026-04-05] Removed payment retry logic.
+            ## Tasks
+            - [pending] Task 1: Add payment webhook handler [Evidence: src]
+            ## Progress
+        """)
+        self.assertFalse(data["contradiction_warning"])
+
+    def test_contradiction_explicit_tag(self):
+        """Task with [Contradicts: DL-1] must set contradiction_warning=true."""
+        data = self._run_loop_on("""\
+            # Test Plan
+            ## Decision Log
+            - [DIRECTION] [2026-04-05] Use SQLite.
+            ## Tasks
+            - [pending] Task 1: Migrate to Postgres [Contradicts: DL-1] [Evidence: src]
+            ## Progress
+        """)
+        self.assertTrue(data["contradiction_warning"])
+        self.assertIn("Contradicts", data["contradicts_tag"])
+
+    def test_contradiction_rate_limit_skipped(self):
+        """RATE-LIMIT entries must not trigger keyword overlap."""
+        data = self._run_loop_on("""\
+            # Test Plan
+            ## Decision Log
+            - [RATE-LIMIT] [2026-04-05] Deploy limited to 3 per day.
+            ## Tasks
+            - [pending] Task 1: Deploy the new feature today [Evidence: src]
+            ## Progress
+        """)
+        self.assertFalse(data["contradiction_warning"])
+
+    def test_contradiction_no_dl_section(self):
+        """Plans without Decision Log must have all contradiction fields false/empty."""
+        data = self._run_loop_on("""\
+            # Test Plan
+            ## Tasks
+            - [pending] Task 1: Build feature [Evidence: src]
+            ## Progress
+        """)
+        self.assertFalse(data["contradiction_warning"])
+        self.assertEqual(data["contradiction_matches"], "")
+        self.assertEqual(data["contradicts_tag"], "")
+
+    def test_contradiction_direction_overlap(self):
+        """DIRECTION entry overlap must trigger warning."""
+        data = self._run_loop_on("""\
+            # Test Plan
+            ## Decision Log
+            - [DIRECTION] [2026-04-05] Chose SQLite over Postgres for storage.
+            ## Tasks
+            - [pending] Task 1: Migrate storage to Postgres [Evidence: src]
+            ## Progress
+        """)
+        self.assertTrue(data["contradiction_warning"])
+
+    # ===== v2.3.0 NEW TESTS: Doctor Script ===== #
+
+    def test_doctor_script_exists_and_executable(self):
+        """vidux-doctor.sh must exist and be executable."""
+        script = self.SCRIPTS_DIR / "vidux-doctor.sh"
+        self.assertTrue(script.exists(), "vidux-doctor.sh missing")
+        self.assertTrue(os.access(script, os.X_OK), "vidux-doctor.sh not executable")
+
+    def test_doctor_json_output_is_valid(self):
+        """vidux-doctor.sh --json must produce valid JSON with required fields."""
+        result = subprocess.run(
+            ["bash", str(self.SCRIPTS_DIR / "vidux-doctor.sh"), "--json"],
+            capture_output=True, text=True, timeout=15,
+        )
+        data = json.loads(result.stdout)
+        for key in ("version", "pass", "total", "checks"):
+            self.assertIn(key, data)
+        self.assertIsInstance(data["checks"], list)
+        self.assertGreaterEqual(len(data["checks"]), 7)
+
+    def test_doctor_checks_have_required_fields(self):
+        """Each check in doctor JSON output must have id, category, and status."""
+        result = subprocess.run(
+            ["bash", str(self.SCRIPTS_DIR / "vidux-doctor.sh"), "--json"],
+            capture_output=True, text=True, timeout=15,
+        )
+        data = json.loads(result.stdout)
+        for check in data["checks"]:
+            self.assertIn("id", check)
+            self.assertIn("category", check)
+            self.assertIn("status", check)
+            self.assertIn(check["status"], ("pass", "warn", "block"))
+
+
+if __name__ == "__main__":
+    unittest.main()
