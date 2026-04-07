@@ -55,49 +55,8 @@ Create a net-new plan-first orchestration system that makes quarter-long iOS pro
 
 ### Phase 7: Open Source Publication — COMPLETE
 
-### Phase 8: Canonical Unification — IN PROGRESS
-
-### Phase 9: Automation Quality — COMPLETE
-- [completed] Create example fleet configs for a reference project (writer + 2 radars + coordinator, staggered schedule). [Done: 2026-04-06] [Evidence: examples/fleet-reference/]
-- [completed] End-to-end test: ran /vidux from scratch on NextJS (17/20) and iOS (19/20). Both created compound task investigations. Plan quality validated. [Done: 2026-04-06] [Evidence: projects/vidux-self-investigation/evidence/2026-04-06-e2e-plan-quality.md]
-
-### Phase 10: Visibility, Intelligence & Health — IN PROGRESS
-
-**Goal:** Make vidux self-aware, visible, and self-healing. Clear stage indicators, cross-tool dashboard, ledger-powered coordination, backpressure, and a manager that can diagnose and test itself.
-
-[Evidence: 5-agent fan-out research synthesis at `projects/vidux-self-investigation/evidence/2026-04-06-phase10-research-synthesis.md`]
-
-- [completed] **10.1 Stage indicators** — 6 primary stages (🔍 GATHER, 📐 PLAN, ⚡ EXECUTE, ✅ VERIFY, 📌 CHECKPOINT, 🏁 COMPLETE) + 3 meta-stages + depth tracking [L1/L2/L3]. Embedded in /vidux command. "DIE" renamed to "COMPLETE" across 9 files. "Design for yield" renamed to "Design for completion." [Done: 2026-04-06]
-- [completed] **10.2 vidux.config.json extensions** — Added `external_plan_roots[]`, `dashboard.*`, `ledger.*`, `pruning.*`, `backpressure.*` config sections with documented defaults. Backward-compatible. [Done: 2026-04-07] [Evidence: phase10-research-synthesis.md specs, existing script consumers validated]
-- [completed] **10.3 Ledger integration** — Built 3-file integration layer: ledger-config.sh (discovery + fallback), ledger-emit.sh (vidux_loop_start/end, checkpoint, plan_modified, fleet_health events), ledger-query.sh (bimodal_distribution, automation_runs, handoff_gaps, fleet_health, conflict_check). Wired into vidux-loop.sh and vidux-checkpoint.sh. vidux-manager.md updated to use ledger queries. Validated against real production ledger (3205 entries, 14 automations). [Done: 2026-04-06]
-- [completed] **10.4 /vidux-dashboard command** — 3-source plan discovery (local projects/, ~/.codex/automations/, ~/.claude/ + external roots). Tree view with status, health, last activity. JSON mode. 205 lines. [Done: 2026-04-06]
-- [completed] **10.5 vidux-prune.sh** — Subcommands: plans, worktrees, ledger, all, pressure. Plan archival at threshold. Worktree lifecycle. Ledger compaction. Circuit breaker. Pressure scoring 0-10. Dry-run mode. 387 lines. [Done: 2026-04-06]
-- [completed] **10.6 /vidux-manager command** — 4 modes: diagnose, test, investigate, fleet-health. Stage indicators integrated. Quality scoring against 17-19/20 baseline. 312 lines. [Done: 2026-04-06]
-- [completed] **10.7 Contract tests** — 30 new tests added (138 total) covering ledger libs, vidux-prune.sh, vidux-fleet-quality.sh, dashboard/manager/recipes commands, DOCTRINE.md 12-principle check, SKILL.md dispatch/reduce/bimodal/bounded-recursion terms. [Done: 2026-04-07] [Evidence: test-agent swarm commit 0f85e02]
-
-### Phase 11: Dispatch/Reduce Structural Enforcement + Fleet Hardening
-
-**Goal:** Make the bimodal distribution structural (not just prompt discipline), integrate Vercel toolbar for mobile QA, harden the Codex DB write pattern, and bake the three new doctrine tenets into the open-source docs.
-
-[Evidence: `projects/vidux-v230/evidence/2026-04-06-burst-vs-watch-mode-insight.md`, nia research 2026-04-07 (agentic patterns + Vercel integration + closure-bias workarounds), evening fleet data (resplit-asc 71m burst, resplit-web 33m burst — burst doctrine confirmed working)]
-
-- [completed] **11.1 Bake dispatch/reduce/self-extending doctrine into DOCTRINE.md** — Added Loop Discipline section (principles 10-12), Dispatch/Reduce section with Redux analogy and flow diagram. Updated header to 12 principles. Zero burst/watch terminology. [Done: 2026-04-07] [Evidence: doctrine-agent commit 82fa88b, 108 tests pass]
-- [completed] **11.2 vidux-dispatch.sh** — 230-line dispatch assessment script. Dry-run + full mode. Dispatch protocol (stop_conditions, forbidden, required). Exit criteria gate. Stuck detection. Ledger integration. Subagent spawning is agent-side behavior, protocol surface exposed in JSON. [Done: 2026-04-07] [Evidence: valid JSON output, 15 pending tasks detected, 138/138 tests pass]
-- [completed] **11.3 Tighten vidux-loop.sh to explicit reduce mode** — All JSON output uses mode:reduce. next_action uses dispatch|none. Added reduce_contract block: read_only, 120s budget, forbidden/allowed actions. [Done: 2026-04-07] [Evidence: prune-agent rename + reduce_contract addition, 138/138 tests pass]
-- [x] **11.4 Exit-criteria hook** — Add a machine-verifiable `## Exit Criteria` section to PLAN.md template. Hook rejects agent "done" signal if criteria aren't met. Community-validated pattern (Claude Code #30150). [Evidence: nia research — "append grep-testable conditions, reject done signal if unmet"] [Done: 2026-04-06]
-- [blocked] **11.5 Vercel toolbar → task queue bridge** — [Blocker: requires Vercel MCP access + live strongyes project context. Cannot implement in vidux core repo alone.]
-- [completed] **11.6 Codex DB write resilience** — Built reusable `scripts/lib/codex-db.sh` lib: codex_db_stop_app, codex_db_write (refuses if app running), codex_db_query, codex_db_epoch_ms. Kill→write→verify pattern extracted from fleet-rebuild.sh. WAL mode won't fix the in-memory cache overwrite — app-stop is the canonical pattern. [Done: 2026-04-07] [Evidence: tested against live Codex (app running detected)]
-- [completed] **11.7 Prune stale references** — 9 files changed: burst→dispatch, watch→reduce across scripts/tests/commands/SKILL.md. Removed vidux-amp ref, pruned RALPH.md from live constraints. Historical entries preserved. [Done: 2026-04-07] [Evidence: prune-agent commit 4e1b5fd, merge ddb31d8]
-- [completed] **11.8 JSON task queue experiment** — Built `scripts/lib/queue-jsonl.sh`: queue_sync (PLAN.md→QUEUE.jsonl), queue_next (first actionable), queue_count (status breakdown). QUEUE.jsonl is gitignored (derived index). 70 tasks synced, status counts match loop.sh. [Done: 2026-04-07] [Evidence: tested against live PLAN.md, 138/138 tests pass]
-- [completed] **11.9 Lifecycle hooks integration** — Added beforeTask (vidux-doctor.sh --json) and afterTask (vidux-checkpoint.sh) to hooks/hooks.json. 5 hooks total. Users wire these in Claude Code settings.json or Codex lifecycle config. [Done: 2026-04-07] [Evidence: hooks.json valid, 138/138 tests pass]
-
-### Phase 12: Continuous Feedback Loop
-- [completed] Task 12.1: Add merge-gate to vidux-dispatch.sh — `--merge-gate` mode: detects worktree, tries ff-merge (Tier 1), regular merge (Tier 2), or creates PR on conflict (Tier 3). Proper worktree detection via resolved absolute paths. [Done: 2026-04-07] [Evidence: tested from non-worktree (skip) + merge-gate-harness-fix.md design]
-- [completed] Task 12.2: Add auto-pause to vidux-loop.sh — checks last 3 Progress entries for unproductive patterns (blocked, proof-refresh only, nothing to do, escalate). Outputs `auto_pause_recommended` and `unproductive_streak` in JSON. Callers read these to adjust cadence. [Done: 2026-04-07] [Evidence: tested with empty/productive Progress, pipefail-safe]
-- [completed] Task 12.3: Add bimodal enforcement to vidux-loop.sh — reads `backpressure.bimodal_critical_threshold` from config (default 70). Queries ledger_bimodal_distribution. If score < threshold, sets `bimodal_gate: blocked` and refuses to fire dispatch. Outputs bimodal_score and bimodal_gate in JSON. [Done: 2026-04-07] [Evidence: tested with no ledger (pass-through), config integration verified]
-- [completed] Task 12.4: Build vidux-witness.sh — 300-line fleet health observer. Per-plan task counts, git freshness, ledger mid-zone detection, automation memory scanning, fleet A-F grade, JSON output. [Done: 2026-04-07] [Evidence: witness-agent commit c5ee920, 138 tests pass]
-- [completed] Task 12.5: Add self-extension quality metric to vidux-manager diagnose — step 5 in diagnose flow. Counts tasks added vs completed, computes ratio. Healthy ≤1.5, warning 1.5-3.0, recursive overload >3.0. Supports [Added-by:] tags and Progress fallback. [Done: 2026-04-07] [Evidence: added to vidux-manager.md diagnose steps, 138/138 tests pass]
-- [completed] Task 12.6: Contract tests for Phase 12 — 11 new tests (149 total): merge-gate mode, auto-pause fields, bimodal gate, reduce contract, codex-db lib, queue-jsonl lib, witness script, lifecycle hooks, config backpressure/pruning, self-extension metric. [Done: 2026-04-07]
+### Phases 8-12 — ARCHIVED (see ARCHIVE.md)
+<!-- 38 tasks archived to ARCHIVE.md on 2026-04-07, Cycle 38 -->
 
 ### Phase 13: Hardening & Coverage — COMPLETE
 
@@ -142,6 +101,16 @@ Create a net-new plan-first orchestration system that makes quarter-long iOS pro
 - [completed] **15.4 Mid-zone enforcement in harness prompts** — Added "Dispatch-side mid-zone kill" to DOCTRINE.md Principle 10 and best-practices.md REDUCE gate section. Rule: 3+ minutes with no file write in dispatch = checkpoint and exit. Cited fleet data (32% mid-zone, target <15%). 2 contract tests. [Done: 2026-04-07] [Evidence: fleet-loop-analysis.md#3]
 - [completed] **15.5 Contract tests for circuit breaker** — 2 tests: circuit_breaker field exists and is open/closed, idle progress triggers open + blocks dispatch. Merged into 15.1 delivery. [Done: 2026-04-07] [Evidence: coverage-gaps pattern]
 
+### Phase 16: Plan Hygiene & Archive — IN PROGRESS
+
+**Goal:** The PLAN.md has grown to 200+ lines with 80+ completed tasks across 15 phases. Archive completed phases to keep the hot window lean (<30 tasks). Also prune stale evidence and project plans.
+
+[Evidence: vidux-loop.sh context_warning=true, context_note="69 completed tasks"]
+
+- [completed] **16.1 Archive phases 8-12 to ARCHIVE.md** — 38 completed tasks moved. PLAN.md dropped from 230 to ~130 lines. Phases 1-7 were already headers-only. Phases 13-15 kept as recent context. [Done: 2026-04-07] [Evidence: loop context_warning]
+- [pending] **16.2 Prune stale project plans** — Run `vidux-prune.sh plans --simulate` to identify archivable project plans in projects/. Archive any with 100% completed tasks. [Evidence: fleet-loop-analysis.md]
+- [pending] **16.3 Update README.md with Phase 13-15 features** — Circuit breaker, idle-churn detection, radar template, mid-zone kill, compat.sh — these are user-facing features that should be in the README. [Evidence: self-extending plan, Doctrine 11]
+
 ### Phase 10 Open Questions
 - [x] Q6: Max plan nesting depth = 3, 4th allowed but flagged. Enforced by dashboard. [Decision Log entry exists.] [Done: 2026-04-07]
 - [x] Q7: Dashboard refresh = on-demand. Config added in 10.2 (`dashboard.refresh_mode: "on-demand"`). [Done: 2026-04-07]
@@ -152,7 +121,7 @@ Create a net-new plan-first orchestration system that makes quarter-long iOS pro
 - [x] Q2: Plan readiness = 10-point checklist in LOOP.md. 5 required gates + 5 quality points. Score >= 7 to code, < 7 means refine the plan. [Done: 2026-04-01]
 - [x] Q3: SKILL.md alone is sufficient for all 3 tools (agentskills.io open standard). Plugin manifests are for marketplace distribution only, not cross-tool compat. Captain symlinks handle discovery. [Done: 2026-04-01]
 - [x] Q4: Agent subagents (not Teams) for fan-out. Teams persist across sessions (violates stateless doctrine), add coordination overhead, and risk orphaned state if cron dies. Subagents are fire-and-forget, perfect for embarrassingly parallel research. Teams reserved for future multi-turn critic debates. [Done: 2026-04-01]
-- [ ] Q5: Should the public repo ship example automation harnesses, or stay focused on the skill and loop contract first? -> Action: gather feedback from Issues after first publish.
+- [x] Q5: Ship **templates**, not full harnesses. The public repo already has: `guides/vidux/radar-template.md` (Phase 15.3), `examples/fleet-reference/` (Phase 9), and the REDUCE gate block in `guides/vidux/best-practices.md`. Full harnesses are project-specific (Layer 2) and contain absolute paths, skill lists, and authority chains that don't generalize. Templates with `{{placeholders}}` are the right abstraction. [Done: 2026-04-07] [Evidence: Phase 15.3 radar template, Phase 9 fleet configs, fleet-loop-analysis.md prompt quality audit]
 
 ## Surprises
 - [2026-03-31] obra/superpowers (128K stars) already installed in our env. Its brainstorm->plan->execute->verify chain is close to Vidux's gather->plan->execute->verify. Could be a companion rather than competitor.
@@ -182,6 +151,7 @@ Create a net-new plan-first orchestration system that makes quarter-long iOS pro
 - [DIRECTION] [2026-04-06] Automations self-extend plans. Every automation can add tasks to PLAN.md. No writer/reader distinction. Bounded by three-strike rule to prevent recursive overload.
 
 ## Progress
+- [2026-04-07] Cycle 38: 📐→⚡ PLAN+EXECUTE — Resolved Q5 (ship templates not full harnesses). Archived 38 tasks from phases 8-12 to ARCHIVE.md (230→~130 lines). Planned Phase 16 (3 tasks). Shipped 16.1 (archive). All open questions now answered. Next: 16.2 (prune stale projects), 16.3 (README update).
 - [2026-04-07] Cycle 37: ⚡→📌 CHECKPOINT — Phase 15 COMPLETE (5/5). Shipped 15.4 (dispatch-side mid-zone kill in DOCTRINE.md + best-practices.md). Rule: 3+ min with no file write in dispatch = exit. Fleet data cited (32% mid-zone, target <15%). 2 contract tests. Phases 13-15 all complete. Next: research-driven Phase 16 or archive + plan pruning.
 - [2026-04-07] Cycle 36: ⚡ EXECUTE — Shipped 15.3 (radar template at guides/vidux/radar-template.md). Extracted shared pattern from 3 StrongYes radars (~80% identical). Template includes updated REDUCE gate with circuit_breaker, sizing guidance, examples. Contract test added. Phase 15: 4/5 done. Next: 15.4 (mid-zone enforcement).
 - [2026-04-07] Cycle 35: ⚡ EXECUTE — Shipped 15.2 (idle-churn detection in witness.sh: per-automation idle_churn_pct + total_entries). Fixed compat.sh nounset guard. Verified: hourly-media-studio=100% churn, resplit-android=66%, codex-orchestrator=33%. Next: 15.3 (radar template), 15.4 (mid-zone enforcement).

@@ -45,3 +45,11 @@ Tasks completed and archived from PLAN.md to keep context lean.
 - [completed] Retire `ai/skills/vidux/` — all 9 automation.toml files updated to canonical path. Ralph + vidux-amp dead refs removed. ai/skills/vidux symlink removed. [Done: 2026-04-06] [Evidence: `projects/vidux-self-investigation/evidence/2026-04-06-stale-path-audit.md`]
 - [completed] Add bimodal runtime enforcement to vidux-doctor.sh — CHECK 11: flags projects where >30% of runs fall in 3-8 min dead zone. Uses git commit timestamps. [Done: 2026-04-06]
 - [completed] Build automation quality inspector — vidux-fleet-quality.sh reads memory.md files, classifies runs (quick/deep/mid/normal), reports per-automation and fleet-wide bimodal quality. [Done: 2026-04-06]
+
+## Archived 2026-04-07 (Cycle 38) — Phases 8-12
+
+### Phase 8: Canonical Unification
+### Phase 9: Automation Quality — fleet configs, e2e tests (NextJS 17/20, iOS 19/20)
+### Phase 10: Visibility, Intelligence & Health — 7 tasks (10.1-10.7): stage indicators, config extensions, ledger integration, dashboard, prune, manager, 30 contract tests
+### Phase 11: Dispatch/Reduce + Fleet Hardening — 9 tasks (11.1-11.9): doctrine bake, dispatch.sh, reduce mode, exit-criteria, Codex DB resilience, stale ref prune, queue-jsonl, lifecycle hooks. 11.5 blocked (Vercel MCP).
+### Phase 12: Continuous Feedback Loop — 6 tasks (12.1-12.6): merge-gate, auto-pause, bimodal enforcement, witness.sh, self-extension metric, 11 contract tests (149 total)
