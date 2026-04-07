@@ -2555,5 +2555,18 @@ class ViduxContractTests(unittest.TestCase):
         self.assertIn("800-1200 chars", text)
 
 
+    def test_midzone_kill_in_doctrine(self):
+        """DOCTRINE.md Principle 10 must include dispatch-side mid-zone kill."""
+        text = _read(ROOT / "DOCTRINE.md")
+        self.assertIn("mid-zone kill", text.lower())
+        self.assertIn("3+ minutes", text)
+
+    def test_midzone_kill_in_best_practices(self):
+        """best-practices.md must include dispatch-side mid-zone kill guidance."""
+        text = _read(ROOT / "guides" / "vidux" / "best-practices.md")
+        self.assertIn("mid-zone kill", text.lower())
+        self.assertIn("32%", text)
+
+
 if __name__ == "__main__":
     unittest.main()

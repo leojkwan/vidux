@@ -332,6 +332,20 @@ REDUCE gate (run FIRST, before any other work):
 Budget: steps 1-3 must complete in under 60 seconds.
 ```
 
+### Dispatch-side mid-zone kill
+
+The REDUCE gate prevents mid-zone on the way *in*. This rule prevents it during dispatch:
+
+> **If 3+ minutes pass in dispatch mode with no file write and no active research query,
+> checkpoint what you have and exit.**
+
+Do not re-read the plan, re-assess state, or "think about what to do next" — that is
+reduce-mode work happening inside a dispatch. Either write a file or exit. The circuit
+breaker in `vidux-loop.sh` enforces this from the outside (blocks dispatch after N idle
+cycles), but the agent should self-enforce from the inside too.
+
+Fleet data (2026-04-07): 32% of Codex sessions land in the 3-8 min mid-zone. Target: <15%.
+
 ### Insertion point guidance
 
 The REDUCE gate block goes **inside** the prompt string, immediately after the mission and skill-loading lines, and **before** the authority chain or read order. The agent must hit the gate before it starts reading authority files. The gate text is literal -- copy it verbatim, replacing only `<plan-path>` with the automation's actual plan path.

@@ -76,7 +76,9 @@ Healthy runs are bimodal: <2 min (nothing to do, checkpoint and exit) or 15+ min
 
 Every harness must say "if you checkpoint in under 5 minutes and pending work remains, you stopped too early -- pick up the next task." Quick exits are healthy when nothing is pending; mid-zone exits are stuck agents masquerading as polite ones.
 
-*Why this matters: Claude Code #34238 documents the closure bias pattern. Gastown's dispatch/reduce research found the same bimodal shape: short reduce cycles that find nothing, or long dispatch runs that finish real work, with very little in between.*
+**Dispatch-side mid-zone kill:** Once in dispatch mode, if 3+ minutes pass with no file write and no active research query, checkpoint what you have and exit. Do not re-read the plan, re-assess state, or "think about what to do next" -- that is reduce-mode work happening inside a dispatch, which is the mid-zone by definition. Either write a file or exit. The circuit breaker in `vidux-loop.sh` enforces this from the outside (blocks dispatch after N idle cycles), but the agent should self-enforce from the inside too.
+
+*Why this matters: Claude Code #34238 documents the closure bias pattern. Gastown's dispatch/reduce research found the same bimodal shape: short reduce cycles that find nothing, or long dispatch runs that finish real work, with very little in between. Fleet data shows 32% of Codex sessions land in the mid-zone (target: <15%).*
 
 ## 11. Self-extending plans with taste
 

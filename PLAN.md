@@ -130,7 +130,7 @@ Create a net-new plan-first orchestration system that makes quarter-long iOS pro
 - [completed] **14.6 Add cadence-runtime health check to vidux-doctor.sh** — CHECK 12 added. Reads rrule BYMINUTE count + memory file runtimes. Doctor now has 14 checks. [Done: 2026-04-07]
 - [completed] **14.7 Fleet restructuring contract tests** — 8 new tests (168 total): cadence-runtime check existence, 14+ doctor checks, REDUCE gate in DOCTRINE.md + best-practices.md, compat.sh functions, prune/witness use compat not raw stat/date. [Done: 2026-04-07]
 
-### Phase 15: Fleet Intelligence & Self-Healing — IN PROGRESS
+### Phase 15: Fleet Intelligence & Self-Healing — COMPLETE
 
 **Goal:** Make vidux fleets self-healing based on real runtime data. Fix the 32% mid-zone problem, add circuit breakers, implement idle-churn detection, and template the radar pattern.
 
@@ -139,7 +139,7 @@ Create a net-new plan-first orchestration system that makes quarter-long iOS pro
 - [completed] **15.1 Add circuit breaker to vidux-loop.sh** — Scans last N Progress entries for shipping signals (shipped/commit/fixed/merged/etc). If none found, sets `circuit_breaker: open` and blocks dispatch. Configurable via `backpressure.circuit_breaker_threshold` (default 3). 2 contract tests added. [Done: 2026-04-07] [Evidence: agentic-patterns-research.md#5, fleet-loop-analysis.md#4]
 - [completed] **15.2 Add idle-churn detection to vidux-witness.sh** — Per-automation `idle_churn_pct` and `total_entries` in JSON output. Counts memory.md entries with/without shipping signals (shipped/commit/fixed/etc). Also fixed compat.sh nounset guard. [Done: 2026-04-07] [Evidence: fleet-loop-analysis.md#4]
 - [completed] **15.3 Radar template pattern** — Created guides/vidux/radar-template.md: {{placeholder}}-based harness template for read-only radars. Includes updated REDUCE gate (circuit_breaker check), sizing guidance (800-1200 chars target), examples table. Contract test added. [Done: 2026-04-07] [Evidence: fleet-loop-analysis.md#5, prompt analysis]
-- [pending] **15.4 Mid-zone enforcement in harness prompts** — Add a "mid-zone kill" instruction to DOCTRINE.md and best-practices.md: if a cycle has been running >3min with no file write and no pending research, checkpoint and exit. Target: reduce 32% mid-zone to <15%. [Evidence: fleet-loop-analysis.md#3]
+- [completed] **15.4 Mid-zone enforcement in harness prompts** — Added "Dispatch-side mid-zone kill" to DOCTRINE.md Principle 10 and best-practices.md REDUCE gate section. Rule: 3+ minutes with no file write in dispatch = checkpoint and exit. Cited fleet data (32% mid-zone, target <15%). 2 contract tests. [Done: 2026-04-07] [Evidence: fleet-loop-analysis.md#3]
 - [completed] **15.5 Contract tests for circuit breaker** — 2 tests: circuit_breaker field exists and is open/closed, idle progress triggers open + blocks dispatch. Merged into 15.1 delivery. [Done: 2026-04-07] [Evidence: coverage-gaps pattern]
 
 ### Phase 10 Open Questions
@@ -182,6 +182,7 @@ Create a net-new plan-first orchestration system that makes quarter-long iOS pro
 - [DIRECTION] [2026-04-06] Automations self-extend plans. Every automation can add tasks to PLAN.md. No writer/reader distinction. Bounded by three-strike rule to prevent recursive overload.
 
 ## Progress
+- [2026-04-07] Cycle 37: ⚡→📌 CHECKPOINT — Phase 15 COMPLETE (5/5). Shipped 15.4 (dispatch-side mid-zone kill in DOCTRINE.md + best-practices.md). Rule: 3+ min with no file write in dispatch = exit. Fleet data cited (32% mid-zone, target <15%). 2 contract tests. Phases 13-15 all complete. Next: research-driven Phase 16 or archive + plan pruning.
 - [2026-04-07] Cycle 36: ⚡ EXECUTE — Shipped 15.3 (radar template at guides/vidux/radar-template.md). Extracted shared pattern from 3 StrongYes radars (~80% identical). Template includes updated REDUCE gate with circuit_breaker, sizing guidance, examples. Contract test added. Phase 15: 4/5 done. Next: 15.4 (mid-zone enforcement).
 - [2026-04-07] Cycle 35: ⚡ EXECUTE — Shipped 15.2 (idle-churn detection in witness.sh: per-automation idle_churn_pct + total_entries). Fixed compat.sh nounset guard. Verified: hourly-media-studio=100% churn, resplit-android=66%, codex-orchestrator=33%. Next: 15.3 (radar template), 15.4 (mid-zone enforcement).
 - [2026-04-07] Cycle 34: 🔍→📐→⚡ FULL LOOP — 3-agent fan-out (fleet memory analysis, ledger runtime patterns, prompt quality audit). Wrote comprehensive fleet loop analysis evidence. Planned Phase 15 (5 tasks). Shipped 15.1 (circuit breaker — scans Progress for shipping signals, blocks dispatch after 3 idle cycles) + 15.5 (2 contract tests). Evidence: `fleet-loop-analysis.md`. Key finding: 32% mid-zone rate, strongyes-content 60% idle churn. Next: 15.2-15.4.
