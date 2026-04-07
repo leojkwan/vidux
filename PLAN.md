@@ -114,6 +114,22 @@ Create a net-new plan-first orchestration system that makes quarter-long iOS pro
 - [completed] **10.6 /vidux-manager command** — 4 modes: diagnose, test, investigate, fleet-health. Stage indicators integrated. Quality scoring against 17-19/20 baseline. 312 lines. [Done: 2026-04-06]
 - [ ] **10.7 Contract tests** — Cover all new scripts (ledger-config.sh, vidux-prune.sh), commands (vidux-dashboard.md, vidux-manager.md), and config schema validation. [Depends: 10.1-10.6]
 
+### Phase 11: Burst/Watch Structural Enforcement + Fleet Hardening
+
+**Goal:** Make the bimodal distribution structural (not just prompt discipline), integrate Vercel toolbar for mobile QA, harden the Codex DB write pattern, and bake the three new doctrine tenets into the open-source docs.
+
+[Evidence: `projects/vidux-v230/evidence/2026-04-06-burst-vs-watch-mode-insight.md`, nia research 2026-04-07 (agentic patterns + Vercel integration + closure-bias workarounds), evening fleet data (resplit-asc 71m burst, resplit-web 33m burst — burst doctrine confirmed working)]
+
+- [ ] **11.1 Bake burst/watch/self-extending doctrine into DOCTRINE.md** — DOCTRINE.md has 0 mentions of burst, watch mode, closure bias, or self-extending plans. SKILL.md mentions bimodal (11 refs) but not the structural enforcement. Add Doctrine 10 (burst/watch) and Doctrine 11 (self-extending plans with bounded recursion). [Evidence: grep shows 0 burst refs in DOCTRINE.md, memory feedback_vidux_automation_doctrine.md has the three tenets]
+- [ ] **11.2 vidux-burst.sh** — New script: long-running deep-work mode. No upper time bound. Drains queue until empty, hard blocker, or context budget. Spawns subagents when context fills. Exits clean only on queue drain. ~150 lines. [Evidence: burst-vs-watch-mode-insight.md architecture] [Depends: 11.1]
+- [ ] **11.3 Tighten vidux-loop.sh to explicit watch mode** — Add hard 2-minute budget. Add `next_action: burst|none` to JSON output. Forbid code changes in watch mode (read-only assessment). [Evidence: Gastown Witness pattern, burst-vs-watch-mode-insight.md] [Depends: 11.1]
+- [ ] **11.4 Exit-criteria hook** — Add a machine-verifiable `## Exit Criteria` section to PLAN.md template. Hook rejects agent "done" signal if criteria aren't met. Community-validated pattern (Claude Code #30150). [Evidence: nia research — "append grep-testable conditions, reject done signal if unmet"]
+- [ ] **11.5 Vercel toolbar → task queue bridge** — strongyes-product already watches `list_toolbar_threads`. Generalize: any automation with Vercel MCP access should poll toolbar threads, triage them, and auto-add to PLAN.md as tasks. Close the visual-QA → task-queue loop. [Evidence: nia research — Vercel toolbar integrates with Linear/Jira/Slack, MCP provides list+reply]
+- [ ] **11.6 Codex DB write resilience** — The Codex desktop app caches automation state in memory and overwrites SQLite on restart. Current workaround: kill app before writes. Research proper fix: config flag, WAL mode, or write-through pattern. [Evidence: fleet rebuild sessions — 3 failed attempts before discovering the race]
+- [ ] **11.7 Prune stale references** — vidux-fleet-rebuild.sh still references resplit-nurse, resplit-super-nurse-hourly. SKILL.md mentions `/vidux-amp` (absorbed into /vidux). Clean all stale refs. [Evidence: grep audit]
+- [ ] **11.8 JSON task queue experiment** — Community is moving toward JSONL/SQLite task queues over markdown for automated resume logic. Prototype a QUEUE.jsonl alongside PLAN.md that machines read and PLAN.md stays human-readable. [Evidence: nia research — "markdown is too ambiguous for automated resume logic"] [P]
+- [ ] **11.9 Lifecycle hooks integration** — Claude Code supports `beforeTask`/`afterTask` hooks in settings.json. Wire vidux-doctor.sh as beforeTask (pre-flight health check) and vidux-checkpoint.sh as afterTask (post-flight scorecard). Replaces manual checkpoint invocations. [Evidence: nia research — Claude Code scheduled-task lifecycle hooks]
+
 ### Phase 10 Open Questions
 - [ ] Q6: Max plan nesting depth — research says 3, stage indicators support 4. Decision: 3 enforced by dashboard, 4th level allowed but flagged as "consider splitting."
 - [ ] Q7: Dashboard refresh — real-time (tail -f) vs polling (5s interval) vs on-demand only? Start with on-demand for simplicity, add watch mode later.
