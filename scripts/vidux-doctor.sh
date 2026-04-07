@@ -218,7 +218,7 @@ status = data.get("status") or ""
 kind = data.get("kind") or ""
 
 watch_markers = [
-    "watch mode",
+    "reduce mode",
     "next_action",
     "fire burst",
     "stay under 2 minutes",

@@ -264,7 +264,7 @@ the dispatch must be safe to end; this principle says it must not end at the *wr
 Agents have a learned closure bias: they hit the first natural milestone (a commit, a
 sub-task, a build pass) and invent reasons to quit — "context is getting tight," "this is
 a good stopping point." Claude Code issue #34238 documents the pattern; the bimodal
-distribution model in `scripts/lib/ledger-query.sh` measures it. Gastown's burst/watch
+distribution model in `scripts/lib/ledger-query.sh` measures it. Gastown's dispatch/reduce
 research found the same shape: short watches that find nothing or long bursts that finish
 real work, with very little in between.
 
