@@ -184,7 +184,7 @@ Agents never "just code." They either update docs (which creates queue items) or
 
 ## 4. The Six Core Principles
 
-Non-negotiable doctrine. Each exists because a specific failure was observed. Full text with examples in `DOCTRINE.md`; all 11 principles (including fleet-scale doctrines 7-11) in `SKILL.md`.
+Non-negotiable doctrine. Each exists because a specific failure was observed. Full text with examples in `DOCTRINE.md` (11 doctrines); extended set with implementation details in `SKILL.md` (12 principles).
 
 **1. Plan is the store.** PLAN.md is truth. Code is derived. Fix the plan first.
 
@@ -330,7 +330,7 @@ Vidux core is company-agnostic. Zero references to any internal tooling, build s
             v
 +-------------------------------------------+
 | Layer 1: Vidux Core (open-sourceable)     |
-|  Doctrine (11 principles), data           |
+|  Doctrine (11-12 principles), data        |
 |  structures, loop mechanics, failure      |
 |  protocol, PLAN.md template               |
 +-------------------------------------------+
