@@ -2187,6 +2187,126 @@ class ViduxContractTests(unittest.TestCase):
             "SKILL.md missing bounded recursion concept",
         )
 
+    # ===================================================================== #
+    # Phase 12: Continuous Feedback Loop contracts                          #
+    # ===================================================================== #
+
+    def test_dispatch_merge_gate_mode(self):
+        """vidux-dispatch.sh --merge-gate must produce valid JSON with merge_gate field."""
+        result = subprocess.run(
+            ["bash", str(ROOT / "scripts" / "vidux-dispatch.sh"), str(PLAN), "--merge-gate"],
+            capture_output=True, text=True, timeout=10,
+        )
+        self.assertEqual(result.returncode, 0, f"merge-gate failed: {result.stderr}")
+        data = json.loads(result.stdout)
+        self.assertIn("merge_gate", data)
+        self.assertIn(data["merge_gate"], ["skip", "merged", "conflict", "blocked"])
+
+    def test_loop_auto_pause_fields(self):
+        """vidux-loop.sh JSON must include auto_pause_recommended and unproductive_streak."""
+        data = self._run_loop_on("""\
+            # Test Plan
+
+            ## Tasks
+            - [pending] Task 1: test [Evidence: fixture]
+
+            ## Progress
+            - [2026-04-07] Cycle 1: Done: something. Next: check plan.
+        """)
+        self.assertIn("auto_pause_recommended", data)
+        self.assertIn("unproductive_streak", data)
+        self.assertIsInstance(data["auto_pause_recommended"], bool)
+        self.assertIsInstance(data["unproductive_streak"], int)
+
+    def test_loop_bimodal_gate_fields(self):
+        """vidux-loop.sh JSON must include bimodal_score and bimodal_gate."""
+        data = self._run_loop_on("""\
+            # Test Plan
+
+            ## Tasks
+            - [pending] Task 1: test [Evidence: fixture]
+
+            ## Progress
+        """)
+        self.assertIn("bimodal_score", data)
+        self.assertIn("bimodal_gate", data)
+        self.assertIn(data["bimodal_gate"], ["pass", "blocked"])
+
+    def test_loop_reduce_contract_fields(self):
+        """vidux-loop.sh JSON must include reduce_contract with read_only and budget."""
+        data = self._run_loop_on("""\
+            # Test Plan
+
+            ## Tasks
+            - [pending] Task 1: test [Evidence: fixture]
+
+            ## Progress
+        """)
+        self.assertIn("reduce_contract", data)
+        contract = data["reduce_contract"]
+        self.assertTrue(contract["read_only"])
+        self.assertEqual(contract["max_budget_seconds"], 120)
+        self.assertIn("code_changes", contract["forbidden"])
+
+    def test_codex_db_lib_exists(self):
+        """scripts/lib/codex-db.sh must exist and be sourceable."""
+        lib = ROOT / "scripts" / "lib" / "codex-db.sh"
+        self.assertTrue(lib.exists(), "codex-db.sh missing")
+        # Verify it sources without error (double-source guard)
+        result = subprocess.run(
+            ["bash", "-c", f"source '{lib}' && source '{lib}' && echo ok"],
+            capture_output=True, text=True, timeout=5,
+        )
+        self.assertIn("ok", result.stdout)
+
+    def test_queue_jsonl_lib_exists(self):
+        """scripts/lib/queue-jsonl.sh must exist and be sourceable."""
+        lib = ROOT / "scripts" / "lib" / "queue-jsonl.sh"
+        self.assertTrue(lib.exists(), "queue-jsonl.sh missing")
+        result = subprocess.run(
+            ["bash", "-c", f"source '{lib}' && source '{lib}' && echo ok"],
+            capture_output=True, text=True, timeout=5,
+        )
+        self.assertIn("ok", result.stdout)
+
+    def test_witness_script_exists_and_executable(self):
+        """vidux-witness.sh must exist and be executable."""
+        witness = ROOT / "scripts" / "vidux-witness.sh"
+        self.assertTrue(witness.exists(), "vidux-witness.sh missing")
+        self.assertTrue(os.access(witness, os.X_OK), "vidux-witness.sh not executable")
+
+    def test_hooks_include_lifecycle_hooks(self):
+        """hooks.json must include beforeTask and afterTask lifecycle hooks."""
+        hooks_file = ROOT / "hooks" / "hooks.json"
+        data = json.loads(hooks_file.read_text())
+        events = [h["event"] for h in data["hooks"]]
+        self.assertIn("beforeTask", events, "Missing beforeTask hook")
+        self.assertIn("afterTask", events, "Missing afterTask hook")
+
+    def test_config_has_backpressure_section(self):
+        """vidux.config.json must have backpressure section with bimodal thresholds."""
+        config = json.loads((ROOT / "vidux.config.json").read_text())
+        self.assertIn("backpressure", config)
+        bp = config["backpressure"]
+        self.assertIn("bimodal_critical_threshold", bp)
+        self.assertIn("bimodal_warning_threshold", bp)
+        self.assertGreater(bp["bimodal_warning_threshold"], bp["bimodal_critical_threshold"])
+
+    def test_config_has_pruning_section(self):
+        """vidux.config.json must have pruning section."""
+        config = json.loads((ROOT / "vidux.config.json").read_text())
+        self.assertIn("pruning", config)
+        self.assertIn("stale_blocked_days", config["pruning"])
+        self.assertIn("max_concurrent_worktrees", config["pruning"])
+
+    def test_manager_has_self_extension_metric(self):
+        """vidux-manager.md diagnose must reference self-extension quality metric."""
+        text = _read(ROOT / "commands" / "vidux-manager.md")
+        self.assertTrue(
+            "self-extension" in text.lower() or "recursive overload" in text.lower(),
+            "Manager diagnose missing self-extension quality metric",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

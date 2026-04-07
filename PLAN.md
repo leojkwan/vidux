@@ -136,7 +136,7 @@ Create a net-new plan-first orchestration system that makes quarter-long iOS pro
 - [completed] Task 12.3: Add bimodal enforcement to vidux-loop.sh — reads `backpressure.bimodal_critical_threshold` from config (default 70). Queries ledger_bimodal_distribution. If score < threshold, sets `bimodal_gate: blocked` and refuses to fire dispatch. Outputs bimodal_score and bimodal_gate in JSON. [Done: 2026-04-07] [Evidence: tested with no ledger (pass-through), config integration verified]
 - [completed] Task 12.4: Build vidux-witness.sh — 300-line fleet health observer. Per-plan task counts, git freshness, ledger mid-zone detection, automation memory scanning, fleet A-F grade, JSON output. [Done: 2026-04-07] [Evidence: witness-agent commit c5ee920, 138 tests pass]
 - [completed] Task 12.5: Add self-extension quality metric to vidux-manager diagnose — step 5 in diagnose flow. Counts tasks added vs completed, computes ratio. Healthy ≤1.5, warning 1.5-3.0, recursive overload >3.0. Supports [Added-by:] tags and Progress fallback. [Done: 2026-04-07] [Evidence: added to vidux-manager.md diagnose steps, 138/138 tests pass]
-- [pending] Task 12.6: Contract tests for Phase 12 scripts [Depends: 12.1-12.5]
+- [completed] Task 12.6: Contract tests for Phase 12 — 11 new tests (149 total): merge-gate mode, auto-pause fields, bimodal gate, reduce contract, codex-db lib, queue-jsonl lib, witness script, lifecycle hooks, config backpressure/pruning, self-extension metric. [Done: 2026-04-07]
 
 ### Phase 10 Open Questions
 - [ ] Q6: Max plan nesting depth — research says 3, stage indicators support 4. Decision: 3 enforced by dashboard, 4th level allowed but flagged as "consider splitting."
