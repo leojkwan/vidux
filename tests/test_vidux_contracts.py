@@ -11,8 +11,11 @@ Runs on stdlib unittest — zero-bootstrap, no pip install needed.
 import json
 import os
 import re
+import sqlite3
 import subprocess
+import tempfile
 import textwrap
+import time
 import unittest
 from pathlib import Path
 
@@ -372,6 +375,16 @@ class ViduxContractTests(unittest.TestCase):
         self.assertEqual(data["mode"], "watch")
         self.assertEqual(data["action"], "complete")
         self.assertEqual(data["next_action"], "none")
+
+    def test_vidux_loop_exposes_process_fix_declared(self):
+        """Watch mode must surface [ProcessFix: ...] declarations for the current task."""
+        data = self._run_loop_on("""\
+            # Test Plan
+            ## Tasks
+            - [pending] Task 1: Fix replay bug [ProcessFix: test] [Evidence: src]
+            ## Progress
+        """)
+        self.assertEqual(data["process_fix_declared"], "test")
 
     def test_vidux_burst_dry_run_exposes_contract(self):
         """vidux-burst.sh --dry-run must emit the burst contract surface."""
@@ -881,6 +894,46 @@ class ViduxContractTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0)
             self.assertIn("terminal state", result.stdout)
 
+    def test_checkpoint_warns_when_process_fix_artifact_missing(self):
+        """Checkpoint must warn when a tagged process fix has no matching repo artifact."""
+        import tempfile
+        task = "Task 1: Fix replay bug [ProcessFix: test] [Evidence: source]"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            plan = self._make_git_plan(tmpdir, textwrap.dedent(f"""\
+                # Test Plan
+                ## Tasks
+                - [pending] {task}
+                ## Progress
+            """))
+            Path(tmpdir, "src.py").write_text("print('bugfix')\n", encoding="utf-8")
+            result = subprocess.run(
+                ["bash", str(self.SCRIPTS_DIR / "vidux-checkpoint.sh"), plan, task, "fixed replay bug"],
+                capture_output=True, text=True, timeout=10, cwd=tmpdir,
+            )
+            self.assertEqual(result.returncode, 0, f"checkpoint failed: {result.stderr}")
+            self.assertIn("PROCESS-FIX WARNING", result.stderr)
+
+    def test_checkpoint_accepts_untracked_matching_process_fix_artifact(self):
+        """Checkpoint must treat matching untracked files as valid process-fix artifacts."""
+        import tempfile
+        task = "Task 1: Fix replay bug [ProcessFix: test] [Evidence: source]"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            plan = self._make_git_plan(tmpdir, textwrap.dedent(f"""\
+                # Test Plan
+                ## Tasks
+                - [pending] {task}
+                ## Progress
+            """))
+            tests_dir = Path(tmpdir, "tests")
+            tests_dir.mkdir()
+            (tests_dir / "test_replay_regression.py").write_text("def test_replay():\n    assert True\n", encoding="utf-8")
+            result = subprocess.run(
+                ["bash", str(self.SCRIPTS_DIR / "vidux-checkpoint.sh"), plan, task, "fixed replay bug"],
+                capture_output=True, text=True, timeout=10, cwd=tmpdir,
+            )
+            self.assertEqual(result.returncode, 0, f"checkpoint failed: {result.stderr}")
+            self.assertNotIn("PROCESS-FIX WARNING", result.stderr)
+
     # -----------------------------------------------------------------------
     # Task 12: FSM parsing, Q-gating, malformed config, archive idempotency
     # -----------------------------------------------------------------------
@@ -1350,8 +1403,6 @@ class ViduxContractTests(unittest.TestCase):
 
     def test_doctor_repo_flag_rescopes_project_scan(self):
         """--repo must scan the target repo's projects/, not the script checkout's projects/."""
-        import tempfile
-
         with tempfile.TemporaryDirectory() as tmpdir:
             repo = Path(tmpdir)
             plan = repo / "projects" / "test-conflict" / "PLAN.md"
@@ -1378,6 +1429,301 @@ class ViduxContractTests(unittest.TestCase):
 
             self.assertEqual(result.returncode, 1)
             self.assertEqual(merge_check["status"], "block")
+
+    def test_doctor_watch_harness_scope_warns_on_bursty_cron_prompt(self):
+        """Doctor must flag active cron prompts that schedule deep Vidux work without a watch contract."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = Path(tmpdir)
+            (repo / "projects").mkdir()
+            auto_dir = repo / "automations" / "vidux-v230-planner"
+            auto_dir.mkdir(parents=True)
+            (auto_dir / "automation.toml").write_text(textwrap.dedent("""
+                version = 1
+                id = "vidux-v230-planner"
+                kind = "cron"
+                status = "ACTIVE"
+                prompt = "Use [$vidux](/tmp/vidux/SKILL.md) to continuously improve Vidux itself. Build new verification, write new contract tests, and implement the fix in the same scheduled run."
+            """).lstrip(), encoding="utf-8")
+
+            result = subprocess.run(
+                [
+                    "bash",
+                    str(self.SCRIPTS_DIR / "vidux-doctor.sh"),
+                    "--json",
+                    "--repo",
+                    str(repo),
+                    "--automations-dir",
+                    str(repo / "automations"),
+                ],
+                capture_output=True,
+                text=True,
+                timeout=15,
+            )
+            data = json.loads(result.stdout)
+            check = next(
+                check for check in data["checks"] if check["id"] == "watch_harness_scope"
+            )
+
+            self.assertEqual(check["status"], "warn")
+            self.assertEqual(check["count"], 1)
+            self.assertEqual(check["details"][0]["automation_id"], "vidux-v230-planner")
+            self.assertIn("missing_watch_contract", check["details"][0]["issues"])
+
+    def test_doctor_watch_harness_scope_allows_explicit_watch_prompt(self):
+        """Doctor must pass when a cron prompt stays in watch mode and hands deep work to burst."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = Path(tmpdir)
+            (repo / "projects").mkdir()
+            auto_dir = repo / "automations" / "vidux-watch"
+            auto_dir.mkdir(parents=True)
+            (auto_dir / "automation.toml").write_text(textwrap.dedent("""
+                version = 1
+                id = "vidux-watch"
+                kind = "cron"
+                status = "ACTIVE"
+                prompt = "Use [$vidux](/tmp/vidux/SKILL.md) in watch mode. Keep this run brief, stay under 2 minutes, inspect the plan, and return next_action=burst when real work exists."
+            """).lstrip(), encoding="utf-8")
+
+            result = subprocess.run(
+                [
+                    "bash",
+                    str(self.SCRIPTS_DIR / "vidux-doctor.sh"),
+                    "--json",
+                    "--repo",
+                    str(repo),
+                    "--automations-dir",
+                    str(repo / "automations"),
+                ],
+                capture_output=True,
+                text=True,
+                timeout=15,
+            )
+            data = json.loads(result.stdout)
+            check = next(
+                check for check in data["checks"] if check["id"] == "watch_harness_scope"
+            )
+
+            self.assertEqual(check["status"], "pass")
+            self.assertEqual(check["count"], 0)
+
+    def test_doctor_stalled_active_automation_rows_warns_on_overdue_zero_run_rows(self):
+        """Doctor must flag active scheduler rows that are overdue and still have zero runs."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = Path(tmpdir)
+            (repo / "projects").mkdir()
+            auto_dir = repo / "automations"
+            auto_dir.mkdir()
+            db = repo / "codex-dev.db"
+
+            conn = sqlite3.connect(db)
+            conn.execute(textwrap.dedent("""
+                CREATE TABLE automations (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    prompt TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'ACTIVE',
+                    next_run_at INTEGER,
+                    last_run_at INTEGER,
+                    cwds TEXT NOT NULL DEFAULT '[]',
+                    rrule TEXT NOT NULL DEFAULT 'FREQ=HOURLY;INTERVAL=24;BYMINUTE=0',
+                    created_at INTEGER NOT NULL,
+                    updated_at INTEGER NOT NULL,
+                    model TEXT,
+                    reasoning_effort TEXT
+                )
+            """))
+            conn.execute(textwrap.dedent("""
+                CREATE TABLE automation_runs (
+                    automation_id TEXT,
+                    created_at INTEGER
+                )
+            """))
+
+            now_ms = int(time.time() * 1000)
+            overdue_ms = now_ms - (20 * 60 * 1000)
+            conn.execute(
+                """
+                INSERT INTO automations (
+                    id, name, prompt, status, next_run_at, last_run_at,
+                    cwds, rrule, created_at, updated_at, model, reasoning_effort
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    "stalled-auto",
+                    "Stalled Automation",
+                    "Keep the loop healthy.",
+                    "ACTIVE",
+                    overdue_ms,
+                    None,
+                    "[]",
+                    "FREQ=HOURLY;INTERVAL=1;BYMINUTE=0,30",
+                    now_ms,
+                    now_ms,
+                    "gpt-5.4",
+                    "xhigh",
+                ),
+            )
+            conn.commit()
+            conn.close()
+
+            result = subprocess.run(
+                [
+                    "bash",
+                    str(self.SCRIPTS_DIR / "vidux-doctor.sh"),
+                    "--json",
+                    "--repo",
+                    str(repo),
+                    "--automations-dir",
+                    str(auto_dir),
+                    "--automation-db",
+                    str(db),
+                ],
+                capture_output=True,
+                text=True,
+                timeout=15,
+            )
+            data = json.loads(result.stdout)
+            check = next(
+                check for check in data["checks"] if check["id"] == "stalled_active_automation_rows"
+            )
+
+            self.assertEqual(check["status"], "warn")
+            self.assertEqual(check["count"], 1)
+            self.assertEqual(check["details"][0]["id"], "stalled-auto")
+            self.assertFalse(check["details"][0]["repo_backed"])
+
+    def test_ledger_bimodal_distribution_ignores_non_automation_noise(self):
+        """Repo-wide bimodal stats must ignore raw codex live/stop noise without automation IDs."""
+        ledger_entries = [
+            {
+                "ts": "2026-04-07T00:00:00Z",
+                "repo": "vidux",
+                "automation_id": "vidux-v230-planner",
+                "automation_name": "Vidux v2.3.0 Planner",
+                "agent_id": "codex/run-good",
+                "event": "live",
+                "summary": "run start",
+            },
+            {
+                "ts": "2026-04-07T00:01:00Z",
+                "repo": "vidux",
+                "automation_id": "vidux-v230-planner",
+                "automation_name": "Vidux v2.3.0 Planner",
+                "agent_id": "codex/run-good",
+                "event": "stop",
+                "summary": "run end",
+            },
+            {
+                "ts": "2026-04-07T00:02:00Z",
+                "repo": "vidux",
+                "agent_id": "codex/noise",
+                "event": "live",
+                "summary": "noise start",
+            },
+            {
+                "ts": "2026-04-07T00:06:00Z",
+                "repo": "vidux",
+                "agent_id": "codex/noise",
+                "event": "stop",
+                "summary": "noise end",
+            },
+        ]
+
+        data = self._run_ledger_bimodal_distribution(ledger_entries)
+        self.assertEqual(data["totals"]["total_runs"], 1)
+        self.assertEqual(data["totals"]["mid"], 0)
+        self.assertEqual(data["bimodal_score"], 100)
+        self.assertEqual(len(data["per_automation"]), 1)
+        self.assertEqual(data["per_automation"][0]["automation_id"], "vidux-v230-planner")
+
+    def test_ledger_bimodal_distribution_collapses_live_snapshots_into_one_run(self):
+        """Multiple live snapshots from one automation agent must classify as one run."""
+        ledger_entries = [
+            {
+                "ts": "2026-04-07T00:00:00Z",
+                "repo": "vidux",
+                "automation_id": "vidux-v230-planner",
+                "automation_name": "Vidux v2.3.0 Planner",
+                "agent_id": "codex/run-mid",
+                "event": "live",
+                "summary": "snapshot 1",
+            },
+            {
+                "ts": "2026-04-07T00:03:00Z",
+                "repo": "vidux",
+                "automation_id": "vidux-v230-planner",
+                "automation_name": "Vidux v2.3.0 Planner",
+                "agent_id": "codex/run-mid",
+                "event": "live",
+                "summary": "snapshot 2",
+            },
+            {
+                "ts": "2026-04-07T00:06:00Z",
+                "repo": "vidux",
+                "automation_id": "vidux-v230-planner",
+                "automation_name": "Vidux v2.3.0 Planner",
+                "agent_id": "codex/run-mid",
+                "event": "stop",
+                "summary": "snapshot 3",
+            },
+            {
+                "ts": "2026-04-07T00:10:00Z",
+                "repo": "vidux",
+                "automation_id": "vidux-endurance",
+                "automation_name": "vidux-endurance",
+                "agent_id": "codex/run-quick",
+                "event": "live",
+                "summary": "quick 1",
+            },
+            {
+                "ts": "2026-04-07T00:11:00Z",
+                "repo": "vidux",
+                "automation_id": "vidux-endurance",
+                "automation_name": "vidux-endurance",
+                "agent_id": "codex/run-quick",
+                "event": "stop",
+                "summary": "quick 2",
+            },
+        ]
+
+        data = self._run_ledger_bimodal_distribution(ledger_entries)
+        planner = next(
+            item for item in data["per_automation"] if item["automation_id"] == "vidux-v230-planner"
+        )
+        self.assertEqual(planner["total"], 1)
+        self.assertEqual(planner["mid"], 1)
+        self.assertEqual(data["totals"]["total_runs"], 2)
+        self.assertEqual(data["totals"]["mid"], 1)
+        self.assertEqual(data["totals"]["quick"], 1)
+
+    def _run_ledger_bimodal_distribution(self, entries):
+        """Helper: run ledger_bimodal_distribution against a temp ledger fixture."""
+        with tempfile.NamedTemporaryFile("w", delete=False) as ledger_file:
+            for entry in entries:
+                ledger_file.write(json.dumps(entry) + "\n")
+            ledger_path = ledger_file.name
+
+        env = os.environ.copy()
+        env["VIDUX_LEDGER_FILE"] = ledger_path
+        try:
+            result = subprocess.run(
+                [
+                    "bash",
+                    "-lc",
+                    (
+                        f"source {self.SCRIPTS_DIR / 'lib' / 'ledger-query.sh'} "
+                        "&& ledger_bimodal_distribution vidux 168"
+                    ),
+                ],
+                capture_output=True,
+                text=True,
+                timeout=15,
+                env=env,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            return json.loads(result.stdout)
+        finally:
+            os.unlink(ledger_path)
 
 
 if __name__ == "__main__":

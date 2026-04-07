@@ -51,26 +51,27 @@ echo "  Deleted ${#OLD_IDS[@]} old IDs. $REMAINING automations remain."
 echo ""
 
 # --- Step 4: Update cadences to 30-min spread ---
+# The live scheduler stores epoch timestamps in milliseconds, not seconds.
 echo "Step 4: Setting 30-min cadences..."
 sqlite3 "$DB" <<'SQL'
-UPDATE automations SET rrule='FREQ=HOURLY;INTERVAL=1;BYMINUTE=0,30',  updated_at=strftime('%s','now') WHERE id='resplit-web';
-UPDATE automations SET rrule='FREQ=HOURLY;INTERVAL=1;BYMINUTE=3,33',  updated_at=strftime('%s','now') WHERE id='resplit-asc';
-UPDATE automations SET rrule='FREQ=HOURLY;INTERVAL=1;BYMINUTE=6,36',  updated_at=strftime('%s','now') WHERE id='resplit-currency';
-UPDATE automations SET rrule='FREQ=HOURLY;INTERVAL=1;BYMINUTE=9,39',  updated_at=strftime('%s','now') WHERE id='resplit-android';
-UPDATE automations SET rrule='FREQ=HOURLY;INTERVAL=1;BYMINUTE=12,42', updated_at=strftime('%s','now') WHERE id='strongyes-ux';
-UPDATE automations SET rrule='FREQ=HOURLY;INTERVAL=1;BYMINUTE=15,45', updated_at=strftime('%s','now') WHERE id='strongyes-product';
-UPDATE automations SET rrule='FREQ=HOURLY;INTERVAL=1;BYMINUTE=18,48', updated_at=strftime('%s','now') WHERE id='strongyes-backend';
-UPDATE automations SET rrule='FREQ=HOURLY;INTERVAL=1;BYMINUTE=21,51', updated_at=strftime('%s','now') WHERE id='strongyes-content-scraper';
-UPDATE automations SET rrule='FREQ=HOURLY;INTERVAL=1;BYMINUTE=24,54', updated_at=strftime('%s','now') WHERE id='strongyes-email';
-UPDATE automations SET rrule='FREQ=HOURLY;INTERVAL=1;BYMINUTE=27,57', updated_at=strftime('%s','now') WHERE id='strongyes-problem-builder';
-UPDATE automations SET rrule='FREQ=HOURLY;INTERVAL=1;BYMINUTE=0',     updated_at=strftime('%s','now') WHERE id='vidux-meta';
+UPDATE automations SET rrule='FREQ=HOURLY;INTERVAL=1;BYMINUTE=0,30',  updated_at=CAST(strftime('%s','now') AS INTEGER) * 1000 WHERE id='resplit-web';
+UPDATE automations SET rrule='FREQ=HOURLY;INTERVAL=1;BYMINUTE=3,33',  updated_at=CAST(strftime('%s','now') AS INTEGER) * 1000 WHERE id='resplit-asc';
+UPDATE automations SET rrule='FREQ=HOURLY;INTERVAL=1;BYMINUTE=6,36',  updated_at=CAST(strftime('%s','now') AS INTEGER) * 1000 WHERE id='resplit-currency';
+UPDATE automations SET rrule='FREQ=HOURLY;INTERVAL=1;BYMINUTE=9,39',  updated_at=CAST(strftime('%s','now') AS INTEGER) * 1000 WHERE id='resplit-android';
+UPDATE automations SET rrule='FREQ=HOURLY;INTERVAL=1;BYMINUTE=12,42', updated_at=CAST(strftime('%s','now') AS INTEGER) * 1000 WHERE id='strongyes-ux';
+UPDATE automations SET rrule='FREQ=HOURLY;INTERVAL=1;BYMINUTE=15,45', updated_at=CAST(strftime('%s','now') AS INTEGER) * 1000 WHERE id='strongyes-product';
+UPDATE automations SET rrule='FREQ=HOURLY;INTERVAL=1;BYMINUTE=18,48', updated_at=CAST(strftime('%s','now') AS INTEGER) * 1000 WHERE id='strongyes-backend';
+UPDATE automations SET rrule='FREQ=HOURLY;INTERVAL=1;BYMINUTE=21,51', updated_at=CAST(strftime('%s','now') AS INTEGER) * 1000 WHERE id='strongyes-content-scraper';
+UPDATE automations SET rrule='FREQ=HOURLY;INTERVAL=1;BYMINUTE=24,54', updated_at=CAST(strftime('%s','now') AS INTEGER) * 1000 WHERE id='strongyes-email';
+UPDATE automations SET rrule='FREQ=HOURLY;INTERVAL=1;BYMINUTE=27,57', updated_at=CAST(strftime('%s','now') AS INTEGER) * 1000 WHERE id='strongyes-problem-builder';
+UPDATE automations SET rrule='FREQ=HOURLY;INTERVAL=1;BYMINUTE=0',     updated_at=CAST(strftime('%s','now') AS INTEGER) * 1000 WHERE id='vidux-meta';
 SQL
 echo "  Done."
 echo ""
 
 # --- Step 5: Ensure all remaining are ACTIVE with xhigh reasoning ---
 echo "Step 5: Activating all + xhigh reasoning..."
-sqlite3 "$DB" "UPDATE automations SET status='ACTIVE', reasoning_effort='xhigh', model='gpt-5.4', updated_at=strftime('%s','now') WHERE status != 'ACTIVE' OR reasoning_effort != 'xhigh';"
+sqlite3 "$DB" "UPDATE automations SET status='ACTIVE', reasoning_effort='xhigh', model='gpt-5.4', updated_at=CAST(strftime('%s','now') AS INTEGER) * 1000 WHERE status != 'ACTIVE' OR reasoning_effort != 'xhigh';"
 echo "  Done."
 echo ""
 

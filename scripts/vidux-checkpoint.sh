@@ -34,6 +34,7 @@ if ! git -C "$(dirname "$PLAN")" rev-parse --show-toplevel &>/dev/null; then
   echo "Error: $PLAN is not inside a git repository. Checkpoint requires git." >&2
   exit 1
 fi
+REPO_ROOT="$(git -C "$(dirname "$PLAN")" rev-parse --show-toplevel)"
 
 # --- ledger integration (optional) ----------------------------------------- #
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -45,6 +46,43 @@ fi
 
 DATE=$(date +%Y-%m-%d)
 PLAN_DIR=$(dirname "$PLAN")
+
+collect_repo_changed_paths() {
+  {
+    git -C "$REPO_ROOT" diff --name-only HEAD -- . 2>/dev/null || true
+    git -C "$REPO_ROOT" diff --cached --name-only HEAD -- . 2>/dev/null || true
+    git -C "$REPO_ROOT" ls-files --others --exclude-standard 2>/dev/null || true
+  } | sed '/^$/d' | sort -u
+}
+
+process_fix_matches_type() {
+  local pf_type="$1"
+  local changed_paths="$2"
+
+  case "$pf_type" in
+    test)
+      printf '%s\n' "$changed_paths" | grep -qiE '(^|/)(tests?|specs?)(/|$)|(^|/)test_[^/]+|(_test|_spec)\.'
+      ;;
+    hook)
+      printf '%s\n' "$changed_paths" | grep -qiE '(^|/)(hooks/|\.husky/)|pre-commit|post-commit'
+      ;;
+    linter)
+      printf '%s\n' "$changed_paths" | grep -qiE 'eslint|swiftlint|pylint|rubocop|lint'
+      ;;
+    ci)
+      printf '%s\n' "$changed_paths" | grep -qiE '(^|/)\.github/workflows/|(^|/)Jenkinsfile$|\.circleci/|bitrise'
+      ;;
+    script)
+      printf '%s\n' "$changed_paths" | grep -qiE '(^|/)scripts/|\.sh$'
+      ;;
+    constraint)
+      git -C "$REPO_ROOT" diff --no-color HEAD -- '*.md' 2>/dev/null | grep -qE '^\+[^+].*(ALWAYS|NEVER):'
+      ;;
+    *)
+      return 2
+      ;;
+  esac
+}
 
 # =============================================================================
 # --archive mode: move old completed tasks to ARCHIVE.md
@@ -227,6 +265,33 @@ else
   sedi "/^## Progress$/a\\
 ${PROGRESS_LINE}
 " "$PLAN"
+fi
+
+# --- Process-fix verification (warn-only; never blocks checkpoint) ---------- #
+PROCESS_FIX_TAG="$(echo "$TASK" | grep -oE '\[ProcessFix: ?[a-z_]+\]' | head -1 || true)"
+FIX_HEURISTIC="$(echo "$TASK" | grep -iE '(fix|bug|broke|failure|regression|incident)' || true)"
+if [[ -n "$PROCESS_FIX_TAG" ]]; then
+  PF_TYPE="$(echo "$PROCESS_FIX_TAG" | sed -E 's/\[ProcessFix: ?([a-z_]+)\]/\1/')"
+  CHANGED_PATHS="$(collect_repo_changed_paths)"
+  if process_fix_matches_type "$PF_TYPE" "$CHANGED_PATHS"; then
+    :
+  else
+    MATCH_STATUS=$?
+    if [[ "$MATCH_STATUS" -eq 2 ]]; then
+      echo "PROCESS-FIX WARNING: Unknown [ProcessFix:] type '$PF_TYPE'." >&2
+    else
+      echo "PROCESS-FIX WARNING: Task declares [ProcessFix: $PF_TYPE] but no matching artifact was found in repo changes." >&2
+      echo "  Expected a $PF_TYPE artifact in modified or untracked files before checkpoint." >&2
+      if [[ -n "$CHANGED_PATHS" ]]; then
+        echo "  Changed paths: $(echo "$CHANGED_PATHS" | tr '\n' ' ')" >&2
+      else
+        echo "  Changed paths: none" >&2
+      fi
+    fi
+  fi
+elif [[ "$STATUS" != "blocked" && -n "$FIX_HEURISTIC" ]]; then
+  echo "PROCESS-FIX ADVISORY: Task looks like a fix but has no [ProcessFix:] tag." >&2
+  echo "  Doctrine 6 requires a machine-checkable process fix alongside the code fix." >&2
 fi
 
 # --- Commit (propagate failures — a failed commit means the checkpoint did not land) ---

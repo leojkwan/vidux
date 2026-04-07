@@ -98,6 +98,7 @@ fi
 
 # Initialize contradiction detection fields (populated after task description is extracted)
 CONTRADICTION_WARNING=false; CONTRADICTION_MATCHES=""; CONTRADICTS_TAG=""
+PROCESS_FIX_DECLARED=""
 
 # --- read: find first actionable task ------------------------------------- #
 # Priority 1: resume an in_progress task (session may have died mid-task)
@@ -116,15 +117,15 @@ if [ -z "$TASK_LINE" ]; then
   # Check if there are blocked tasks left (not "done" — escalate)
   BLOCKED_COUNT="$(grep -cE '^\- \[blocked\] ' "$PLAN" || true)"
   if [ "$BLOCKED_COUNT" -gt 0 ]; then
-    json "{\"mode\":\"watch\", \"cycle\": 0, \"task\": \"none\", \"type\": \"all_blocked\", \"action\": \"escalate\", \"next_action\": \"none\", \"context\": \"$BLOCKED_COUNT task(s) blocked — escalate blockers to human\", \"hot_tasks\": $HOT_TASKS, \"cold_tasks\": $COLD_TASKS, \"context_warning\": $CONTEXT_WARNING, \"context_note\": \"$(json_escape "$CONTEXT_NOTE")\", \"decision_log_count\": $DL_COUNT, \"decision_log_warning\": $DL_WARNING, \"decision_log_entries\": \"$(json_escape "$DL_ENTRIES")\", \"contradiction_warning\": $CONTRADICTION_WARNING, \"contradiction_matches\": \"$(json_escape "$CONTRADICTION_MATCHES")\", \"contradicts_tag\": \"$(json_escape "$CONTRADICTS_TAG")\"}"
+    json "{\"mode\":\"watch\", \"cycle\": 0, \"task\": \"none\", \"type\": \"all_blocked\", \"action\": \"escalate\", \"next_action\": \"none\", \"context\": \"$BLOCKED_COUNT task(s) blocked — escalate blockers to human\", \"hot_tasks\": $HOT_TASKS, \"cold_tasks\": $COLD_TASKS, \"context_warning\": $CONTEXT_WARNING, \"context_note\": \"$(json_escape "$CONTEXT_NOTE")\", \"decision_log_count\": $DL_COUNT, \"decision_log_warning\": $DL_WARNING, \"decision_log_entries\": \"$(json_escape "$DL_ENTRIES")\", \"contradiction_warning\": $CONTRADICTION_WARNING, \"contradiction_matches\": \"$(json_escape "$CONTRADICTION_MATCHES")\", \"contradicts_tag\": \"$(json_escape "$CONTRADICTS_TAG")\", \"process_fix_declared\": \"$(json_escape "$PROCESS_FIX_DECLARED")\"}"
     exit 0
   fi
   # Check if there are ANY tasks at all (any FSM state)
   HAS_TASKS="$(grep -cE '^\- (\[.\]|\[(pending|in_progress|completed|blocked)\]) ' "$PLAN" || true)"
   if [ "$HAS_TASKS" -gt 0 ]; then
-    json "{\"mode\":\"watch\", \"cycle\": 0, \"task\": \"none\", \"type\": \"done\", \"action\": \"complete\", \"next_action\": \"none\", \"context\": \"All tasks done\", \"hot_tasks\": $HOT_TASKS, \"cold_tasks\": $COLD_TASKS, \"context_warning\": $CONTEXT_WARNING, \"context_note\": \"$(json_escape "$CONTEXT_NOTE")\", \"decision_log_count\": $DL_COUNT, \"decision_log_warning\": $DL_WARNING, \"decision_log_entries\": \"$(json_escape "$DL_ENTRIES")\", \"contradiction_warning\": $CONTRADICTION_WARNING, \"contradiction_matches\": \"$(json_escape "$CONTRADICTION_MATCHES")\", \"contradicts_tag\": \"$(json_escape "$CONTRADICTS_TAG")\"}"
+    json "{\"mode\":\"watch\", \"cycle\": 0, \"task\": \"none\", \"type\": \"done\", \"action\": \"complete\", \"next_action\": \"none\", \"context\": \"All tasks done\", \"hot_tasks\": $HOT_TASKS, \"cold_tasks\": $COLD_TASKS, \"context_warning\": $CONTEXT_WARNING, \"context_note\": \"$(json_escape "$CONTEXT_NOTE")\", \"decision_log_count\": $DL_COUNT, \"decision_log_warning\": $DL_WARNING, \"decision_log_entries\": \"$(json_escape "$DL_ENTRIES")\", \"contradiction_warning\": $CONTRADICTION_WARNING, \"contradiction_matches\": \"$(json_escape "$CONTRADICTION_MATCHES")\", \"contradicts_tag\": \"$(json_escape "$CONTRADICTS_TAG")\", \"process_fix_declared\": \"$(json_escape "$PROCESS_FIX_DECLARED")\"}"
   else
-    json "{\"mode\":\"watch\", \"cycle\": 0, \"task\": \"none\", \"type\": \"empty\", \"action\": \"create_tasks\", \"next_action\": \"none\", \"context\": \"Plan has no tasks\", \"hot_tasks\": $HOT_TASKS, \"cold_tasks\": $COLD_TASKS, \"context_warning\": $CONTEXT_WARNING, \"context_note\": \"$(json_escape "$CONTEXT_NOTE")\", \"decision_log_count\": $DL_COUNT, \"decision_log_warning\": $DL_WARNING, \"decision_log_entries\": \"$(json_escape "$DL_ENTRIES")\", \"contradiction_warning\": $CONTRADICTION_WARNING, \"contradiction_matches\": \"$(json_escape "$CONTRADICTION_MATCHES")\", \"contradicts_tag\": \"$(json_escape "$CONTRADICTS_TAG")\"}"
+    json "{\"mode\":\"watch\", \"cycle\": 0, \"task\": \"none\", \"type\": \"empty\", \"action\": \"create_tasks\", \"next_action\": \"none\", \"context\": \"Plan has no tasks\", \"hot_tasks\": $HOT_TASKS, \"cold_tasks\": $COLD_TASKS, \"context_warning\": $CONTEXT_WARNING, \"context_note\": \"$(json_escape "$CONTEXT_NOTE")\", \"decision_log_count\": $DL_COUNT, \"decision_log_warning\": $DL_WARNING, \"decision_log_entries\": \"$(json_escape "$DL_ENTRIES")\", \"contradiction_warning\": $CONTRADICTION_WARNING, \"contradiction_matches\": \"$(json_escape "$CONTRADICTION_MATCHES")\", \"contradicts_tag\": \"$(json_escape "$CONTRADICTS_TAG")\", \"process_fix_declared\": \"$(json_escape "$PROCESS_FIX_DECLARED")\"}"
   fi
   exit 0
 fi
@@ -133,6 +134,7 @@ LINE_NUM="${TASK_LINE%%:*}"
 TASK_REST="${TASK_LINE#*:}"
 # Strip the FSM/checkbox prefix: - [ ] , - [pending] , - [in_progress] , etc.
 TASK_DESC="$(echo "$TASK_REST" | sed -E 's/^- \[([^]]*)\] //')"
+PROCESS_FIX_DECLARED="$(echo "$TASK_DESC" | grep -oE '\[ProcessFix: ?[a-z_]+\]' | head -1 | sed -E 's/\[ProcessFix: ?([a-z_]+)\]/\1/' || true)"
 
 # --- contradiction detection (keyword overlap + explicit tag) -------------- #
 # Check for explicit [Contradicts: ...] tag first
@@ -371,6 +373,7 @@ cat <<ENDJSON
   "contradiction_warning": $CONTRADICTION_WARNING,
   "contradiction_matches": "$(json_escape "$CONTRADICTION_MATCHES")",
   "contradicts_tag": "$(json_escape "$CONTRADICTS_TAG")",
+  "process_fix_declared": "$(json_escape "$PROCESS_FIX_DECLARED")",
   "ledger_available": $([ "${LEDGER_AVAILABLE:-false}" = "true" ] && echo true || echo false),
   "ledger_conflicts": ${LEDGER_CONFLICT_COUNT:-0}
 }

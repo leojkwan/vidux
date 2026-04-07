@@ -49,58 +49,63 @@ ledger_bimodal_distribution() {
     [.[] | select(
       ($repo == "" or .repo == $repo) and
       ($cutoff == "" or (.ts // "") >= $cutoff) and
+      ((.automation_id // "") != "") and
       ((.event // "") == "stop" or (.event // "") == "live" or
        (.event // "") == "vidux_loop_start" or (.event // "") == "vidux_loop_end")
     )] |
 
-    # Group by automation_id (or agent_id if no automation)
-    group_by(.automation_id // .agent_id // "unknown") |
+    # Group by automation_id, then by agent_id to recover one run per automation invocation.
+    group_by(.automation_id) |
 
-    # For each group, compute run durations from consecutive events
+    # For each automation, compute run durations from its per-agent event streams.
     map(
-      (.[0].automation_id // .[0].automation_name // .[0].agent_id // "unknown") as $name |
-      (.[0].automation_id // .[0].agent_id // "unknown") as $id |
+      (.[0].automation_name // .[0].automation_id // "unknown") as $name |
+      (.[0].automation_id // "unknown") as $id |
 
-      # Sort by timestamp
-      sort_by(.ts) |
-
-      # Pair vidux_loop_start with vidux_loop_end for exact durations
-      # Otherwise estimate from consecutive stop events
-      . as $events |
-      [range(1; length)] |
+      group_by(.agent_id // .eid // .ts) |
       map(
-        $events[.].ts as $end_ts |
-        $events[. - 1].ts as $start_ts |
-        # Rough duration in minutes: parse ISO timestamps
+        sort_by(.ts) as $run |
+        (($run | map(select((.event // "") == "vidux_loop_start")) | map(.ts) | first) // "") as $start_exact |
+        (($run | map(select((.event // "") == "vidux_loop_end")) | map(.ts) | last) // "") as $end_exact |
+        ($run[0].ts // "") as $start_fallback |
+        ($run[-1].ts // "") as $end_fallback |
+        (
+          if ($start_exact != "" and $end_exact != "") then [$start_exact, $end_exact]
+          elif ($run | length) >= 2 then [$start_fallback, $end_fallback]
+          else empty
+          end
+        ) |
+        .[0] as $start_ts |
+        .[1] as $end_ts |
         (($end_ts | split("T")[1] | split("Z")[0] | split(":") |
           (.[0] | tonumber) * 60 + (.[1] | tonumber)) -
          ($start_ts | split("T")[1] | split("Z")[0] | split(":") |
           (.[0] | tonumber) * 60 + (.[1] | tonumber))) |
-        # Handle day boundaries (negative = crossed midnight)
         if . < 0 then . + 1440 else . end
-      ) |
+      ) as $durations |
 
       # Classify each duration
-      map(
+      ($durations | map(
         if . < 2 then "quick"
         elif . >= 2 and . < 3 then "normal"
         elif . >= 3 and . <= 8 then "mid"
         elif . > 8 and . < 15 then "normal"
         else "deep"
         end
-      ) |
+      )) as $classes |
 
       # Count per bucket
       {
         automation: $name,
         automation_id: $id,
-        total: length,
-        quick: [.[] | select(. == "quick")] | length,
-        deep: [.[] | select(. == "deep")] | length,
-        mid: [.[] | select(. == "mid")] | length,
-        normal: [.[] | select(. == "normal")] | length
+        total: ($classes | length),
+        quick: ($classes | map(select(. == "quick")) | length),
+        deep: ($classes | map(select(. == "deep")) | length),
+        mid: ($classes | map(select(. == "mid")) | length),
+        normal: ($classes | map(select(. == "normal")) | length)
       }
     ) |
+    map(select(.total > 0)) |
 
     # Aggregate
     . as $per_auto |

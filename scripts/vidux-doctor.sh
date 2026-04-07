@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # vidux-doctor.sh — runtime health checks for the Vidux control plane
-# Usage:  bash vidux-doctor.sh [--json] [--fix] [--repo PATH] [--stale-days N]
+# Usage:  bash vidux-doctor.sh [--json] [--fix] [--repo PATH] [--automations-dir PATH] [--automation-db PATH] [--stale-days N]
 #
 # Checks cross-plan, cross-repo runtime state. Complements vidux-install.sh doctor
 # (which checks installation health). This checks RUNTIME health.
@@ -17,6 +17,8 @@ MAX_CODEX_ACTIVE_THREADS=400
 MAX_CODEX_ACTIVE_AUTOMATION_THREADS=250
 MAX_CODEX_AVG_TITLE_CHARS=2000
 MIN_SYSTEM_MEMORY_FREE_PCT=15
+AUTOMATIONS_DIR_OVERRIDE=""
+AUTOMATION_DB_OVERRIDE=""
 
 # --- parse args ------------------------------------------------------------- #
 while [[ $# -gt 0 ]]; do
@@ -24,6 +26,8 @@ while [[ $# -gt 0 ]]; do
     --json)       JSON_MODE=true; shift ;;
     --fix)        FIX_MODE=true; shift ;;
     --repo)       REPO="$2"; shift 2 ;;
+    --automations-dir) AUTOMATIONS_DIR_OVERRIDE="$2"; shift 2 ;;
+    --automation-db) AUTOMATION_DB_OVERRIDE="$2"; shift 2 ;;
     --stale-days) STALE_DAYS="$2"; shift 2 ;;
     *) echo "Unknown argument: $1" >&2; exit 2 ;;
   esac
@@ -50,7 +54,7 @@ if [ -f "$CONFIG" ]; then
   [[ "$STALE_DAYS" -eq 3 ]] && STALE_DAYS="$STALE_DAYS_CFG"
 fi
 
-VERSION="2.3.1"
+VERSION="2.3.2"
 HOST="$(hostname -s 2>/dev/null || echo unknown)"
 TIMESTAMP="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
@@ -73,6 +77,182 @@ _fail() { [[ "$JSON_MODE" = false ]] && echo -e "  ${RED}BLOCK${RESET} $1" || tr
 # Append a check result (one JSON object per line) to temp file
 _add_check() {
   echo "$1" >> "$CHECKS_FILE"
+}
+
+_resolve_automations_dir() {
+  if [[ -n "$AUTOMATIONS_DIR_OVERRIDE" ]]; then
+    echo "$AUTOMATIONS_DIR_OVERRIDE"
+    return
+  fi
+  if [[ -d "$AUTOMATIONS_DIR" ]]; then
+    echo "$AUTOMATIONS_DIR"
+    return
+  fi
+  if [[ -d "$HOME/.codex/automations" ]]; then
+    echo "$HOME/.codex/automations"
+    return
+  fi
+  echo "$AUTOMATIONS_DIR"
+}
+
+AUTOMATIONS_DIR="$(_resolve_automations_dir)"
+
+_resolve_automation_db() {
+  if [[ -n "$AUTOMATION_DB_OVERRIDE" ]]; then
+    echo "$AUTOMATION_DB_OVERRIDE"
+    return
+  fi
+  if [[ -f "$HOME/.codex/sqlite/codex-dev.db" ]]; then
+    echo "$HOME/.codex/sqlite/codex-dev.db"
+    return
+  fi
+  if [[ -f "$HOME/.Codex/sqlite/codex-dev.db" ]]; then
+    echo "$HOME/.Codex/sqlite/codex-dev.db"
+    return
+  fi
+  echo "$HOME/.codex/sqlite/codex-dev.db"
+}
+
+AUTOMATION_DB="$(_resolve_automation_db)"
+
+_stalled_automation_rows_json() {
+  local db_path="$1"
+  local automations_dir="$2"
+  local grace_minutes=10
+
+  python3 - "$db_path" "$automations_dir" "$grace_minutes" <<'PY'
+import json
+import os
+import sqlite3
+import sys
+import time
+from datetime import datetime
+
+db_path, automations_dir, grace_minutes_s = sys.argv[1:4]
+grace_minutes = int(grace_minutes_s)
+now_ms = int(time.time() * 1000)
+
+if not os.path.isfile(db_path):
+    print(json.dumps({
+        "available": False,
+        "db_path": db_path,
+        "grace_minutes": grace_minutes,
+        "rows": [],
+    }))
+    raise SystemExit
+
+conn = sqlite3.connect(db_path)
+conn.row_factory = sqlite3.Row
+query = """
+SELECT
+  a.id,
+  a.next_run_at,
+  a.last_run_at,
+  COALESCE(r.runs, 0) AS runs
+FROM automations a
+LEFT JOIN (
+  SELECT automation_id, COUNT(*) AS runs
+  FROM automation_runs
+  GROUP BY automation_id
+) r ON r.automation_id = a.id
+WHERE a.status = 'ACTIVE'
+  AND COALESCE(r.runs, 0) = 0
+  AND a.last_run_at IS NULL
+  AND (a.next_run_at IS NULL OR a.next_run_at <= ?)
+ORDER BY a.next_run_at ASC, a.id ASC
+"""
+
+def iso_local(ms):
+    if ms is None:
+        return None
+    return datetime.fromtimestamp(ms / 1000).strftime("%Y-%m-%d %H:%M:%S")
+
+rows = []
+threshold_ms = now_ms - (grace_minutes * 60 * 1000)
+for row in conn.execute(query, (threshold_ms,)):
+    aid = row["id"]
+    next_run_at = row["next_run_at"]
+    repo_backed = False
+    if automations_dir:
+        repo_backed = os.path.isfile(os.path.join(automations_dir, aid, "automation.toml"))
+    overdue_minutes = None
+    if next_run_at is not None:
+        overdue_minutes = max(0, int((now_ms - next_run_at) / 60000))
+    rows.append({
+        "id": aid,
+        "repo_backed": repo_backed,
+        "runs": int(row["runs"] or 0),
+        "last_run_at": row["last_run_at"],
+        "next_run_at": next_run_at,
+        "next_run_local": iso_local(next_run_at),
+        "overdue_minutes": overdue_minutes,
+    })
+
+print(json.dumps({
+    "available": True,
+    "db_path": db_path,
+    "grace_minutes": grace_minutes,
+    "rows": rows,
+}))
+PY
+}
+
+_watch_harness_prompt_scan() {
+  local toml="$1"
+  python3 - "$toml" <<'PY'
+import json
+import sys
+
+try:
+    import tomllib
+except ModuleNotFoundError:  # pragma: no cover
+    import tomli as tomllib  # type: ignore
+
+path = sys.argv[1]
+with open(path, "rb") as fh:
+    data = tomllib.load(fh)
+
+prompt = (data.get("prompt") or "").lower()
+automation_id = data.get("id") or ""
+status = data.get("status") or ""
+kind = data.get("kind") or ""
+
+watch_markers = [
+    "watch mode",
+    "next_action",
+    "fire burst",
+    "stay under 2 minutes",
+    "keep this run brief",
+    "scheduled run should stay brief",
+]
+deep_markers = [
+    "implement",
+    "build new verification",
+    "write new contract tests",
+    "create new fake projects",
+    "work the highest-value unblocked slice to a real boundary",
+    "run the vidux contract suite",
+    "do not skip straight from evidence to implementation",
+]
+
+matched_watch = [marker for marker in watch_markers if marker in prompt]
+matched_deep = [marker for marker in deep_markers if marker in prompt]
+issues = []
+if matched_deep and not matched_watch:
+    issues.append("missing_watch_contract")
+if matched_deep and matched_watch:
+    issues.append("mixed_watch_and_burst_scope")
+
+payload = {
+    "automation_id": automation_id,
+    "status": status,
+    "kind": kind,
+    "matched_watch_markers": matched_watch,
+    "matched_deep_markers": matched_deep,
+    "issues": issues,
+}
+print(json.dumps(payload))
+PY
 }
 
 _browser_snapshot_json() {
@@ -501,6 +681,109 @@ _check_orphan_automations() {
 }
 
 # ============================================================================ #
+# CHECK 4b: Watch Harness Scope Drift
+# ============================================================================ #
+_check_watch_harness_scope() {
+  TOTAL=$((TOTAL + 1))
+  local count=0 details_json="["
+  local first=true
+
+  if [[ ! -d "$AUTOMATIONS_DIR" ]]; then
+    _ok "No automations directory available for watch-harness audit"
+    PASS_COUNT=$((PASS_COUNT + 1))
+    _add_check "{\"id\":\"watch_harness_scope\",\"category\":\"automations\",\"status\":\"pass\",\"count\":0}"
+    return
+  fi
+
+  for toml in "$AUTOMATIONS_DIR"/*/automation.toml; do
+    [[ -f "$toml" ]] || continue
+    local scan_json status kind issue_count
+    scan_json="$(_watch_harness_prompt_scan "$toml" 2>/dev/null || echo '{}')"
+    status="$(python3 -c 'import json,sys; print(json.load(sys.stdin).get("status",""))' <<< "$scan_json" 2>/dev/null || true)"
+    kind="$(python3 -c 'import json,sys; print(json.load(sys.stdin).get("kind",""))' <<< "$scan_json" 2>/dev/null || true)"
+    [[ "$status" != "ACTIVE" ]] && continue
+    [[ "$kind" != "cron" ]] && continue
+    issue_count="$(python3 -c 'import json,sys; print(len(json.load(sys.stdin).get("issues",[])))' <<< "$scan_json" 2>/dev/null || echo 0)"
+    [[ "$issue_count" -eq 0 ]] && continue
+
+    count=$((count + 1))
+    [[ "$first" = true ]] && first=false || details_json="$details_json,"
+    details_json="$details_json$scan_json"
+  done
+  details_json="$details_json]"
+
+  if [[ "$count" -gt 0 ]]; then
+    local summary
+    summary="$(python3 - <<'PY' "$details_json"
+import json
+import sys
+
+details = json.loads(sys.argv[1])
+bits = []
+for item in details:
+    aid = item.get("automation_id") or "unknown"
+    deep = ", ".join(item.get("matched_deep_markers") or [])
+    issues = ", ".join(item.get("issues") or [])
+    bits.append(f"{aid} ({issues}; deep={deep})")
+print("; ".join(bits))
+PY
+)"
+    _warn "Watch harness scope drift: $summary"
+    _add_check "{\"id\":\"watch_harness_scope\",\"category\":\"automations\",\"status\":\"warn\",\"count\":$count,\"details\":$details_json}"
+  else
+    _ok "No watch harness prompts mixing scheduled checks with burst work"
+    PASS_COUNT=$((PASS_COUNT + 1))
+    _add_check "{\"id\":\"watch_harness_scope\",\"category\":\"automations\",\"status\":\"pass\",\"count\":0}"
+  fi
+}
+
+# ============================================================================ #
+# CHECK 4c: Stalled Active Automation Rows
+# ============================================================================ #
+_check_stalled_active_automation_rows() {
+  TOTAL=$((TOTAL + 1))
+  local snapshot available count grace_minutes db_path details_json summary
+  snapshot="$(_stalled_automation_rows_json "$AUTOMATION_DB" "$AUTOMATIONS_DIR")"
+  available="$(python3 -c "import json,sys; print('1' if json.load(sys.stdin).get('available') else '0')" <<< "$snapshot")"
+
+  if [[ "$available" != "1" ]]; then
+    db_path="$(python3 -c "import json,sys; print(json.load(sys.stdin).get('db_path',''))" <<< "$snapshot")"
+    _ok "Automation DB unavailable for stalled-row audit ($db_path)"
+    PASS_COUNT=$((PASS_COUNT + 1))
+    _add_check "{\"id\":\"stalled_active_automation_rows\",\"category\":\"automations\",\"status\":\"pass\",\"available\":false,\"db_path\":\"$db_path\",\"count\":0}"
+    return
+  fi
+
+  count="$(python3 -c "import json,sys; print(len(json.load(sys.stdin).get('rows', [])))" <<< "$snapshot")"
+  grace_minutes="$(python3 -c "import json,sys; print(json.load(sys.stdin).get('grace_minutes', 10))" <<< "$snapshot")"
+  db_path="$(python3 -c "import json,sys; print(json.load(sys.stdin).get('db_path',''))" <<< "$snapshot")"
+  details_json="$(python3 -c "import json,sys; print(json.dumps(json.load(sys.stdin).get('rows', [])))" <<< "$snapshot")"
+
+  if [[ "$count" -gt 0 ]]; then
+    summary="$(python3 - <<'PY' "$details_json"
+import json
+import sys
+
+details = json.loads(sys.argv[1])
+bits = []
+for item in details:
+    mode = "repo" if item.get("repo_backed") else "db-only"
+    overdue = item.get("overdue_minutes")
+    overdue_txt = "no next_run_at" if overdue is None else f"{overdue}m overdue"
+    bits.append(f"{item.get('id')} ({mode}, {overdue_txt})")
+print("; ".join(bits))
+PY
+)"
+    _warn "Active scheduler rows with zero runs: $summary"
+    _add_check "{\"id\":\"stalled_active_automation_rows\",\"category\":\"automations\",\"status\":\"warn\",\"available\":true,\"db_path\":\"$db_path\",\"grace_minutes\":$grace_minutes,\"count\":$count,\"details\":$details_json}"
+  else
+    _ok "No active scheduler rows are overdue with zero runs"
+    PASS_COUNT=$((PASS_COUNT + 1))
+    _add_check "{\"id\":\"stalled_active_automation_rows\",\"category\":\"automations\",\"status\":\"pass\",\"available\":true,\"db_path\":\"$db_path\",\"grace_minutes\":$grace_minutes,\"count\":0,\"details\":[]}"
+  fi
+}
+
+# ============================================================================ #
 # CHECK 5: Browser Process Pressure / Zombie Candidates
 # ============================================================================ #
 _check_browser_process_pressure() {
@@ -839,6 +1122,8 @@ fi
 
 _check_dual_active_automations
 _check_orphan_automations
+_check_watch_harness_scope
+_check_stalled_active_automation_rows
 _check_browser_process_pressure
 
 if [[ "$JSON_MODE" = false ]]; then
