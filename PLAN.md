@@ -127,8 +127,8 @@ Create a net-new plan-first orchestration system that makes quarter-long iOS pro
 - [completed] **14.3 PAUSE blocked lanes** — resplit-android PAUSED (Play Store blocked), 14 total automations paused then cleaned. StrongYes radars later unpaused after domain fix. [Done: 2026-04-07]
 - [completed] **14.4 Kill ghost fleet rows** — 22 paused/ghost rows deleted from Codex DB. Dashboard clean: 12 active, 0 paused. [Done: 2026-04-07]
 - [completed] **14.5 Clean stale worktrees and browser processes** — 229 worktrees pruned (11GB), 750 browser processes killed (20GB RAM). [Done: 2026-04-07]
-- [pending] **14.6 Add cadence-runtime health check to vidux-doctor.sh** — New CHECK: flags automations where cadence < avg_runtime. Reads runtime from memory files or ledger. Proposes cadence fix.
-- [pending] **14.7 Fleet restructuring contract tests** — Tests for: REDUCE gate presence in harness prompts, cadence-runtime ratio, no mid-zone runs in ledger, blocked lanes are PAUSED.
+- [completed] **14.6 Add cadence-runtime health check to vidux-doctor.sh** — CHECK 12 added. Reads rrule BYMINUTE count + memory file runtimes. Doctor now has 14 checks. [Done: 2026-04-07]
+- [completed] **14.7 Fleet restructuring contract tests** — 8 new tests (168 total): cadence-runtime check existence, 14+ doctor checks, REDUCE gate in DOCTRINE.md + best-practices.md, compat.sh functions, prune/witness use compat not raw stat/date. [Done: 2026-04-07]
 
 ### Phase 10 Open Questions
 - [x] Q6: Max plan nesting depth = 3, 4th allowed but flagged. Enforced by dashboard. [Decision Log entry exists.] [Done: 2026-04-07]

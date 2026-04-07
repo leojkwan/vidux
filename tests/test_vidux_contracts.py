@@ -2408,5 +2408,61 @@ class ViduxContractTests(unittest.TestCase):
         self.assertGreater(len(data["sections"]), 0)
 
 
+    # === Phase 14: Fleet Restructuring Contract Tests ===
+
+    def test_doctor_cadence_runtime_check_exists(self):
+        """vidux-doctor.sh must have a cadence_runtime check (CHECK 12)."""
+        content = (self.SCRIPTS_DIR / "vidux-doctor.sh").read_text()
+        self.assertIn("cadence_runtime", content)
+        self.assertIn("_check_cadence_runtime", content)
+
+    def test_doctor_total_checks_at_least_14(self):
+        """vidux-doctor.sh --json must report at least 14 total checks."""
+        result = subprocess.run(
+            ["bash", str(self.SCRIPTS_DIR / "vidux-doctor.sh"), "--json"],
+            capture_output=True, text=True, timeout=60,
+        )
+        data = json.loads(result.stdout)
+        self.assertGreaterEqual(data["total"], 14)
+
+    def test_reduce_gate_in_doctrine(self):
+        """DOCTRINE.md must document the REDUCE gate pattern."""
+        content = (self.ROOT / "DOCTRINE.md").read_text()
+        self.assertIn("REDUCE", content)
+        self.assertIn("gate", content.lower())
+
+    def test_reduce_gate_in_best_practices(self):
+        """best-practices.md must have the REDUCE gate pattern section."""
+        bp = self.ROOT / "guides" / "vidux" / "best-practices.md"
+        if bp.exists():
+            content = bp.read_text()
+            self.assertIn("REDUCE Gate", content)
+
+    def test_compat_lib_exists(self):
+        """scripts/lib/compat.sh must exist for OS portability."""
+        self.assertTrue((self.SCRIPTS_DIR / "lib" / "compat.sh").exists())
+
+    def test_compat_lib_has_required_functions(self):
+        """compat.sh must define file_mtime_epoch, dir_newest_mtime, parse_iso_epoch."""
+        content = (self.SCRIPTS_DIR / "lib" / "compat.sh").read_text()
+        for fn in ["file_mtime_epoch", "dir_newest_mtime", "parse_date_epoch", "parse_iso_epoch"]:
+            self.assertIn(fn, content, f"Missing function: {fn}")
+
+    def test_prune_uses_compat(self):
+        """vidux-prune.sh must source compat.sh, not use raw stat -f."""
+        content = (self.SCRIPTS_DIR / "vidux-prune.sh").read_text()
+        self.assertIn("source", content)
+        self.assertIn("compat.sh", content)
+        # Should not have raw macOS-only stat calls
+        self.assertNotIn("stat -f '%m'", content)
+
+    def test_witness_uses_compat(self):
+        """vidux-witness.sh must source compat.sh, not use raw date -j -f."""
+        content = (self.SCRIPTS_DIR / "vidux-witness.sh").read_text()
+        self.assertIn("compat.sh", content)
+        # Should not have raw macOS-only date calls
+        self.assertNotIn("date -j -f", content)
+
+
 if __name__ == "__main__":
     unittest.main()
