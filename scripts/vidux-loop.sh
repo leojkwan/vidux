@@ -339,6 +339,31 @@ $DL_ENTRY\\
   fi
 fi
 
+# --- auto-pause detection (fleet-level unproductive streak) ----------------- #
+# If the last 3 Progress entries indicate no real work, recommend pausing.
+# Patterns: "blocked", "proof-refresh only", "nothing to do", "no pending",
+# "all blocked", "checkpoint_only", "escalate". Threshold: 3 consecutive.
+AUTO_PAUSE_RECOMMENDED=false; UNPRODUCTIVE_STREAK=0
+if grep -q '^## Progress' "$PLAN" 2>/dev/null; then
+  # Get last 3 progress entries (most recent first)
+  LAST_3="$(printf '%s\n' "$PROG_BLOCK" | { grep -E '^\- \[' || true; } | tail -3)"
+  if [ -n "$LAST_3" ]; then
+    UNPRODUCTIVE_COUNT=0
+    TOTAL_CHECKED=0
+    while IFS= read -r pline; do
+      [ -z "$pline" ] && continue
+      TOTAL_CHECKED=$((TOTAL_CHECKED + 1))
+      if printf '%s' "$pline" | grep -qiE 'blocked|proof-refresh only|nothing to do|no pending|all blocked|checkpoint_only|escalate|no actionable'; then
+        UNPRODUCTIVE_COUNT=$((UNPRODUCTIVE_COUNT + 1))
+      fi
+    done <<< "$LAST_3"
+    UNPRODUCTIVE_STREAK=$UNPRODUCTIVE_COUNT
+    if [ "$UNPRODUCTIVE_COUNT" -ge 3 ] && [ "$TOTAL_CHECKED" -ge 3 ]; then
+      AUTO_PAUSE_RECOMMENDED=true
+    fi
+  fi
+fi
+
 # --- recompute hot_tasks after mutations (stuck-loop may have auto-blocked) - #
 HOT_TASKS="$(grep -nE '^\- (\[ \]|\[(pending|in_progress)\]) ' "$PLAN" | _exclude_ec_lines | grep -c '.' || true)"
 
@@ -417,6 +442,8 @@ cat <<ENDJSON
   "exit_criteria_pending": $EXIT_CRITERIA_PENDING,
   "ledger_available": $([ "${LEDGER_AVAILABLE:-false}" = "true" ] && echo true || echo false),
   "ledger_conflicts": ${LEDGER_CONFLICT_COUNT:-0},
+  "auto_pause_recommended": $AUTO_PAUSE_RECOMMENDED,
+  "unproductive_streak": $UNPRODUCTIVE_STREAK,
   "reduce_contract": {
     "read_only": true,
     "max_budget_seconds": 120,
