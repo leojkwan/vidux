@@ -2308,5 +2308,105 @@ class ViduxContractTests(unittest.TestCase):
         )
 
 
+    # --- Phase 13.6-13.10: Coverage gap tests -------------------------------- #
+
+    def test_witness_produces_valid_json(self):
+        """vidux-witness.sh must produce valid JSON with fleet_grade and counts."""
+        result = subprocess.run(
+            ["bash", str(self.SCRIPTS_DIR / "vidux-witness.sh")],
+            capture_output=True, text=True, timeout=30,
+        )
+        data = json.loads(result.stdout)
+        self.assertIn("fleet_grade", data)
+        self.assertIn("counts", data)
+        self.assertIn("total", data["counts"])
+
+    def test_witness_fleet_grade_is_letter(self):
+        """vidux-witness.sh fleet_grade must be A-F."""
+        result = subprocess.run(
+            ["bash", str(self.SCRIPTS_DIR / "vidux-witness.sh")],
+            capture_output=True, text=True, timeout=30,
+        )
+        data = json.loads(result.stdout)
+        self.assertIn(data["fleet_grade"], list("ABCDF"))
+
+    def test_skill_has_compound_tasks_section(self):
+        """SKILL.md must document compound tasks and investigations."""
+        text = _read(ROOT / "SKILL.md")
+        self.assertIn("Compound Tasks", text)
+        self.assertIn("Investigation", text)
+        self.assertIn("Impact Map", text)
+        self.assertIn("Fix Spec", text)
+        self.assertIn("status propagation", text.lower())
+
+    def test_skill_investigation_template_has_required_sections(self):
+        """SKILL.md investigation template must have all required sections."""
+        text = _read(ROOT / "SKILL.md")
+        for section in ["Reporter Says", "Root Cause", "Impact Map", "Fix Spec", "Gate"]:
+            self.assertIn(section, text, f"Investigation template missing: {section}")
+
+    def test_doctrine_principle5_mentions_compaction(self):
+        """DOCTRINE.md Principle 5 must mention compaction survival."""
+        text = _read(ROOT / "DOCTRINE.md")
+        self.assertTrue(
+            "compaction" in text.lower(),
+            "DOCTRINE.md missing compaction guidance in Principle 5",
+        )
+
+    def test_doctrine_principle7_mentions_investigation(self):
+        """DOCTRINE.md Principle 7 must mention investigation and nested."""
+        text = _read(ROOT / "DOCTRINE.md")
+        self.assertIn("investigation", text.lower())
+        self.assertIn("nested", text.lower())
+
+    def test_doctrine_principle8_mentions_harness(self):
+        """DOCTRINE.md Principle 8 must mention harness and stateless."""
+        text = _read(ROOT / "DOCTRINE.md")
+        self.assertIn("harness", text.lower())
+        self.assertIn("stateless", text.lower())
+
+    def test_doctrine_principle9_mentions_subagent(self):
+        """DOCTRINE.md Principle 9 must mention subagent and coordinator."""
+        text = _read(ROOT / "DOCTRINE.md")
+        self.assertIn("subagent", text.lower())
+        self.assertIn("coordinator", text.lower())
+
+    def test_loop_empty_tasks_produces_valid_json(self):
+        """vidux-loop.sh with empty Tasks section must produce valid JSON."""
+        import tempfile, os
+        plan_text = textwrap.dedent("""\
+            # Test Plan
+            ## Tasks
+            ## Decision Log
+            ## Progress
+        """)
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
+            f.write(plan_text)
+            tmp = f.name
+        try:
+            result = subprocess.run(
+                ["bash", str(self.SCRIPTS_DIR / "vidux-loop.sh"), tmp],
+                capture_output=True, text=True, timeout=10,
+            )
+            data = json.loads(result.stdout)
+            self.assertIn("mode", data)
+            self.assertIn("hot_tasks", data)
+            self.assertEqual(data["hot_tasks"], 0)
+        finally:
+            os.unlink(tmp)
+
+    def test_test_all_json_output(self):
+        """vidux-test-all.sh --json must produce valid JSON with sections array."""
+        result = subprocess.run(
+            ["bash", str(self.SCRIPTS_DIR / "vidux-test-all.sh"), "--json"],
+            capture_output=True, text=True, timeout=300,
+        )
+        data = json.loads(result.stdout)
+        self.assertIn("overall", data)
+        self.assertIn("sections", data)
+        self.assertIsInstance(data["sections"], list)
+        self.assertGreater(len(data["sections"]), 0)
+
+
 if __name__ == "__main__":
     unittest.main()
