@@ -1,29 +1,22 @@
 # Vidux Best Practices
 
-Lessons from 9 overnight cron cycles where Vidux built itself.
-This is not theory. Everything here was learned the hard way.
+Lessons from 28+ cycles where Vidux built itself, managed a 10-automation fleet across Resplit and StrongYes, and ran overnight cron loops unsupervised. This is not theory. Everything here was learned the hard way.
 
 ---
 
 ## 1. Writing a Good PLAN.md
 
-The plan is the single most important artifact. Not the code. The plan. If the
-plan is wrong, everything downstream is wrong.
+The plan is the single most important artifact. Not the code. The plan. If the plan is wrong, everything downstream is wrong.
 
-**Purpose:** One paragraph, user-visible goal only. No implementation details.
-The Vidux build plan says: "Create a net-new plan-first orchestration system
-that makes quarter-long iOS projects completable in a week via overnight cron
-loops." No mention of hooks, scripts, or files. Just the outcome.
+**Purpose:** One paragraph, user-visible goal only. No implementation details. The Vidux build plan says: "Create a net-new plan-first orchestration system that makes quarter-long iOS projects completable in a week via overnight cron loops." No mention of hooks, scripts, or files. Just the outcome.
 
-**Evidence** is the backbone. Every bullet cites a source with `[Source: ...]`.
-No source means it is a guess. Remove it or go find evidence.
+**Evidence** is the backbone. Every bullet cites a source with `[Source: ...]`. No source means it is a guess. Remove it or go find evidence.
 
 Good evidence entry:
 ```
 - [Source: SlopCodeBench, arxiv 2603.24755] Agent code degradation is monotonic.
   Erosion in 80% of trajectories. "Coding while thinking" is empirically bad.
 ```
-Specific, citable, actionable. Directly informs the 50/30/20 split.
 
 Bad evidence entry:
 ```
@@ -36,302 +29,278 @@ No source. "Probably" means guessing. Does not belong in the plan.
 - ASK FIRST: human-gated. "ASK FIRST before changing installer or bootstrap behavior."
 - NEVER: hard prohibitions. "NEVER run more than 4 coding agents in parallel."
 
-Include reviewer preferences grounded in real PR comments. The Vidux plan has:
-"Reviewer preference: Sports analogies (point guard, ref), not
-political ones (mayor)." That came from actual feedback.
+Include reviewer preferences grounded in real PR comments.
 
-**The 10-point readiness checklist** (from LOOP.md). Score 7+ to code:
+**The 10-point readiness checklist.** Score 7+ to code:
 
-Required gates (all must be true, or score is 0):
+Required (all must be true or score is 0):
 1. Purpose section filled
 2. Evidence has 3+ cited sources with `[Source:]` markers
 3. Constraints has at least one ALWAYS and one NEVER
-4. At least one Task with evidence cited
-5. No Open Questions blocking the next task
+4. At least one task with evidence cited
+5. No open questions blocking the next task
 
-Quality points (each adds 1):
+Quality (each adds 1):
 6. Evidence includes an external source (not just codebase greps)
 7. Constraints include a stakeholder preference
 8. Tasks have `[Depends:]` markers where applicable
 9. Decisions section has an entry with alternatives and rationale
 10. No vague task descriptions
 
-**Compound tasks (v2).** When a task bundles multiple tickets or requires deep root-cause analysis, mark it with `[Investigation: investigations/<slug>.md]` instead of a plain description. This tells the agent to read the investigation file before starting work. The investigation file contains the bundled tickets, gathered evidence, root cause, impact map, fix spec, and gate criteria. See the architecture guide (Section 6) for the full template.
-
-**What happens when you skip this:** The swiftify-v4 session coded without
-capturing team conventions. Result: a Combine-based implementation reworked
-because the team preferred async/await. A 30-minute evidence pass through
-PR reviews would have caught it. The plan scored maybe 4/10 -- Purpose existed
-but Evidence had zero external sources and Constraints had no stakeholder
-preferences. The checklist would have blocked coding.
+**What happens when you skip this:** swiftify-v4 coded without capturing team conventions. Result: a Combine implementation reworked because the team preferred async/await. A 30-minute evidence pass through PR reviews would have caught it. The plan scored maybe 4/10.
 
 ---
 
 ## 2. The 50/30/20 Rule
 
-```mermaid
-pie title Vidux Time Budget
-    "Plan Refinement (50%)" : 50
-    "Code Execution (30%)" : 30
-    "Last Mile (20%)" : 20
+50% refining the plan. 30% writing code. 20% last mile (build errors, CI, reviewer feedback, merges).
+
+```
+|  50% PLAN REFINEMENT     |  30% CODE     |  20% LM  |
+|  gather, synthesize,     |  one task     |  build,  |
+|  prune, update PLAN.md   |  per cycle    |  CI,     |
+|                          |  derived      |  review  |
+   <-- front-load thinking --> <mechanical> <- tail ->
 ```
 
-50% refining the plan. 30% writing code. 20% last mile (build errors, CI,
-reviewer feedback, merges).
-
-**If you are coding more than planning, stop.** SlopCodeBench shows agent code
-degradation is monotonic -- erosion in 80% of trajectories. The longer you code
-without grounding in evidence, the further you drift.
-
-The Vidux build itself: of 16 cycles, 9 were plan refinement, 4 were code
-execution, 3 were last mile. That is roughly 56/25/19 -- and the build shipped
-clean. The swiftify-v4 session inverted this ratio. Heavy coding, light
-planning. The result was a Combine rework that burned multiple cycles.
+If you are coding more than planning, stop. The Vidux build: of 16 early cycles, 9 were plan refinement, 4 code execution, 3 last mile. Roughly 56/25/19. It shipped clean. swiftify-v4 inverted this. Heavy coding, light planning. Multiple reworks.
 
 ---
 
-## 3. Fan-Out Research Pattern
+## 3. The Closure Bias Defense
 
-Never have 20 agents write one file. Research shows 17x error amplification
-beyond 4 parallel agents without hierarchy.
+After completing any task, agents have a learned impulse to checkpoint and exit. "Context is getting tight." "This is a good stopping point." This is closure bias (Claude Code #34238). It is the single most common failure mode in unattended cron loops.
 
-```mermaid
-graph TD
-    PG[Point Guard] --> GA[Group A: Evidence<br/>team chat, code reviews, issues]
-    PG --> GB[Group B: Architecture<br/>codebase, design docs]
-    PG --> GC[Group C: Constraints<br/>reviewer prefs, conventions]
-    PG --> GD[Group D: Tasks<br/>deps, scope, risk]
-    GA --> SYN[Synthesizer<br/>writes unified PLAN.md]
-    GB --> SYN
-    GC --> SYN
-    GD --> SYN
-    SYN --> CRIT[Critic<br/>challenges assumptions]
-    CRIT --> PG
+**The rule: after completing any task, scan the queue before checkpointing.**
+
+```
+Task completed, build passes
+     |
+     v
+DO NOT CHECKPOINT YET
+     |
+     v
+Open PLAN.md, scan for unchecked tasks
+     |
+     +--> More tasks pending? --> execute the next one
+     |
+     +--> Queue empty? --> NOW checkpoint
+     |
+     +--> Hard blocker? --> checkpoint with blocker noted
 ```
 
-**Tier 1 -- Research:** 4 research agents, all parallel. Each writes
-to its own file (evidence.md, architecture.md, constraints.md, tasks.md).
+The "I am done" feeling is unreliable. The queue is truth.
 
-**Tier 2 -- Synthesis:** One agent reads all four outputs, writes unified
-PLAN.md. Single writer, no conflicts.
+**Real failure:** A Resplit automation completed a payment flow fix, checkpointed, and exited at 4.7 minutes. Six more tasks were pending. The next cron fire spent 2 minutes bootstrapping context just to pick up where the last one could have continued. Multiply this by every run in a 10-automation fleet running overnight and the waste is substantial.
 
-**Tier 3 -- Critique:** One agent challenges assumptions, checks for
-contradictions and scope creep.
-
-For code execution, cap at 4 parallel agents with a point guard plus workers
-model. Research agents scale wider because they are read-only -- no merge
-conflicts. The Vidux build ran 9 research agents in Cycle 0 and 5 swarm agents
-in Cycle 3, all successfully.
-
-Why subagents, not Teams? Teams persist across sessions (violates stateless
-doctrine), add coordination overhead, and risk orphaned state if the cron dies.
-Subagents are fire-and-forget.
+**How dispatch/reduce fixes this structurally:** REDUCE mode exits in under 2 minutes (nothing to do). DISPATCH mode has no exit until queue drain or hard blocker. There is no middle ground. The agent never decides "should I keep going?" because the mode already decided. See the architecture guide, Section 2.
 
 ---
 
-## 4. Running Overnight Cron Loops
+## 4. Self-Extending Plans
 
-Each cycle is stateless: gather, plan, execute, verify, checkpoint, complete. The next
-cycle is a fresh dispatch that knows nothing except what is in the store.
+Automations add tasks to PLAN.md themselves. Do not wait for the human to enumerate work.
 
-**Hourly > 20-minute for overnight.** Twenty-minute cycles create thrashing --
-the agent barely finishes reading context before checkpoint time. Hourly gives
-room for meaningful work. Use 20-minute only for daytime rapid iteration.
+When you fix a bug, log the related bugs you saw on the same surface. When you add a feature, log the polish and edge-cases you spotted. When you fix /pricing, check /plans too -- the same bug class often lives on adjacent pages. Think N steps ahead.
 
-**Expect auth expiry.** Tokens expire, MCP servers disconnect. A crashed session
-loses at most one cycle. The next cycle commits recovered work first.
+**The brake: three-strike rule.** If a surface already has 3+ queued polish tasks, ship the most impactful one and move on. Self-extension without a brake becomes recursive optimization forever. A good automation knows when a surface is honestly good and stops adding work to its own queue.
 
-**Commit is the checkpoint, not push.** Solo computer workflow. Commit after
-every cycle. Push when ready to share. Commit message: `vidux: [what you did]`
-with structured body (Plan, Evidence, Next, Blocker).
+**Real failure:** A Resplit automation discovered 14 polish tasks on a single view controller. Without the three-strike brake it would still be polishing. With the brake it shipped the top 3 and moved to the next gap in the mission.
 
-**Environment variables for ledger:** `AGENT_LANE` (work track) and
-`AGENT_SKILLS` (loaded skills, e.g., `vidux,build-skill,review-skill`).
+**Mission honesty rule:** Separate "current slice status" from "release boundary" from "overall mission completion." If the overall mission has gaps elsewhere, polish on a done surface is procrastination. Only re-extend plans when investigation reveals new surfaces, not when you find one more pixel to align on a surface you already touched.
 
 ---
 
-## 5. Common Mistakes
+## 5. Product Taste Over Functional Correctness
 
-**Coding without a plan entry.** Number one mistake. Every code change traces to
-a PLAN.md task. The PreToolUse hook reminds you, but it is a safety net, not a
-substitute. During the Vidux build, agents kept making "quick cleanups" to
-unplanned files. Each cleanup was small. The cumulative drift was not. That is
-why the drift detection hook was added.
+Functional code is table stakes. The build passes, the tests are green -- that is the floor, not the ceiling. What separates a good automation from a great one is taste: anticipating the next ask, catching visual issues before the human sees them, and knowing when "works correctly" is not the same as "works well."
 
-**Carrying context between sessions.** The next agent remembers nothing. Write
-it to PLAN.md or it does not exist. The Vidux build logged 5 surprises across
-16 cycles. Each one changed subsequent behavior -- because it was written down.
+**Visual proof, not just green builds.** For any UI work, definition of done is a simulator screenshot or before/after comparison, not "the build passes." Load `$picasso` (or equivalent) for visual evaluation. A payment form that compiles but has 4px misaligned labels is not done.
 
-**Too many parallel coding agents.** Four is the cap. 17x error amplification
-without hierarchy. Use point guard plus workers. Research agents can go wider
-(read-only, no merge conflicts).
+**Anticipate the next ask.** When you fix /pricing, also check /plans -- same bug class, adjacent page. When you add a new API endpoint, check that the error states render correctly, not just the happy path. The automation that does this saves the human a round-trip of "now fix the other one."
 
-**Forgetting to checkpoint.** No commit means the next session starts blind.
-Even plan-only refinement gets a commit: `vidux: refined evidence for Task 3`.
+**Before/after screenshots as proof.** When a UI task is complete, capture before and after. This is not documentation -- it is evidence that the change is an improvement. An agent that says "I fixed the layout" without visual proof is asking the human to trust. An agent that shows the screenshots is showing.
 
-**Plan without evidence.** An uncited entry is a guess. The readiness checklist
-requires 3+ cited sources to start coding. A 4/10 plan should never produce code.
+**Real example from Resplit:** An automation fixed the currency conversion display -- build passed, tests green. But the formatted amount was clipped by the container on small screens. A `$picasso` visual check caught it in the same cycle. Without taste-level checking, it would have shipped broken to 320px devices and required a second cycle to diagnose and fix.
 
-**Over-engineering enforcement.** Prompt hooks for judgment calls. Command hooks
-for objective checks (compile, lint). Plan compliance is a judgment call -- a
-command hook parsing PLAN.md for file paths is brittle. A prompt hook that
-reminds the agent to check is flexible and effective.
+**Real example from StrongYes:** An automation built the interview prep timer. Functionally correct -- it counted down, it beeped. But the font was 12px on a component that needed to be glanceable from arm's length. Product taste means catching this in the same cycle, not three cycles later when the human notices.
 
 ---
 
-## 6. When to Use Vidux vs Pilot
+## 6. Fan-Out Research Pattern
 
-```mermaid
-graph TD
-    START{How big is the work?} -->|Under 2 hours| PILOT[Pilot - Mode A]
-    START -->|Multi-session| MULTI{8+ files?}
-    MULTI -->|No| PILOT
-    MULTI -->|Yes| VIDUX[Vidux - Mode B]
-    START -->|PR nursing / CI fix| SLOTH[Pilot + Sloth]
-    VIDUX --> PLAN[Start with PLAN.md]
-    PILOT --> CODE[Start coding]
-    SLOTH --> REACT[React to CI / reviews]
+Never have 20 agents write one file. 17x error amplification beyond 4 parallel agents without hierarchy.
+
+```
+          +----------+  +----------+  +----------+  +----------+
+TIER 1    | Agent A  |  | Agent B  |  | Agent C  |  | Agent D  |
+(parallel)| team chat|  | codebase |  | rules    |  | issues   |
+          +----+-----+  +----+-----+  +----+-----+  +----+-----+
+               |              |              |              |
+               v              v              v              v
+          evidence/      arch/        constraints/   tasks/
+               |              |              |              |
+               +---------+---+--------------+--------------+
+                         |
+                         v
+                   +-----------+
+TIER 2 (serial)    | Synthesizer|  reads all 4, writes one PLAN.md
+                   +-----------+
+                         |
+                         v
+                   +-----------+
+TIER 3 (serial)    |   Critic   |  challenges assumptions
+                   +-----------+
 ```
 
-**Vidux (Mode B):** Multi-day features, 8+ files, quarter-long projects, work
-spanning multiple sessions. The plan makes handoff possible.
+**Tier 1** -- 4 research agents, all parallel. Each writes to its own file.
 
-**Pilot (Mode A):** Bug fixes, single-file changes, under 2 hours. No plan
-overhead.
+**Tier 2** -- One synthesizer reads all four, writes unified PLAN.md.
 
-**Pilot + Sloth:** PR nursing -- CI fixes, review responses, issue tracker SLA triage.
-Reactive and bounded.
+**Tier 3** -- One critic challenges assumptions, checks for contradictions and scope creep.
 
-**Rule of thumb:** "Will a second agent need to pick this up later?" If yes,
-Vidux. The Vidux build decided this explicitly: "Two modes -- Pilot for Mode A,
-Vidux for Mode B. Don't try to make one system do both."
+Cap coding agents at 4 with a point guard plus workers model. Research agents can go wider because they are read-only. The Vidux build ran 9 research agents in Cycle 0 successfully.
+
+Why subagents, not Teams? Teams persist across sessions (violates stateless doctrine), add coordination overhead, and risk orphaned state if the cron dies. Subagents are fire-and-forget.
 
 ---
 
-## 7. Debugging a Stuck Plan
+## 7. Running Overnight Cron Loops
 
-```mermaid
-graph TD
-    STUCK[Task stuck 3+ cycles] --> SCORE{Readiness score?}
-    SCORE -->|Below 7| REFINE[Stop coding.<br/>Refine the plan.]
-    SCORE -->|7+| SIZE{Task too large?}
-    SIZE -->|Yes| BREAK[Break into sub-tasks]
-    SIZE -->|No| EVIDENCE{Evidence missing?}
-    EVIDENCE -->|Yes| GATHER[Gather evidence first]
-    EVIDENCE -->|No| BLOCKED{External blocker?}
-    BLOCKED -->|Yes| MARK[Mark BLOCKED. Move on.]
-    BLOCKED -->|No| FIVEWHYS[Run dual five-whys]
-    FIVEWHYS --> STRIKE{3+ fixes on same surface?}
-    STRIKE -->|Yes| ABSTRACT[Move up one abstraction layer]
-    STRIKE -->|No| FIX[Targeted fix + process fix]
+Each cycle is stateless: REDUCE reads the store, optionally fires DISPATCH, checkpoint, exit. The next cycle is a fresh agent that knows nothing except what is in the files.
+
+**30-minute cadence for fleet automations.** The Resplit/StrongYes fleet uses 30-minute cron intervals. REDUCE fires every 30 min. If work is pending, DISPATCH runs until the queue is drained. If nothing is pending, REDUCE exits in under 2 minutes.
+
+**Expect auth expiry.** Tokens expire, MCP servers disconnect. A crashed session loses at most one cycle. The next cycle commits recovered work first.
+
+**Commit is the checkpoint, not push.** Solo computer workflow. Commit after every cycle. Push when ready. Commit message: `vidux: [what you did]` with structured body (Plan, Evidence, Next, Blocker).
+
+**Environment variables for ledger:** `AGENT_LANE` (work track) and `AGENT_SKILLS` (loaded skills).
+
+---
+
+## 8. Common Mistakes
+
+**Coding without a plan entry.** Number one mistake. Every code change traces to a PLAN.md task. The PreToolUse hook reminds you, but it is a safety net, not a substitute. During the Vidux build, agents kept making "quick cleanups" to unplanned files. Each cleanup was small. The cumulative drift was not.
+
+**Checkpointing after one task when more are pending.** Number two mistake. This is closure bias in action. Scan the queue. If there is more work, keep going. DISPATCH mode exists to enforce this structurally.
+
+**Carrying context between sessions.** The next agent remembers nothing. Write it to PLAN.md or it does not exist.
+
+**Too many parallel coding agents.** Four is the cap. Research agents can go wider (read-only).
+
+**Forgetting to checkpoint.** No commit means the next session starts blind. Even plan-only refinement gets a commit.
+
+**Plan without evidence.** An uncited entry is a guess. The readiness checklist requires 3+ cited sources to start coding.
+
+**Self-extending without the brake.** Adding polish tasks is good. Adding 14 polish tasks to one surface while the mission has gaps elsewhere is procrastination. Three-strike rule: 3+ queued tasks on one surface means ship the best and move on.
+
+**Functional correctness without taste.** Build passes, tests green, but the UI is broken on small screens. Load visual evaluation tools for UI work. Before/after screenshots are not optional.
+
+---
+
+## 9. When to Use Vidux vs Pilot
+
+```
+How big is the work?
+     |
+     +--> Under 2 hours, single file --> Pilot (Mode A)
+     |
+     +--> PR nursing, CI fix --> Pilot + Sloth
+     |
+     +--> Multi-session, 8+ files --> Vidux (Mode B)
+     |
+     +--> "We need to plan this" --> Vidux
+     |
+     +--> "Just do it" --> Pilot
 ```
 
-**Most common cause:** Plan was not ready and agents are flailing. Check the
-readiness score first. Below 7 means stop coding and refine.
-
-**Stuck-loop detection** (from LOOP.md, borrowed from GSD): same task in 3+
-consecutive cycles means one of three things -- task is too large (break it),
-evidence is missing (gather it), or it is externally blocked (mark it BLOCKED).
-
-**Dual five-whys:** Two separate chains on every failure. Why did the error
-happen (technical root cause)? Why did the agent make that mistake (process
-root cause)? The second chain is more valuable -- it produces process fixes.
-
-Real example: Phase 4 (plugin packaging) was treated as required. Cycle 7
-discovered SKILL.md alone is the cross-tool format -- plugins are for
-marketplace distribution only. Surprise logged: "Phase 4 was over-engineered."
-The behavior five-whys: Why did we build it? Assumed plugins were needed. Why?
-Did not research agentskills.io first. Process fix: always research existing
-standards before building new packaging.
-
-**Three-strike gate:** 3+ fixes on the same surface without resolution means
-the problem is in the design, not the code. Stop patching. Move up one
-abstraction layer.
+**Rule of thumb:** "Will a second agent need to pick this up later?" If yes, Vidux. The plan makes handoff possible.
 
 ---
 
-## 8. The Failure Protocol
+## 10. Debugging a Stuck Plan
 
-From Jeffrey Lee-Chan's harness engineering pattern.
-
-```mermaid
-graph TD
-    FAIL[Build/test fails] --> RETRY[Retry once with targeted fix]
-    RETRY -->|Pass| DONE[Continue. Log surprise.]
-    RETRY -->|Fail| DUAL[Dual five-whys]
-    DUAL --> ERR[Error chain:<br/>what broke technically]
-    DUAL --> AGENT[Behavior chain:<br/>why did the agent do that]
-    ERR --> STRIKE{3+ fixes same surface?}
-    AGENT --> STRIKE
-    STRIKE -->|Yes| UP[Move up one abstraction layer]
-    STRIKE -->|No| TWO[Produce two artifacts]
-    UP --> TWO
-    TWO --> CF[Code fix: immediate repair]
-    TWO --> PF[Process fix: constraint / hook / test]
-    CF --> UPD[Update PLAN.md surprises]
-    PF --> UPD
+```
+Task stuck 3+ cycles
+     |
+     v
+Check readiness score
+     |
+     +--> Below 7? --> Stop coding, refine the plan
+     |
+     +--> 7+? --> Task too large?
+                    |
+                    +--> Yes --> Break into sub-tasks
+                    |
+                    +--> No --> Evidence missing?
+                                 |
+                                 +--> Yes --> Gather evidence
+                                 |
+                                 +--> No --> External blocker?
+                                              |
+                                              +--> Yes --> Mark BLOCKED, move on
+                                              |
+                                              +--> No --> Run dual five-whys
 ```
 
-**Step 1:** Retry once. Not a blind re-run -- read the error, form a hypothesis,
-apply a specific fix.
+**Most common cause:** Plan was not ready and agents are flailing. Check readiness score first.
 
-**Step 2:** If retry fails, dual five-whys. The error chain finds what broke.
-The behavior chain finds why the agent made the mistake. The behavior chain is
-arguably more important -- it tells you what to fix in the process.
+**Stuck-loop detection:** same task in 3+ consecutive cycles means task is too large (break it), evidence is missing (gather it), or it is externally blocked (mark BLOCKED).
 
-**Step 3:** Three-strike check. 3+ fixes on the same surface means the design
-is wrong, not the code.
+**Dual five-whys:** Two chains on every failure. Why did the error happen (technical)? Why did the agent make that mistake (process)? The process chain is more valuable -- it produces process fixes.
 
-**Step 4:** Every failure produces two artifacts. A code fix (table stakes) and
-a process fix (the valuable output). The process fix could be an updated
-constraint, a new hook, a new test, or a skill update. Over 16 cycles, the
-Vidux build produced the drift detection hook, the checkpoint enforcement hook,
-and the three-strike gate itself -- all from failures that were analyzed, not
-just patched.
-
-**Step 5:** Add a Surprise entry to PLAN.md with both root causes and the
-process fix. The next agent reads it and avoids the same trap.
+**Three-strike gate:** 3+ fixes on the same surface without resolution means the problem is in the design, not the code. Stop patching. Move up one abstraction layer.
 
 ---
 
-## 9. Quick Reference
+## 11. The Failure Protocol
+
+```
+Build/test fails
+     |
+     v
+Retry once (read error, form hypothesis, apply targeted fix)
+     |
+     +--> Pass? --> Continue, log surprise
+     |
+     +--> Fail? --> Dual five-whys
+                     |
+                     +--> Error chain (what broke technically)
+                     +--> Behavior chain (why did the agent do that)
+                     |
+                     v
+                3+ fixes on same surface?
+                     |
+                     +--> Yes --> Move up one abstraction layer
+                     +--> No --> Produce two artifacts:
+                                   1. Code fix (immediate repair)
+                                   2. Process fix (constraint/hook/test)
+                     |
+                     v
+                Update PLAN.md surprises
+```
+
+The code fix is table stakes. The process fix is the valuable output. Over the Vidux build, the drift detection hook, checkpoint enforcement, and three-strike gate itself all came from failures that were analyzed, not just patched.
+
+---
+
+## 12. Quick Reference
 
 **Before coding:** Readiness score 7+? If not, refine the plan.
 
 **Before editing a file:** Covered by a PLAN.md task? If not, update plan first.
 
+**After completing a task:** Scan the queue. More work pending? Keep going. Do not checkpoint yet.
+
 **Before checkpoint:** Progress section updated? Tasks checked off? Committed?
 
 **Before stopping:** Can a stranger pick up from the files alone?
 
-**On failure:** Retry once. Dual five-whys. Three-strike check. Always produce
-a process fix alongside the code fix.
+**On failure:** Retry once. Dual five-whys. Three-strike check. Always produce a process fix alongside the code fix.
 
-**On stuck plan:** Readiness score. Break large tasks. Gather missing evidence.
-Mark blockers. Escalate with five-whys.
+**On stuck plan:** Readiness score. Break large tasks. Gather missing evidence. Mark blockers. Escalate with five-whys.
+
+**On UI work:** Visual proof required. Before/after screenshots. Load $picasso or equivalent.
 
 **Commit is the checkpoint.** Not push. Every cycle. Always.
-
----
-
-## 10. When to Investigate vs When to Just Fix
-
-Not every task needs a compound investigation. Most do not. Use this decision tree:
-
-```
-Is it a single obvious fix with a known root cause?
-  → Atomic task. One checkbox, one cycle, done.
-
-Are 2+ tickets hitting the same surface (file, module, API)?
-  → Compound. Bundle them into one investigation so fixes do not contradict.
-
-Have 3+ prior atomic fixes already been attempted on this surface?
-  → Compound with full impact map. The design is wrong, not the code.
-    Map everything the root cause touches before writing a fix.
-
-Is the root cause unclear — you know the symptom but not the why?
-  → Compound. Gather evidence first. The investigation file is where
-    you work out the root cause before committing to a fix direction.
-```
-
-When in doubt, start atomic. If the first fix fails its Q-gate or a second ticket arrives on the same surface, promote to compound. The `[Investigation: ...]` marker in PLAN.md and the corresponding file in `investigations/` can be added at any point -- you do not need to decide upfront.
