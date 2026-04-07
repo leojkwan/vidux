@@ -5,390 +5,379 @@
 
 Vidux is a plan-first orchestration system for AI-assisted coding on multi-day projects. It enforces unidirectional data flow -- evidence feeds the plan, the plan drives the code -- so that agent sessions can crash, restart, and resume without losing progress.
 
+Battle-tested across 28+ cycles building itself, a 10-automation fleet across 2 products (Resplit iOS/web and StrongYes web), and overnight cron loops that run unsupervised.
+
 ---
 
 ## 1. The Redux Analogy
 
-This is not a loose metaphor. The structural mapping between Redux and Vidux is load-bearing. Understanding it is the fastest way to internalize the entire system.
+This is not a loose metaphor. The structural mapping is load-bearing.
 
 In Redux, a UI store holds application state. Components render views derived from that state. State mutations happen only through dispatched actions, processed by reducers. Vidux does the same thing, but the store is a markdown file and the view is code.
 
 | Redux Concept | Vidux Equivalent | Why the Mapping Holds |
 |---------------|-----------------|----------------------|
 | Store | PLAN.md | Single source of truth. All state lives here. |
-| Actions | Plan amendments (require evidence) | The only legal way to mutate the store. Each must carry a payload (evidence). |
-| Reducers | Gather + synthesize + critique | Pure functions that transform evidence into plan state. |
+| Actions | Plan amendments (require evidence) | The only legal way to mutate the store. Each carries a payload (evidence). |
+| Reducers | REDUCE mode (read store, produce new state) | Pure function. Reads the current store, decides what happens next. |
+| dispatch() | DISPATCH mode (deep work, drain the queue) | Fires a long execution. Yields only on completion. |
 | View | Code (derived, never independent) | Rendered from the store. If the view is wrong, the store is wrong. |
-| Dispatch | Must go through the plan | No direct mutations. Every code change traces back to a plan entry. |
-| DevTools | Ledger (reconstruct any mission) | Append-only log. Replay any session. Time-travel debugging. |
+| DevTools | Git log + Ledger | Append-only. Replay any session. Time-travel debugging. |
 
-The practical consequence is blunt: if the code is wrong, the plan is wrong. Fix the plan first, then fix the code. An agent that edits code without a corresponding plan entry is doing the equivalent of mutating Redux state outside a reducer -- a violation that makes the system unpredictable. The enforcement hooks (Section 7) exist to catch exactly this class of violation.
+The practical consequence is blunt: if the code is wrong, the plan is wrong. Fix the plan first, then fix the code. An agent that edits code without a corresponding plan entry is doing the equivalent of mutating Redux state outside a reducer -- a violation that makes the system unpredictable.
 
 The analogy also explains why Vidux feels heavyweight for small tasks. Redux is overkill for a counter app. Vidux is overkill for a single-file bug fix. Both pay off when state is complex enough that unmanaged mutations create chaos.
 
 ---
 
-## 2. Two Data Structures
+## 2. The Dispatch/Reduce Cycle
+
+This is the core runtime model. Understanding it makes everything else obvious.
+
+### The Problem
+
+Agents have a learned closure bias (Claude Code #34238). After completing any task, they hit the first natural milestone -- a commit, a sub-task completion, a passing build -- and invent reasons to quit. "Context is getting tight." "This is a good stopping point." The result: 3-8 minute runs that do real work but stop before draining the queue. Wasted context window bootstrapping, half-finished surfaces, and a cron loop that churns without converging.
+
+### The Solution: Two Modes, No Middle
+
+```
+Cron fires every 30 minutes
+     |
+     v
+REDUCE (<2 min, read-only)
+     |
+     +--> Read PLAN.md, git log, git diff
+     |
+     +--> Nothing pending?
+     |         |
+     |         v
+     |    Checkpoint "reduce: nothing pending", exit
+     |
+     +--> Work pending?
+              |
+              v
+         Fire DISPATCH
+              |
+              v
+         DISPATCH (15+ min, deep work)
+              |
+              +--> Execute first unchecked task
+              +--> SCAN QUEUE (mandatory -- closure bias defense)
+              +--> More work? Execute next task
+              +--> Repeat until:
+              |      - queue drained
+              |      - hard external blocker
+              |      - context budget exhausted
+              |
+              v
+         Checkpoint with structured commit, exit
+```
+
+**REDUCE** is the cron entry point. It reads the store, evaluates state, and either exits (nothing to do) or fires DISPATCH (work pending). REDUCE never writes code, never modifies the plan beyond updating timestamps. It is a pure function of the current store -- exactly like a Redux reducer.
+
+**DISPATCH** is deep work mode. It pops tasks from the queue, executes them, verifies with build/test gates, and keeps going until the queue is drained or a hard blocker stops it. No upper time bound. No "one task and exit." The harness says: "keep working until the queue is empty or something external stops you."
+
+### Why Mid-Zone Is Structurally Impossible
+
+In a naive setup, the agent decides when to stop. This is the root of the problem -- an agent's "I am done" feeling is unreliable (closure bias). Dispatch/Reduce eliminates this decision:
+
+```
+Duration spectrum:
+
+  REDUCE          Mid-zone (eliminated)       DISPATCH
+  |<-- <2 min -->|                           |<-- 15+ min -------->|
+  [read, decide] [agents used to quit here]  [drain queue, real work]
+                  ^
+                  This zone cannot exist because:
+                  - REDUCE exits in <2 min (read-only, no work)
+                  - DISPATCH has no exit until queue drain/blocker
+                  - There is no third mode
+```
+
+The agent never has to decide "should I keep going?" because the mode already decided. REDUCE always exits fast. DISPATCH never exits until the work is done. The 3-8 minute mid-zone where stuck agents masquerade as polite ones is structurally gone.
+
+### The Closure Bias Defense
+
+After completing any task inside DISPATCH, the agent MUST scan the queue before checkpointing. This is not optional. The "I am done" feeling after a successful commit is the exact moment closure bias strikes.
+
+```
+Task completed successfully
+     |
+     v
+DO NOT CHECKPOINT YET
+     |
+     v
+Scan PLAN.md for unchecked tasks
+     |
+     +--> More tasks? --> Execute next task
+     |
+     +--> Queue empty? --> NOW checkpoint and exit
+     |
+     +--> Hard blocker? --> Checkpoint with blocker noted, exit
+```
+
+The queue is truth. The feeling is not.
+
+### Real Example: Resplit Fleet
+
+Before dispatch/reduce, the Resplit iOS automation averaged 4.2 minutes per run. After: bimodal -- either 1.1 minutes (REDUCE, nothing to do) or 22 minutes (DISPATCH, real work). Mid-zone runs dropped from 40% to under 5%. Net tasks completed per day increased because context window bootstrapping (the expensive part) happened less often.
+
+---
+
+## 3. Two Data Structures
 
 Vidux has exactly two data structures. Everything else is derived.
 
 ```
-┌─────────────────────────┐         ┌─────────────────────────┐
-│  DOC TREE (the store)   │         │  WORK QUEUE (FIFO)      │
-│                         │         │                         │
-│  PLAN.md                │ ──edit─▶│  ┌───┬───┬───┬───┐      │
-│  evidence/              │         │  │ 1 │ 2 │ 3 │...│ hot  │
-│  constraints/           │         │  └───┴───┴───┴───┘      │
-│  decisions/             │         │  (last 30 items)        │
-│  investigations/        │         │  ──────────────         │
-│                         │◀──pop── │  cold: git history      │
-└─────────────────────────┘  result └─────────────────────────┘
-        ▲                                     │
-        │                                     ▼
-        │                          ┌─────────────────────────┐
-        └──── results write back ──│  Agent executes one     │
-                                   │  item, verifies, dies   │
-                                   └─────────────────────────┘
++---------------------------+         +---------------------------+
+|  DOC TREE (the store)     |         |  WORK QUEUE (FIFO)        |
+|                           |         |                           |
+|  PLAN.md                  | --edit->|  +---+---+---+---+        |
+|  evidence/                |         |  | 1 | 2 | 3 |...|  hot   |
+|  constraints/             |         |  +---+---+---+---+        |
+|  decisions/               |         |  (last 30 items)          |
+|  investigations/          |         |  ----------------         |
+|                           |<--pop-- |  cold: git history        |
++---------------------------+  result +---------------------------+
+        ^                                     |
+        |                                     v
+        |                          +---------------------------+
+        +--- results write back ---|  Agent executes one       |
+                                   |  item, verifies, exits    |
+                                   +---------------------------+
 ```
-
-The doc tree is the persistent store. The work queue is derived: doc edits create
-queue items, agents pop them, execution results write back into the tree. Code is
-never written outside this loop.
 
 ### Documentation Tree (the store)
 
-A markdown-based tree of folders and docs. This is the single source of truth. All knowledge, plans, evidence, and decisions live here.
+A markdown-based tree. Single source of truth. All knowledge, plans, evidence, and decisions live here.
 
 ```
-vidux/
+projects/<mission>/
   PLAN.md              -- purpose, tasks, constraints, decisions
-  evidence/            -- cached MCP queries, codebase analysis, stakeholder research
-  constraints/         -- reviewer preferences, team conventions, architecture rules
+  evidence/            -- cached MCP queries, codebase analysis
+  constraints/         -- reviewer preferences, team conventions
   decisions/           -- what was decided, alternatives, rationale
+  investigations/      -- compound task deep-dives
 ```
 
-Changes to the documentation tree are the PRIMARY work product. Code changes are SECONDARY. A cycle that improves the plan but writes zero code is productive. A cycle that writes 500 lines without updating the plan is a liability.
+Changes to the doc tree are the PRIMARY work product. Code changes are SECONDARY. A cycle that improves the plan but writes zero code is productive. A cycle that writes 500 lines without updating the plan is a liability.
 
 ### Work Queue (FIFO, sliding window)
 
-A queue of work items produced by documentation changes. When a doc changes, it creates a work slice in the queue.
+Tasks in PLAN.md form the queue. Hot window: last 30 items (in context). Cold storage: item 31+ (in git history, retrievable on demand).
 
-```
-Hot window:  last 30 items (always in context, always queryable)
-Cold storage: item 31+ (in git history, retrievable but not loaded)
-```
+Why FIFO: tasks have dependencies. A stack (LIFO) would work on the newest item first, which is almost never right. FIFO aligns with dependency ordering.
 
-In v2, an `investigations/` directory lives alongside `evidence/` in the doc tree. When a task is promoted to a compound investigation (multiple tickets on the same surface, unclear root cause, or three-strike escalation), its research and analysis live in `investigations/<slug>.md` rather than inline in PLAN.md. This keeps the plan scannable while giving deep-dive analysis a durable home that any future agent can read.
-
-Why FIFO: tasks have dependencies, and a stack (LIFO) would cause agents to work on the newest item first, which is almost never the right priority. FIFO aligns with dependency ordering.
-
-Why 30 items: a token budget constraint. Thirty task entries with evidence citations fit in a single context window without crowding out working code. Beyond 30, items move to cold storage (git history) -- retrievable on demand but not loaded by default.
+Why 30: token budget. Thirty task entries with evidence citations fit in a single context window. Beyond 30, items move to cold storage.
 
 ### Unidirectional Flow
 
-```mermaid
-graph LR
-    A[Agents update docs] --> B[Doc changes create queue items]
-    B --> C[Agents pop and execute]
-    C --> D[Results feed back into docs]
-    D --> A
+```
+Agents update docs --> Doc changes create queue items --> Agents pop and execute
+       ^                                                          |
+       +------------------ results feed back into docs -----------+
 ```
 
-Agents never "just code." They either update docs (which creates queue items) or pop queue items (which were created by doc updates). Every code change has a provenance chain: evidence led to a plan entry, the plan entry created a queue item, the queue item was executed as code. If you cannot trace a code change back through this chain, it is an unmanaged mutation.
+Agents never "just code." They either update docs (which creates queue items) or pop queue items (which were created by doc updates). Every code change has a provenance chain: evidence -> plan entry -> queue item -> code. If you cannot trace a code change back through this chain, it is an unmanaged mutation.
 
 ---
 
-## 3. The Core Six Principles
+## 4. The Six Core Principles
 
-Non-negotiable doctrine. Each exists because a specific failure mode was observed in real multi-session AI coding projects. These six are the short form (also in `DOCTRINE.md`); `SKILL.md` adds three more (investigations, harnesses, subagents) that apply only when the situation calls for them.
+Non-negotiable doctrine. Each exists because a specific failure was observed. Full text with examples in `DOCTRINE.md`; all 11 principles (including fleet-scale doctrines 7-11) in `SKILL.md`.
 
-**1. Plan is the store.** PLAN.md is the single source of truth. Code is a derived view. If the code contradicts the plan, the plan needs fixing first. SlopCodeBench (arxiv 2603.24755) demonstrates that agent code degradation is monotonic -- agents drift, they do not suddenly break. By cycle 10, code bears little resemblance to the original intent. Making the plan the store forces reconciliation every cycle, catching drift before it compounds.
+**1. Plan is the store.** PLAN.md is truth. Code is derived. Fix the plan first.
 
-**2. Unidirectional flow.** The cycle is Gather, Plan, Execute, Verify, Checkpoint, Gather. No step is skippable. To change code in a way the plan does not specify, you must update the plan first. The cost of skipping a step is invisible in any single cycle but devastating over a multi-day project. If you cannot fill in the evidence field, you are not ready to plan. If you cannot pass the build gate, you are not ready to checkpoint.
+**2. Unidirectional flow.** Gather -> Plan -> Execute -> Verify -> Checkpoint -> Gather. No step is skippable.
 
-**3. 50/30/20 split.** 50% plan refinement. 30% code. 20% last mile. If you are coding more than planning, you are doing it wrong. This ratio was derived from the swiftify-v4 Combine rework, where 80/20 code-to-plan produced three full reworks when late-discovered constraints invalidated prior code. Inverting the ratio eliminated rework on subsequent projects.
+**3. 50/30/20 split.** 50% plan refinement. 30% code. 20% last mile. If you are coding more than planning, you are doing it wrong.
 
-**4. Evidence over instinct.** Every plan entry must cite at least one evidence source: MCP query, codebase grep, design doc, or team convention. No source means no entry. Gathering evidence adds 2-5 minutes per task. A wrong assumption costs 15-60 minutes of rework plus ripple effects. The evidence requirement front-loads cost where it is cheapest to pay.
+**4. Evidence over instinct.** Every plan entry cites a source. No source = no entry. Gathering costs 2-5 minutes. A wrong assumption costs 15-60 minutes plus ripple effects.
 
-**5. Design for completion.** Every dispatch will end. Context will be lost. Auth will expire. But the store persists. Therefore: state lives in files, every cycle reads fresh, checkpoints are structured, and any agent can resume from the last checkpoint. Tool state (.claude/, .cursor/) never lives inside the repo. A 20-minute cron fire does not get to assume it will get a 21st minute. The checkpoint at the end of each cycle is not optional bookkeeping -- it is the only thing that survives.
+**5. Design for completion.** Dispatches end. Context is lost. The store persists. State in files, not memory.
 
-**6. Process fixes over code fixes.** Every failure produces two artifacts: a code fix (the immediate repair) and a process fix (a new constraint, test, hook, or skill update). The process fix is the valuable output because it makes the system smarter for next time. Research on multi-agent error propagation shows 17x error amplification when agents lack hierarchical correction -- a single bad assumption propagates through dependent tasks exponentially. Process fixes break this amplification chain by adding constraints that prevent the same class of error from recurring.
+**6. Process fixes > code fixes.** Every failure produces a code fix (table stakes) and a process fix (the valuable one). The drift detection hook, checkpoint enforcement, and three-strike gate all came from analyzed failures.
 
 ---
 
-## 4. The Stateless Cycle
+## 5. The Stateless Cycle
 
-Every cron fire (20-minute or hourly) runs a fresh, stateless agent through five steps. The agent that wakes up has no memory of the previous agent. It knows nothing except what is in the files.
+Every cron fire runs a fresh, stateless agent through five steps. The agent knows nothing except what is in the files.
 
-```mermaid
-graph TD
-    A[Cron fires] --> B[READ - 30s]
-    B --> C[ASSESS - 30s]
-    C --> D{Score >= 7?}
-    D -->|Yes| E[ACT: Execute code - 15 min]
-    D -->|No| F[ACT: Refine plan - 15 min]
-    E --> G[CHECKPOINT - 1 min]
-    F --> G
-    G --> H[COMPLETE]
-    H -.->|Next cron fire| A
+```
+REDUCE entry:
+  Cron fires --> READ (30s) --> ASSESS (30s) --> work pending?
+                                                      |
+                     +----------No----> checkpoint, exit (<2 min total)
+                     |
+                    Yes
+                     |
+                     v
+DISPATCH entry:
+  ACT (15+ min) --> VERIFY (gate) --> CHECKPOINT (30s) --> exit
+  ^                                        |
+  +--- more tasks? scan queue, loop -------+
 ```
 
-### Read (30s)
+### Read (30 seconds)
 
-Read PLAN.md, `git log --oneline -10`, `git diff --stat`, and the last ledger entry. If uncommitted work exists from a crashed session, commit it first. This crash recovery comes from GSD's stuck-loop detection pattern.
+Read PLAN.md, `git log --oneline -10`, `git diff --stat`. If uncommitted work exists from a crashed session, commit it first as crash recovery.
 
-### Assess (30s)
+### Assess (30 seconds)
 
-Run the plan readiness checklist (10-point scoring). Five required items must all be true; five quality items add one point each. Score 7+ to proceed to code; below 7, spend the cycle on plan refinement.
-
-In v2, the decision tree checks two things before anything else: (1) **`[in_progress]` resume priority** -- if a task was marked in-progress by a previous cycle that died mid-execution, it is resumed first, before any new task selection; (2) **per-task Q-gating** -- each task's quality gate (build passes, tests pass, evidence cited) must be satisfied before the task can be marked complete. A task that was executed but failed its Q-gate stays `[in_progress]` and gets priority on the next cycle.
+Score the plan on a 10-point readiness checklist. Five required items (purpose filled, 3+ cited evidence, at least one ALWAYS and NEVER constraint, at least one task with evidence, no open questions blocking the next task). Five quality items add one point each. Score 7+ to code; below 7, spend the cycle refining.
 
 The decision tree:
 
-```mermaid
-graph TD
-    A[Start assess] --> B{Plan has unchecked tasks<br/>with evidence, no open questions?}
-    B -->|Yes| C[Execute first unchecked task]
-    B -->|No| D{Tasks without evidence?}
-    D -->|Yes| E[Gather evidence for first unevidenced task]
-    D -->|No| F{Open questions?}
-    F -->|Yes| G[Research first open question]
-    F -->|No| H{Plan empty or missing?}
-    H -->|Yes| I[Fan out research agents]
-    H -->|No| J[All tasks done - verify and complete]
+```
+Start
+  |
+  +--> Plan exists? --No--> GATHER: fan out research, create PLAN.md
+  |
+  +--> Yes
+        |
+        +--> Open questions blocking tasks? --Yes--> Research first question
+        |
+        +--> Tasks without evidence? --Yes--> Gather evidence
+        |
+        +--> Unchecked tasks with evidence? --Yes--> Execute first task
+        |
+        +--> All tasks complete --> Verify final state
 ```
 
-### Act (15 min)
+Notice the ordering. Open questions before unevidenced tasks before code execution. The system biases toward understanding over action.
 
-Either refine the plan or execute one task. Never two. One task per cycle prevents half-finished work.
+### Act (15+ minutes in DISPATCH)
 
-### Checkpoint (1 min) then Complete
+Execute one task. Verify it passes the build/test gate. Then -- critically -- scan the queue. If more work is pending, execute the next task. Do not checkpoint and exit after one task. The queue is truth.
 
-Structured commit: what changed, which task, what is next, blockers. Update PLAN.md Progress. Session ends. No state in memory. Next cron fire reads fresh.
+### Checkpoint (30 seconds)
 
-### Timing Budget
-
-| Step | Time | Notes |
-|------|------|-------|
-| Read | 30s | File reads are fast |
-| Assess | 30s | Decision is simple if plan is good |
-| Act (plan refinement) | 15 min | Research agents + synthesis |
-| Act (code execution) | 15 min | One task + build/test |
-| Checkpoint | 1 min | Commit + progress update |
-| Buffer | 3 min | Retries, errors, network latency |
-
-If a task takes longer than 15 minutes, break it into sub-tasks. This is a hard constraint imposed by the cron interval.
+Structured commit: what changed, which task, what is next, blockers. Update PLAN.md Progress. Git commit is the checkpoint, not push. Push when ready.
 
 ---
 
-## 5. The Fan-Out Pattern
+## 6. The Fan-Out Pattern
 
-A single agent querying team chat, then code reviews, then issue trackers, then the codebase serially would burn its entire cycle on evidence gathering. The fan-out pattern parallelizes this.
-
-```mermaid
-graph TD
-    subgraph "Tier 1: Research (parallel)"
-        A1[Evidence group<br/>team chat + code reviews + issues]
-        A2[Architecture group<br/>codebase + design docs]
-        A3[Constraints group<br/>reviewer prefs + conventions]
-        A4[Tasks group<br/>deps + scope + risk]
-    end
-    subgraph "Tier 2: Synthesis"
-        B[Synthesizer<br/>reads all 4 docs -> PLAN.md]
-    end
-    subgraph "Tier 3: Critique"
-        C[Critic<br/>challenges assumptions]
-    end
-    A1 --> B
-    A2 --> B
-    A3 --> B
-    A4 --> B
-    B --> C
-    C -.->|Findings feed back| B
-```
-
-The shape of fan-out/fan-in is N independent files in, one merged file out, one critic on top:
+A single agent querying team chat, then code reviews, then the codebase serially would burn its entire cycle on evidence gathering. Fan-out parallelizes this.
 
 ```
-            ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐
-  TIER 1    │ Agent A  │  │ Agent B  │  │ Agent C  │  │ Agent D  │
-  (parallel)│ team chat│  │ codebase │  │  rules   │  │  issues  │
-            └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘
-                 │             │             │             │
-                 ▼             ▼             ▼             ▼
-            evidence/A.md  arch/B.md   constraints/  tasks/D.md
-                 │             │           C.md            │
-                 └─────────────┴─────┬───────┴──────────────┘
-                                     ▼
-                             ┌───────────────┐
-  TIER 2 (serial)            │  Synthesizer  │  reads all 4
-                             │  -> PLAN.md   │  writes one
-                             └───────┬───────┘
-                                     ▼
-                             ┌───────────────┐
-  TIER 3 (serial)            │    Critic     │  challenges
-                             │  -> findings  │  assumptions
-                             └───────────────┘
+          +----------+  +----------+  +----------+  +----------+
+TIER 1    | Agent A  |  | Agent B  |  | Agent C  |  | Agent D  |
+(parallel)| team chat|  | codebase |  | rules    |  | issues   |
+          +----+-----+  +----+-----+  +----+-----+  +----+-----+
+               |              |              |              |
+               v              v              v              v
+          evidence/A.md  arch/B.md   constraints/  tasks/D.md
+               |              |           C.md         |
+               +-----+-------+-----------+------------+
+                     |
+                     v
+              +-----------+
+TIER 2        | Synthesizer|  reads all 4, writes one PLAN.md
+(serial)      +-----------+
+                     |
+                     v
+              +-----------+
+TIER 3        |   Critic   |  challenges assumptions
+(serial)      +-----------+
 ```
 
-Fan-out is parallel because the 4 research lanes never touch the same file. Fan-in is serial because merging conflicts requires one mind. Never have N agents write to the same file.
+**Tier 1**: 4 research groups, all parallel. Each writes to its own file. No shared files, no coordination overhead.
 
-**Tier 1: Research groups (4 groups, all parallel).** Each group writes to its own doc. No shared files. No coordination overhead.
+**Tier 2**: One synthesizer reads all 4 and writes unified PLAN.md. Single merge point.
 
-**Tier 2: One synthesizer reads all 4 docs and writes unified PLAN.md.** Single merge point. One agent resolves conflicts between groups and produces a coherent plan.
+**Tier 3**: One critic reads PLAN.md and challenges assumptions. Checks consistency, identifies missing evidence, flags oversized tasks.
 
-**Tier 3: One critic reads PLAN.md and challenges assumptions.** Checks consistency, identifies missing evidence, flags oversized tasks. Adapted from the adversarial-spec pattern.
-
-**Why not 20 agents on one file.** Research shows coordination gains plateau at approximately 4 agents. Beyond that, merging conflicting edits and resolving semantic duplicates costs more than the marginal research value. The 17x error amplification finding applies: without hierarchy, each additional agent multiplies the probability of a bad assumption propagating unchecked. The three-tier hierarchy bounds this by funneling all output through a single synthesis point.
+Why not 20 agents on one file: coordination gains plateau at approximately 4. Beyond that, 17x error amplification without hierarchy. The three-tier hierarchy bounds this by funneling all output through a single synthesis point.
 
 ---
 
-## 6. Compound Tasks & Investigations
+## 7. Compound Tasks and Investigations
 
-Most tasks are atomic: one ticket, one fix, one cycle. But some problems resist atomic treatment. Compound tasks exist for these cases.
+Most tasks are atomic: one fix, one cycle. Some problems resist atomic treatment.
 
-**When to use a compound task:**
-- 2+ tickets touch the same surface (same file, same module, same API)
-- Unclear root cause -- the symptom is known but the fix is not
+**When to use a compound investigation:**
+- 2+ tickets touch the same surface (same file, module, or API)
+- Unclear root cause -- symptom known, fix unknown
 - Three-strike escalation -- 3+ prior atomic fixes on the same surface without resolution
 
-**The `[Investigation: ...]` marker.** In PLAN.md, a compound task is marked with `[Investigation: investigations/<slug>.md]` instead of a simple checkbox description. This tells the agent to read the investigation file before attempting any work.
+Mark compound tasks with `[Investigation: investigations/<slug>.md]` in PLAN.md. The investigation file contains:
 
-**Investigation template.** Each investigation file follows a standard structure:
-1. **Tickets** -- which issues/PRs/bugs are bundled
+1. **Tickets** -- which issues are bundled
 2. **Evidence** -- gathered data, MCP queries, codebase analysis
-3. **Root Cause** -- the underlying problem (not the symptom)
+3. **Root Cause** -- the underlying problem, not the symptom
 4. **Impact Map** -- what else this root cause affects
-5. **Fix Spec** -- the proposed fix, scoped to the root cause
-6. **Tests** -- what must pass before the investigation is closed
-7. **Gate** -- the Q-gate criteria specific to this investigation
+5. **Fix Spec** -- proposed fix scoped to the root cause
+6. **Tests** -- what must pass
+7. **Gate** -- Q-gate criteria specific to this investigation
 
-The investigation file is the compound task's plan-within-a-plan. It prevents the failure mode where an agent applies a surface fix to one ticket, then another agent applies a contradictory fix to a related ticket, and a third agent reverts both.
+The investigation file prevents the failure mode where Agent A applies a surface fix to one ticket, Agent B applies a contradictory fix to a related ticket, and Agent C reverts both.
 
 ---
 
-## 7. Layer Separation
+## 8. Layer Separation
 
 Vidux core is company-agnostic. Zero references to any internal tooling, build system, or team convention.
 
-```mermaid
-graph TB
-    subgraph "Layer 2: Project Wiring (per-team)"
-        W1[MCP tools<br/>build MCP, chat MCP,<br/>issue tracker MCP]
-        W2[Build system<br/>your build tool, CI runner]
-        W3[Team conventions<br/>reviewer prefs, feature flags, DI]
-        W4[Companion skills<br/>Pilot, Ledger, Captain,<br/>build skill, review skill]
-    end
-    subgraph "Layer 1: Vidux Core (open-sourceable)"
-        C1[Doctrine - 12 principles]
-        C2[Two data structures<br/>doc tree + work queue]
-        C3[Loop mechanics<br/>stateless cycle, decision tree]
-        C4[Failure protocol<br/>dual five-whys, three-strike gate]
-        C5[PLAN.md template]
-    end
-    W1 --> C2
-    W2 --> C3
-    W3 --> C1
-    W4 --> C3
+```
++-------------------------------------------+
+| Layer 2: Project Wiring (per-team)        |
+|  MCP tools, build system, team            |
+|  conventions, companion skills            |
++-------------------------------------------+
+            |  imports
+            v
++-------------------------------------------+
+| Layer 1: Vidux Core (open-sourceable)     |
+|  Doctrine (11 principles), data           |
+|  structures, loop mechanics, failure      |
+|  protocol, PLAN.md template               |
++-------------------------------------------+
 ```
 
-**Layer 1: Vidux Core** contains everything portable: doctrine, data structures, loop mechanics, failure protocol, PLAN.md template. If you open-source Vidux, only Layer 1 ships.
+**Layer 1** ships as open source: doctrine, data structures, loop mechanics, failure protocol, PLAN.md template.
 
-**Layer 2: Project Wiring** contains everything team-specific: MCP tools, build commands, conventions, companion skills. Layer 2 imports Layer 1 and maps abstract concepts to concrete tools.
-
-**How to write your own Layer 2.** Replace the MCP tools with yours (GitHub API, Linear, Slack). Replace the build commands (Gradle, npm, make). Replace the companion skills with your equivalents. The core loop, doctrine, and data structures remain unchanged. PLAN.md is the interface contract -- any Layer 2 that can read and write a conformant PLAN.md is compatible.
+**Layer 2** is team-specific: MCP tools, build commands, conventions, companion skills. Replace yours. The core loop and doctrine remain unchanged. PLAN.md is the interface contract -- any Layer 2 that can read and write a conformant PLAN.md is compatible.
 
 ---
 
-## 8. The Enforcement Gradient
+## 9. The Enforcement Gradient
 
-Vidux uses four Claude Code hooks, all prompt-type (nudge, not block).
+Four Claude Code hooks, all prompt-type (nudge, not block). Plan compliance is a judgment call -- a command hook parsing PLAN.md for file paths is brittle. A prompt hook that reminds the agent to check is flexible and effective.
 
-Plan compliance is a judgment call -- the agent must compare semantic intent of a task against the content of an edit. A task that says "refactor shared helpers" might require editing `utils/helpers.ts`, which is not literally named in the plan. A command hook would hard-block this. Prompt hooks delegate the judgment to the agent while keeping it on rails.
-
-```mermaid
-graph LR
-    A[SessionStart<br/>Orientation<br/>GENTLE] --> B[PreToolUse<br/>Friction before action<br/>MEDIUM]
-    B --> C[PostToolUse<br/>Reflection after action<br/>MEDIUM]
-    C --> D[Stop<br/>Obligation before death<br/>FIRM]
-    D -.->|Next session| A
+```
+SessionStart ----> PreToolUse ----> PostToolUse ----> Stop
+(GENTLE)           (MEDIUM)         (MEDIUM)          (FIRM)
+"Read the plan"    "Is this edit    "Did this edit    "Did you
+                    in the plan?"    match the plan?"  checkpoint?"
 ```
 
-The four hooks form a cascade with graduated pressure:
-
-| Hook | Lifecycle Point | Doctrine Enforced | Question Asked |
-|------|----------------|-------------------|----------------|
-| **SessionStart** | Session begins | Design for completion | "Did you read the plan?" |
-| **PreToolUse** | Before Write/Edit | Unidirectional flow | "Is this edit in the plan?" |
-| **PostToolUse** | After Write/Edit | Unidirectional flow | "Did this edit match the plan?" |
-| **Stop** | Session ends | Design for completion | "Did you checkpoint?" |
-
-**Why the cascade works.** Each hook catches what the previous one missed. If the agent follows SessionStart (reads the plan, finds the current task), it rarely triggers PreToolUse because it already knows which files to edit. If it follows PreToolUse, it rarely triggers PostToolUse because the edit was planned. If all three hold, Stop is a formality.
-
-**The four lifecycle points.** They map to the four moments where an agent is most likely to deviate: waking up (might skip the plan), before writing (might edit an unplanned file), after writing (might have drifted), and before dying (might forget to checkpoint). There is no fifth point that matters.
-
-**Why prompt hooks not command hooks.** Command hooks return pass/fail. They work for objective checks (does the build pass, does the linter approve). They do not work for semantic checks (is this edit consistent with the intent of Task 4). That requires reading comprehension, not pattern matching. Prompt hooks inject a question and let the agent reason about it.
+Each hook catches what the previous one missed. If the agent follows SessionStart (reads the plan), it rarely triggers PreToolUse. If it follows PreToolUse, it rarely triggers PostToolUse. If all three hold, Stop is a formality.
 
 ---
 
-## 9. File Map
+## 10. Fleet Topology
 
-| File | Purpose |
-|------|---------|
-| `SKILL.md` | Master reference. Architecture, doctrine, loop, failure protocol, PLAN.md template, activation rules, companion skill table. |
-| `DOCTRINE.md` | The 6 principles in concise form. Redux analogy table. Vidux-vs-Pilot decision matrix. |
-| `LOOP.md` | Loop mechanics. Stateless cycle (5 steps), decision tree, fan-out pattern, readiness checklist (10-point scoring), timing budget, escalation statuses, stuck-loop detection, UNIFY step. |
-| `ENFORCEMENT.md` | Hook design. 4 hooks (SessionStart, PreToolUse, PostToolUse, Stop), full JSON config, rationale for prompt-type over command-type, cascade principle. |
-| `INGREDIENTS.md` | Design lineage. 10 patterns borrowed from open-source tools, with attribution and adoption details. |
-| `PLAN.md` | Live plan for the Vidux skill itself (dogfooding). |
-| `commands/vidux.md` | Slash command `/vidux` -- entry point, activates the full orchestration loop. |
-| `commands/vidux-plan.md` | Slash command `/vidux-plan` -- plan-only mode, skips execution. |
-| `commands/vidux-status.md` | Slash command `/vidux-status` -- shows current plan state and progress. |
-| `commands/vidux-loop.md` | Slash command `/vidux-loop` -- create or refine a cron harness for unattended cycles. |
-| `commands/vidux-dashboard.md` | Slash command `/vidux-dashboard` -- multi-project overview across active missions. |
-| `commands/vidux-manager.md` | Slash command `/vidux-manager` -- top-level project management surface. |
-| `commands/vidux-version.md` | Slash command `/vidux-version` -- print the installed Vidux version. |
-| `hooks/hooks.json` | Hook configuration file for Claude Code integration. |
-| `scripts/install-hooks.sh` | Installs Vidux hooks into the local Claude Code settings. |
-| `scripts/vidux-checkpoint.sh` | Automates the checkpoint step (commit format, progress update). |
-| `scripts/vidux-gather.sh` | Runs the fan-out evidence gathering pattern. |
-| `scripts/vidux-loop.sh` | The cron driver. Runs the full Read, Assess, Act, Checkpoint, Complete cycle. |
-| `scripts/vidux-doctor.sh` | Read-only health check — worktrees, automation topology, stale plans, merge conflicts. |
-| `scripts/vidux-fleet-quality.sh` | Fleet-wide quality scan across active automations. |
-| `scripts/vidux-prune.sh` | Archive stale projects and prune cold storage. |
-| `scripts/vidux-install.sh` | Installer helper for the symlink + hook setup. |
-| `tests/test_vidux_contracts.py` | Contract tests verifying that Vidux documentation is internally consistent. |
-| `.claude-plugin/plugin.json` | Claude Code plugin manifest for skill discovery and activation. |
+The Resplit/StrongYes fleet runs 10 automations across 2 products. All automations share the same shape:
 
----
+- **DISPATCH mode**: every automation does real work, not just monitoring
+- **Self-extending plans**: every automation adds tasks it discovers (Doctrine 11)
+- **30-minute cron cadence**: REDUCE fires every 30 min, DISPATCH when work is pending
+- **Work-stream scoped**: each automation owns one concern (payments, onboarding, UI polish, etc.)
 
-## 10. Design Lineage
+Fleet-wide quality is measured by `scripts/vidux-fleet-quality.sh`, which scans all active automations for stale plans, stuck loops, mid-zone violations, and un-checkpointed work.
 
-Vidux synthesizes 10 patterns from 26 surveyed open-source tools, selected for pattern quality rather than star count. Full analysis lives in `INGREDIENTS.md`.
-
-| # | Pattern | Source | What Vidux Took |
-|---|---------|--------|-----------------|
-| 1 | Phase chain (brainstorm-plan-execute-verify) | superpowers | Unidirectional flow. Each phase produces a durable artifact before the next begins. |
-| 2 | Three-document chain (spec-plan-tasks) | spec-kit | PLAN.md structure. Spec, plan, and task list collapsed into one file for simpler git sync. |
-| 3 | Stuck-loop detection + crash recovery | GSD | Three-strike escalation. Crash recovery via uncommitted work detection. |
-| 4 | Execute/Qualify/Unify loop | PAUL | Four escalation statuses. The UNIFY step (reconcile planned vs actual). |
-| 5 | Markdown-native coordination, git-backed state | tick-md | PLAN.md as a multi-agent task board. Git history as the persistence layer. Design for completion. |
-| 6 | Multi-perspective review gate | claude-code-harness | Process fixes > code fixes. Ground reviews in real data (MCP queries), not generic checklists. |
-| 7 | One-agent-per-criterion + judge layer | opslane/verify | Fan-out decomposition. Readiness checklist as a spec-interpreter pattern. |
-| 8 | Dual-workflow routing | claude-code-spec-workflow | Vidux vs Pilot routing. Full orchestration for big work, lightweight mode for small work. |
-| 9 | Research-before-planning | deep-plan | Evidence over instinct doctrine. Fan-out as scaled multi-source interview. |
-| 10 | Adversarial debate for spec hardening | adversarial-spec | Tier 3 critic in fan-out. Dual five-whys in failure protocol. Surprises section. |
-
-The most structurally influential source is tick-md (18 stars) -- a single markdown file in git is sufficient for multi-agent coordination. The most practically influential is GSD (46K stars), whose stuck-loop detection prevents the most common failure in unattended cron operation. The key rejected pattern was multi-LLM orchestration, which adds deployment complexity that conflicts with running locally with simple installation.
+The topology is flat by design. No coordinator automation manages the others. Each automation reads its own PLAN.md and makes its own dispatch/reduce decision. Coordination happens through the shared git history -- if Automation A fixes a file that Automation B planned to touch, B sees the change in its next REDUCE and adapts.
 
 ---
 
 ## Tradeoffs
 
-**Overhead vs safety.** The 50/30/20 split means half the agent's time goes to planning. Vidux bets that plans are rarely right from the start, so front-loading plan refinement prevents rework that costs more than the planning overhead.
+**Overhead vs safety.** The 50/30/20 split means half the agent's time goes to planning. Vidux bets that plans are rarely right from the start, so front-loading refinement prevents rework that costs more than the overhead.
 
-**Rigidity vs flexibility.** The unidirectional flow is inflexible by design. Drive-by edits to unrelated files are how codebases accumulate untracked changes that interact in surprising ways three sessions later.
+**Rigidity vs flexibility.** Unidirectional flow is inflexible by design. Drive-by edits to unrelated files accumulate untracked changes that interact in surprising ways three sessions later.
 
-**One task per cycle vs throughput.** Half-finished tasks leave the codebase in an intermediate state the next agent must diagnose. One complete task per cycle means the codebase is always in a known-good state at each checkpoint.
+**One task per cycle vs throughput.** Half-finished tasks leave the codebase in an intermediate state the next agent must diagnose. One complete task per cycle (then scan for more) means the codebase is always in a known-good state at each checkpoint.
 
-**Solo computer workflow.** Vidux is designed for one human operating one or more AI agents on a local machine. Tool state (.claude/, .cursor/) lives outside the repo. The repo is the shared surface; tool configuration is per-operator.
+**Solo computer workflow.** Vidux is designed for one human operating one or more AI agents on a local machine. Tool state lives outside the repo. The repo is the shared surface; tool configuration is per-operator.
