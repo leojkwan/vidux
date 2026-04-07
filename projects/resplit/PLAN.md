@@ -15,7 +15,7 @@ Keep recurring Resplit loops honest about product-level completion. Repo-local q
 - [Source: `evidence/2026-04-06-live-controlsheet-lane-boundary.md`] Task 6 is still the right Live Split surface, but fresh preflight shows the attached root is dirty/behind and a live ledger row already touches the same repo-local plan + code files, so radar should keep this reframe in the public store until a clean shipper lane owns it.
 
 ## Constraints
-- ALWAYS: `RALPH.md` and repo-local plans choose the active slice first; this store never overrides the repo queue.
+- ALWAYS: Repo-local plans choose the active slice first; this store never overrides the repo queue.
 - ALWAYS: Separate `current slice status`, `release/upload status`, and `overall mission completion` in every recurring readout.
 - ALWAYS: Treat forgotten or weakly-inventoried UX debt as live work until current-build or live proof explicitly closes it.
 - ALWAYS: When `origin/main` and `origin/master` both carry recent work, use fresh `git symbolic-ref refs/remotes/origin/HEAD` plus clean-worktree proof to distinguish the canonical default branch from other active branches.

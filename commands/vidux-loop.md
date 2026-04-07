@@ -77,7 +77,7 @@ Authority store: <path to project PLAN.md>
 
 Role: radar — read-only monitoring, evidence gathering, no code changes.
 Siblings: <comma-separated list of sibling automations for this project>
-Focus: <specific surface this radar watches>
+Focus: <specific surface this radar monitors>
 
 Design DNA:
 - Check fast. If nothing changed since last run, checkpoint and exit in under 2 minutes.

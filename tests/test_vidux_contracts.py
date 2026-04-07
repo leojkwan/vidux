@@ -314,7 +314,7 @@ class ViduxContractTests(unittest.TestCase):
         """All 4 vidux scripts must exist and be executable."""
         expected = [
             "vidux-loop.sh", "vidux-checkpoint.sh",
-            "vidux-gather.sh", "install-hooks.sh", "vidux-burst.sh",
+            "vidux-gather.sh", "install-hooks.sh", "vidux-dispatch.sh",
         ]
         for name in expected:
             script = self.SCRIPTS_DIR / name
@@ -341,43 +341,43 @@ class ViduxContractTests(unittest.TestCase):
         data = json.loads(result.stdout)
         self.assertTrue(data.get("action") == "create_plan" or "error" in data)
 
-    def test_vidux_loop_exposes_watch_mode_contract(self):
-        """vidux-loop.sh must expose explicit watch-mode routing metadata."""
+    def test_vidux_loop_exposes_reduce_mode_contract(self):
+        """vidux-loop.sh must expose explicit reduce-mode routing metadata."""
         result = subprocess.run(
             ["bash", str(self.SCRIPTS_DIR / "vidux-loop.sh"), str(PLAN)],
             capture_output=True, text=True, timeout=10,
         )
         self.assertEqual(result.returncode, 0, f"vidux-loop.sh failed: {result.stderr}")
         data = json.loads(result.stdout)
-        self.assertEqual(data.get("mode"), "watch")
-        self.assertIn(data.get("next_action"), {"burst", "none"})
+        self.assertEqual(data.get("mode"), "reduce")
+        self.assertIn(data.get("next_action"), {"dispatch", "none"})
 
-    def test_vidux_loop_routes_pending_work_to_burst(self):
-        """Watch mode must recommend burst when a runnable task exists."""
+    def test_vidux_loop_routes_pending_work_to_dispatch(self):
+        """Reduce mode must recommend dispatch when a runnable task exists."""
         data = self._run_loop_on("""\
             # Test Plan
             ## Tasks
             - [pending] Task 1: Build feature [Evidence: src]
             ## Progress
         """)
-        self.assertEqual(data["mode"], "watch")
+        self.assertEqual(data["mode"], "reduce")
         self.assertEqual(data["action"], "execute")
-        self.assertEqual(data["next_action"], "burst")
+        self.assertEqual(data["next_action"], "dispatch")
 
     def test_vidux_loop_routes_done_plan_to_none(self):
-        """Watch mode must return next_action=none when the queue is empty."""
+        """Reduce mode must return next_action=none when the queue is empty."""
         data = self._run_loop_on("""\
             # Test Plan
             ## Tasks
             - [completed] Task 1: Build feature [Done: 2026-04-07]
             ## Progress
         """)
-        self.assertEqual(data["mode"], "watch")
+        self.assertEqual(data["mode"], "reduce")
         self.assertEqual(data["action"], "complete")
         self.assertEqual(data["next_action"], "none")
 
     def test_vidux_loop_exposes_process_fix_declared(self):
-        """Watch mode must surface [ProcessFix: ...] declarations for the current task."""
+        """Reduce mode must surface [ProcessFix: ...] declarations for the current task."""
         data = self._run_loop_on("""\
             # Test Plan
             ## Tasks
@@ -386,8 +386,8 @@ class ViduxContractTests(unittest.TestCase):
         """)
         self.assertEqual(data["process_fix_declared"], "test")
 
-    def test_vidux_burst_dry_run_exposes_contract(self):
-        """vidux-burst.sh --dry-run must emit the burst contract surface."""
+    def test_vidux_dispatch_dry_run_exposes_contract(self):
+        """vidux-dispatch.sh --dry-run must emit the dispatch contract surface."""
         import tempfile, os
         plan_text = textwrap.dedent("""\
             # Test Plan
@@ -400,19 +400,19 @@ class ViduxContractTests(unittest.TestCase):
             tmp = f.name
         try:
             result = subprocess.run(
-                ["bash", str(self.SCRIPTS_DIR / "vidux-burst.sh"), tmp, "--dry-run"],
+                ["bash", str(self.SCRIPTS_DIR / "vidux-dispatch.sh"), tmp, "--dry-run"],
                 capture_output=True, text=True, timeout=10,
             )
-            self.assertEqual(result.returncode, 0, f"vidux-burst.sh failed: {result.stderr}")
+            self.assertEqual(result.returncode, 0, f"vidux-dispatch.sh failed: {result.stderr}")
             data = json.loads(result.stdout)
             self.assertEqual(data["mode"], "dry_run")
-            self.assertEqual(data["recommendation"], "fire_burst")
+            self.assertEqual(data["recommendation"], "fire_dispatch")
             self.assertIn("next_task", data)
         finally:
             os.unlink(tmp)
 
-    def test_vidux_burst_assessment_exposes_protocol(self):
-        """vidux-burst.sh must expose burst-mode action and protocol fields."""
+    def test_vidux_dispatch_assessment_exposes_protocol(self):
+        """vidux-dispatch.sh must expose dispatch-mode action and protocol fields."""
         import tempfile, os
         plan_text = textwrap.dedent("""\
             # Test Plan
@@ -425,15 +425,15 @@ class ViduxContractTests(unittest.TestCase):
             tmp = f.name
         try:
             result = subprocess.run(
-                ["bash", str(self.SCRIPTS_DIR / "vidux-burst.sh"), tmp],
+                ["bash", str(self.SCRIPTS_DIR / "vidux-dispatch.sh"), tmp],
                 capture_output=True, text=True, timeout=10,
             )
-            self.assertEqual(result.returncode, 0, f"vidux-burst.sh failed: {result.stderr}")
+            self.assertEqual(result.returncode, 0, f"vidux-dispatch.sh failed: {result.stderr}")
             data = json.loads(result.stdout)
-            self.assertEqual(data["mode"], "burst")
-            self.assertEqual(data["action"], "execute_burst")
-            self.assertIn("burst_protocol", data)
-            self.assertIn("stop_conditions", data["burst_protocol"])
+            self.assertEqual(data["mode"], "dispatch")
+            self.assertEqual(data["action"], "execute_dispatch")
+            self.assertIn("dispatch_protocol", data)
+            self.assertIn("stop_conditions", data["dispatch_protocol"])
         finally:
             os.unlink(tmp)
 
@@ -1430,8 +1430,8 @@ class ViduxContractTests(unittest.TestCase):
             self.assertEqual(result.returncode, 1)
             self.assertEqual(merge_check["status"], "block")
 
-    def test_doctor_watch_harness_scope_warns_on_bursty_cron_prompt(self):
-        """Doctor must flag active cron prompts that schedule deep Vidux work without a watch contract."""
+    def test_doctor_reduce_harness_scope_warns_on_dispatch_cron_prompt(self):
+        """Doctor must flag active cron prompts that schedule deep Vidux work without a reduce contract."""
         with tempfile.TemporaryDirectory() as tmpdir:
             repo = Path(tmpdir)
             (repo / "projects").mkdir()
@@ -1461,27 +1461,27 @@ class ViduxContractTests(unittest.TestCase):
             )
             data = json.loads(result.stdout)
             check = next(
-                check for check in data["checks"] if check["id"] == "watch_harness_scope"
+                check for check in data["checks"] if check["id"] == "reduce_harness_scope"
             )
 
             self.assertEqual(check["status"], "warn")
             self.assertEqual(check["count"], 1)
             self.assertEqual(check["details"][0]["automation_id"], "vidux-v230-planner")
-            self.assertIn("missing_watch_contract", check["details"][0]["issues"])
+            self.assertIn("missing_reduce_contract", check["details"][0]["issues"])
 
-    def test_doctor_watch_harness_scope_allows_explicit_watch_prompt(self):
-        """Doctor must pass when a cron prompt stays in watch mode and hands deep work to burst."""
+    def test_doctor_reduce_harness_scope_allows_explicit_reduce_prompt(self):
+        """Doctor must pass when a cron prompt stays in reduce mode and hands deep work to dispatch."""
         with tempfile.TemporaryDirectory() as tmpdir:
             repo = Path(tmpdir)
             (repo / "projects").mkdir()
-            auto_dir = repo / "automations" / "vidux-watch"
+            auto_dir = repo / "automations" / "vidux-reduce"
             auto_dir.mkdir(parents=True)
             (auto_dir / "automation.toml").write_text(textwrap.dedent("""
                 version = 1
-                id = "vidux-watch"
+                id = "vidux-reduce"
                 kind = "cron"
                 status = "ACTIVE"
-                prompt = "Use [$vidux](/tmp/vidux/SKILL.md) in watch mode. Keep this run brief, stay under 2 minutes, inspect the plan, and return next_action=burst when real work exists."
+                prompt = "Use [$vidux](/tmp/vidux/SKILL.md) in reduce mode. Keep this run brief, stay under 2 minutes, inspect the plan, and return next_action=dispatch when real work exists."
             """).lstrip(), encoding="utf-8")
 
             result = subprocess.run(
@@ -1500,7 +1500,7 @@ class ViduxContractTests(unittest.TestCase):
             )
             data = json.loads(result.stdout)
             check = next(
-                check for check in data["checks"] if check["id"] == "watch_harness_scope"
+                check for check in data["checks"] if check["id"] == "reduce_harness_scope"
             )
 
             self.assertEqual(check["status"], "pass")

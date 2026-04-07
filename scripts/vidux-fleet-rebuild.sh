@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# vidux-fleet-rebuild.sh — Kill Codex processes, clean the automation DB, apply burst-mode fleet.
+# vidux-fleet-rebuild.sh — Kill Codex processes, clean the automation DB, apply dispatch-mode fleet.
 # Run manually: bash scripts/vidux-fleet-rebuild.sh
 # Requires: sqlite3, pkill
 set -euo pipefail
