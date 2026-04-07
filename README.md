@@ -60,9 +60,22 @@ Vidux solves that by making documentation the control plane. State lives in mark
 - `ENFORCEMENT.md` — Claude Code hook configuration
 - `INGREDIENTS.md` — design lineage (10 patterns from 26 surveyed tools)
 - `commands/` — `/vidux`, `/vidux-plan`, `/vidux-status`, `/vidux-loop`
-- `scripts/` — loop driver, checkpoint, gather, doctor, install helpers
+- `scripts/` — loop driver, checkpoint, gather, doctor, witness, dispatch, prune, install
+- `scripts/lib/` — compat.sh (macOS/Linux portability), codex-db.sh, ledger integration, queue-jsonl
 - `hooks/` — prompt-hook nudges for plan discipline
-- `guides/vidux/` — quickstart, architecture, best practices
+- `guides/vidux/` — quickstart, architecture, best practices, radar template
+- `tests/` — 160+ contract tests (scripts, commands, doctrine, SKILL.md structure)
+
+## Fleet Intelligence (v2.3+)
+
+Vidux includes self-healing mechanisms for automation fleets:
+
+- **Circuit breaker** — `vidux-loop.sh` blocks dispatch after N consecutive idle cycles (configurable, default 3). Prevents automations from burning cycles without shipping.
+- **Idle-churn detection** — `vidux-witness.sh` reports per-automation `idle_churn_pct`. Automations where >50% of runs produce nothing get flagged.
+- **REDUCE gate** — a copy-paste prompt block that forces agents to check for actionable work before loading skills or reading files. Exits in <60s when nothing to do.
+- **Mid-zone kill** — dispatch-side enforcement: 3+ minutes with no file write = checkpoint and exit. Targets the 3-8 minute "stuck agent masquerading as polite" pattern.
+- **Radar template** — shared harness template for read-only observer automations (`guides/vidux/radar-template.md`). ~800-1200 chars per radar prompt.
+- **Cross-platform** — `scripts/lib/compat.sh` abstracts macOS/Linux differences (stat, date).
 
 ## Public Policy
 

@@ -101,15 +101,15 @@ Create a net-new plan-first orchestration system that makes quarter-long iOS pro
 - [completed] **15.4 Mid-zone enforcement in harness prompts** — Added "Dispatch-side mid-zone kill" to DOCTRINE.md Principle 10 and best-practices.md REDUCE gate section. Rule: 3+ minutes with no file write in dispatch = checkpoint and exit. Cited fleet data (32% mid-zone, target <15%). 2 contract tests. [Done: 2026-04-07] [Evidence: fleet-loop-analysis.md#3]
 - [completed] **15.5 Contract tests for circuit breaker** — 2 tests: circuit_breaker field exists and is open/closed, idle progress triggers open + blocks dispatch. Merged into 15.1 delivery. [Done: 2026-04-07] [Evidence: coverage-gaps pattern]
 
-### Phase 16: Plan Hygiene & Archive — IN PROGRESS
+### Phase 16: Plan Hygiene & Archive — COMPLETE
 
 **Goal:** The PLAN.md has grown to 200+ lines with 80+ completed tasks across 15 phases. Archive completed phases to keep the hot window lean (<30 tasks). Also prune stale evidence and project plans.
 
 [Evidence: vidux-loop.sh context_warning=true, context_note="69 completed tasks"]
 
 - [completed] **16.1 Archive phases 8-12 to ARCHIVE.md** — 38 completed tasks moved. PLAN.md dropped from 230 to ~130 lines. Phases 1-7 were already headers-only. Phases 13-15 kept as recent context. [Done: 2026-04-07] [Evidence: loop context_warning]
-- [pending] **16.2 Prune stale project plans** — Run `vidux-prune.sh plans --simulate` to identify archivable project plans in projects/. Archive any with 100% completed tasks. [Evidence: fleet-loop-analysis.md]
-- [pending] **16.3 Update README.md with Phase 13-15 features** — Circuit breaker, idle-churn detection, radar template, mid-zone kill, compat.sh — these are user-facing features that should be in the README. [Evidence: self-extending plan, Doctrine 11]
+- [completed] **16.2 Prune stale project plans** — Scanned 9 project plans. Archived 2 (nextjs-cve-sweep 4/4, vidux-stress-test 6/6). 7 still active with pending tasks. vidux-v230 has 1 in_progress investigation (D3 backpressure). [Done: 2026-04-07] [Evidence: project scan]
+- [completed] **16.3 Update README.md with Phase 13-15 features** — Added "Fleet Intelligence (v2.3+)" section: circuit breaker, idle-churn detection, REDUCE gate, mid-zone kill, radar template, cross-platform compat. Updated "What Ships Here" with scripts/lib/, tests/, radar template. [Done: 2026-04-07] [Evidence: self-extending plan, Doctrine 11]
 
 ### Phase 10 Open Questions
 - [x] Q6: Max plan nesting depth = 3, 4th allowed but flagged. Enforced by dashboard. [Decision Log entry exists.] [Done: 2026-04-07]
@@ -151,6 +151,7 @@ Create a net-new plan-first orchestration system that makes quarter-long iOS pro
 - [DIRECTION] [2026-04-06] Automations self-extend plans. Every automation can add tasks to PLAN.md. No writer/reader distinction. Bounded by three-strike rule to prevent recursive overload.
 
 ## Progress
+- [2026-04-07] Cycle 39: ⚡→📌 CHECKPOINT — Phase 16 COMPLETE (3/3). Archived 2 project plans (nextjs-cve-sweep, vidux-stress-test). Updated README with Fleet Intelligence section (circuit breaker, idle-churn, REDUCE gate, mid-zone kill, radar template, compat). Phases 13-16 all shipped in one session. Queue empty — next cycle should REDUCE exit or plan Phase 17 from agentic research gaps.
 - [2026-04-07] Cycle 38: 📐→⚡ PLAN+EXECUTE — Resolved Q5 (ship templates not full harnesses). Archived 38 tasks from phases 8-12 to ARCHIVE.md (230→~130 lines). Planned Phase 16 (3 tasks). Shipped 16.1 (archive). All open questions now answered. Next: 16.2 (prune stale projects), 16.3 (README update).
 - [2026-04-07] Cycle 37: ⚡→📌 CHECKPOINT — Phase 15 COMPLETE (5/5). Shipped 15.4 (dispatch-side mid-zone kill in DOCTRINE.md + best-practices.md). Rule: 3+ min with no file write in dispatch = exit. Fleet data cited (32% mid-zone, target <15%). 2 contract tests. Phases 13-15 all complete. Next: research-driven Phase 16 or archive + plan pruning.
 - [2026-04-07] Cycle 36: ⚡ EXECUTE — Shipped 15.3 (radar template at guides/vidux/radar-template.md). Extracted shared pattern from 3 StrongYes radars (~80% identical). Template includes updated REDUCE gate with circuit_breaker, sizing guidance, examples. Contract test added. Phase 15: 4/5 done. Next: 15.4 (mid-zone enforcement).
