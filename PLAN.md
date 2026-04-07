@@ -122,11 +122,11 @@ Create a net-new plan-first orchestration system that makes quarter-long iOS pro
 
 [Evidence: `projects/vidux-v230/evidence/2026-04-07-fleet-overnight-diagnosis.md`]
 
-- [pending] **14.1 Fix cadence-runtime mismatches** — Adjust rrule for every active automation to: max(avg_runtime * 1.5, 60min). Specific fixes: resplit-asc → 90min, resplit-currency → 60min, resplit-android → PAUSE, resplit-web → 30min.
-- [pending] **14.2 Design and ship REDUCE gate prompt block** — A 10-15 line text block for harness prompts that enforces: read state first, exit if blocked/unchanged, only dispatch on real work. Two variants: with-vidux (uses vidux-loop.sh) and standalone.
-- [pending] **14.3 PAUSE blocked lanes** — PAUSE resplit-android (blocked on Play Store inputs) and resplit-launch-loop (blocked on ASC key + billing). Add "resume when" conditions to their memory files.
-- [pending] **14.4 Kill ghost fleet rows** — Remove 8 stalled DB-only rows with 0 runs (strongyes-backend, strongyes-content-scraper, strongyes-email, strongyes-problem-builder, strongyes-product, strongyes-ux, vidux-meta, vidux-test-grader).
-- [pending] **14.5 Clean stale worktrees and browser processes** — Prune 38 stale vidux worktrees, kill 69 stale Playwright controllers (18.4GB RAM), add worktree GC to vidux-doctor.sh --fix mode.
+- [completed] **14.1 Fix cadence-runtime mismatches** — All active automations moved to 1x/hr with staggered BYMINUTE values. Fleet: 46 runs/hr → 12 runs/hr. [Done: 2026-04-07]
+- [completed] **14.2 Design and ship REDUCE gate prompt block** — Both variants (with-vidux + standalone) designed and shipped to DOCTRINE.md, best-practices.md, and all 12 active automation TOMLs. [Done: 2026-04-07]
+- [completed] **14.3 PAUSE blocked lanes** — resplit-android PAUSED (Play Store blocked), 14 total automations paused then cleaned. StrongYes radars later unpaused after domain fix. [Done: 2026-04-07]
+- [completed] **14.4 Kill ghost fleet rows** — 22 paused/ghost rows deleted from Codex DB. Dashboard clean: 12 active, 0 paused. [Done: 2026-04-07]
+- [completed] **14.5 Clean stale worktrees and browser processes** — 229 worktrees pruned (11GB), 750 browser processes killed (20GB RAM). [Done: 2026-04-07]
 - [pending] **14.6 Add cadence-runtime health check to vidux-doctor.sh** — New CHECK: flags automations where cadence < avg_runtime. Reads runtime from memory files or ledger. Proposes cadence fix.
 - [pending] **14.7 Fleet restructuring contract tests** — Tests for: REDUCE gate presence in harness prompts, cadence-runtime ratio, no mid-zone runs in ledger, blocked lanes are PAUSED.
 

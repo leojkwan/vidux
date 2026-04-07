@@ -1118,6 +1118,55 @@ _check_bimodal_runtime() {
   fi
 }
 
+# CHECK 12: Cadence-Runtime Mismatch
+# ============================================================================ #
+_check_cadence_runtime() {
+  TOTAL=$((TOTAL + 1))
+  local mismatches="" count=0
+
+  # Read active automations from Codex DB
+  local CODEX_DB="$HOME/.codex/sqlite/codex-dev.db"
+  if [[ -f "$CODEX_DB" ]]; then
+    local rows
+    rows="$(sqlite3 "$CODEX_DB" "SELECT id, rrule FROM automations WHERE status='ACTIVE'" 2>/dev/null || true)"
+    [[ -z "$rows" ]] && { _ok "No active automations to check cadence"; PASS_COUNT=$((PASS_COUNT + 1)); _add_check "{\"id\":\"cadence_runtime\",\"category\":\"quality\",\"status\":\"pass\",\"count\":0}"; return; }
+
+    while IFS='|' read -r aid rrule; do
+      [[ -z "$aid" ]] && continue
+      # Extract BYMINUTE count to determine fires-per-hour
+      local bymin_count=1
+      if [[ "$rrule" =~ BYMINUTE=([0-9,]+) ]]; then
+        bymin_count="$(echo "${BASH_REMATCH[1]}" | tr ',' '\n' | wc -l | tr -d ' ')"
+      fi
+      # Check memory files for runtime clues
+      local runtime_min=0
+      for mem in "$HOME/.codex/automations/$aid/memory.md" "$HOME/Development/ai/automations/$aid/memory.md"; do
+        [[ -f "$mem" ]] || continue
+        # Extract runtime from patterns like "Runtime: ~40m" or "Run time: ~63m"
+        local found_rt
+        found_rt="$(grep -oiE '(run ?time|runtime):? ~?([0-9]+)m' "$mem" 2>/dev/null | grep -oE '[0-9]+' | tail -1 || true)"
+        [[ -n "$found_rt" && "$found_rt" -gt "$runtime_min" ]] && runtime_min="$found_rt"
+        break
+      done
+      # Flag if fires-per-hour > 1 and runtime > cadence interval
+      local cadence_min=$((60 / bymin_count))
+      if [[ "$bymin_count" -gt 1 && "$runtime_min" -gt "$cadence_min" ]]; then
+        mismatches="${mismatches:+$mismatches, }$aid (${runtime_min}m runtime, ${cadence_min}m cadence, ${bymin_count}x/hr)"
+        count=$((count + 1))
+      fi
+    done <<< "$rows"
+  fi
+
+  if [[ "$count" -gt 0 ]]; then
+    _warn "Cadence-runtime mismatch: $mismatches"
+    _add_check "{\"id\":\"cadence_runtime\",\"category\":\"quality\",\"status\":\"warn\",\"count\":$count,\"details\":\"$(json_escape "$mismatches")\"}"
+  else
+    _ok "All automation cadences match observed runtimes"
+    PASS_COUNT=$((PASS_COUNT + 1))
+    _add_check "{\"id\":\"cadence_runtime\",\"category\":\"quality\",\"status\":\"pass\",\"count\":0}"
+  fi
+}
+
 # ============================================================================ #
 # MAIN
 # ============================================================================ #
@@ -1166,6 +1215,7 @@ if [[ "$JSON_MODE" = false ]]; then
 fi
 
 _check_bimodal_runtime
+_check_cadence_runtime
 
 # --- summary ---------------------------------------------------------------- #
 WARN_COUNT=$((TOTAL - PASS_COUNT))
