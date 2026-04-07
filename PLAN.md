@@ -99,6 +99,37 @@ Create a net-new plan-first orchestration system that makes quarter-long iOS pro
 - [completed] Task 12.5: Add self-extension quality metric to vidux-manager diagnose — step 5 in diagnose flow. Counts tasks added vs completed, computes ratio. Healthy ≤1.5, warning 1.5-3.0, recursive overload >3.0. Supports [Added-by:] tags and Progress fallback. [Done: 2026-04-07] [Evidence: added to vidux-manager.md diagnose steps, 138/138 tests pass]
 - [completed] Task 12.6: Contract tests for Phase 12 — 11 new tests (149 total): merge-gate mode, auto-pause fields, bimodal gate, reduce contract, codex-db lib, queue-jsonl lib, witness script, lifecycle hooks, config backpressure/pruning, self-extension metric. [Done: 2026-04-07]
 
+### Phase 13: Hardening & Coverage — IN PROGRESS
+
+**Goal:** Fix security/correctness bugs found by self-audit, close test coverage gaps, and improve cross-platform portability. Evidence-driven: every task traces to audit findings.
+
+[Evidence: `projects/vidux-self-investigation/evidence/2026-04-07-hardening-audit.md`, `projects/vidux-self-investigation/evidence/2026-04-07-coverage-gaps.md`]
+
+- [pending] **13.1 Bulletproof json_escape** — Replace bash string substitution with `python3 -c "import json,sys; print(json.dumps(sys.argv[1]))"` in vidux-loop.sh, vidux-dispatch.sh, vidux-witness.sh, vidux-prune.sh. Current impl corrupts JSON on backticks, $, and RFC 8259 special chars. [Evidence: hardening-audit.md#2] [P]
+- [pending] **13.2 Fix config path injection** — All `python3 -c "...open('$CONFIG')..."` calls (vidux-loop.sh, vidux-doctor.sh, vidux-prune.sh, ~15 instances) must pass path via sys.argv[1] instead of string interpolation. Single-quote in path = arbitrary code execution. [Evidence: hardening-audit.md#5] [P]
+- [pending] **13.3 Fix checkpoint sed metacharacter handling** — vidux-checkpoint.sh line 216 escapes only &/\[] but misses .*+?(){}^$|. Task descriptions with parens or dots match wrong lines. Fix: grep -Fn for line number, sed by line number. [Evidence: hardening-audit.md#3]
+- [pending] **13.4 Add portability layer for stat/date** — vidux-prune.sh uses macOS-only `stat -f '%m'`, vidux-witness.sh uses `date -j -f`. Add OS detection helper in scripts/lib/ that abstracts these. [Evidence: hardening-audit.md#4] [P]
+- [pending] **13.5 Batch config reads into single python3 call** — vidux-doctor.sh spawns 8 separate python3 processes for 8 config values. Read all in one call. ~400-800ms savings. [Evidence: hardening-audit.md#9] [P]
+- [pending] **13.6 Contract tests: witness.sh functional tests** — vidux-witness.sh has zero functional tests. Add tests for JSON output validity, field presence, fleet grade calculation, empty-input handling. [Evidence: coverage-gaps.md#1] [P]
+- [pending] **13.7 Contract tests: test-all.sh self-test** — The meta-runner has --json but no tests validating its own output. Add JSON structure test. [Evidence: coverage-gaps.md#3] [P]
+- [pending] **13.8 Contract tests: compound task / investigation docs** — SKILL.md "Compound Tasks & Investigations" section untested. Validate investigation template has all required sections. [Evidence: coverage-gaps.md#5] [P]
+- [pending] **13.9 Contract tests: doctrine content contracts** — Principles 5 (compaction), 7 (investigation/nested), 8 (harness/stateless), 9 (coordinator/subagent) only have header-existence tests, not content validation. [Evidence: coverage-gaps.md#7,12] [P]
+- [pending] **13.10 Contract tests: edge cases** — Empty Tasks section in loop.sh, missing task in checkpoint.sh, ledger-emit.sh actual JSONL output, queue-jsonl.sh push/pop/peek. [Evidence: coverage-gaps.md#9,10,11,14] [P]
+
+### Phase 14: Fleet Restructuring — Cadence, REDUCE Gates, Dead Lane Cleanup
+
+**Goal:** Fix the structural problems exposed by overnight fleet data: cadence-runtime mismatches, missing REDUCE gates, blocked lanes burning cycles, and ghost automations.
+
+[Evidence: `projects/vidux-v230/evidence/2026-04-07-fleet-overnight-diagnosis.md`]
+
+- [pending] **14.1 Fix cadence-runtime mismatches** — Adjust rrule for every active automation to: max(avg_runtime * 1.5, 60min). Specific fixes: resplit-asc → 90min, resplit-currency → 60min, resplit-android → PAUSE, resplit-web → 30min.
+- [pending] **14.2 Design and ship REDUCE gate prompt block** — A 10-15 line text block for harness prompts that enforces: read state first, exit if blocked/unchanged, only dispatch on real work. Two variants: with-vidux (uses vidux-loop.sh) and standalone.
+- [pending] **14.3 PAUSE blocked lanes** — PAUSE resplit-android (blocked on Play Store inputs) and resplit-launch-loop (blocked on ASC key + billing). Add "resume when" conditions to their memory files.
+- [pending] **14.4 Kill ghost fleet rows** — Remove 8 stalled DB-only rows with 0 runs (strongyes-backend, strongyes-content-scraper, strongyes-email, strongyes-problem-builder, strongyes-product, strongyes-ux, vidux-meta, vidux-test-grader).
+- [pending] **14.5 Clean stale worktrees and browser processes** — Prune 38 stale vidux worktrees, kill 69 stale Playwright controllers (18.4GB RAM), add worktree GC to vidux-doctor.sh --fix mode.
+- [pending] **14.6 Add cadence-runtime health check to vidux-doctor.sh** — New CHECK: flags automations where cadence < avg_runtime. Reads runtime from memory files or ledger. Proposes cadence fix.
+- [pending] **14.7 Fleet restructuring contract tests** — Tests for: REDUCE gate presence in harness prompts, cadence-runtime ratio, no mid-zone runs in ledger, blocked lanes are PAUSED.
+
 ### Phase 10 Open Questions
 - [x] Q6: Max plan nesting depth = 3, 4th allowed but flagged. Enforced by dashboard. [Decision Log entry exists.] [Done: 2026-04-07]
 - [x] Q7: Dashboard refresh = on-demand. Config added in 10.2 (`dashboard.refresh_mode: "on-demand"`). [Done: 2026-04-07]
@@ -123,6 +154,7 @@ Create a net-new plan-first orchestration system that makes quarter-long iOS pro
 - [2026-04-06] Ralph skill was never deleted in Phase 8 — stale copies persisted at ~/.claude/skills/ralph/ and ~/.codex/skills/ralph/ (6157 bytes each, dated Mar 28). Also found resplit-nurse codex automation (7816 bytes, ACTIVE, runs every 20min) still referencing RALPH.md.
 - [2026-04-06] vidux-checkpoint.sh had no git repo guard — running on a plan outside a git repo produced raw git `fatal:` error (exit 128). Fixed with rev-parse check.
 - [2026-04-06] Claude Code has 3 tiers of scheduling: /loop (ephemeral, 1min), Desktop Scheduled Tasks (persistent, local, 1min), Cloud Scheduled Tasks (Anthropic infra, 1hr). Desktop tasks are the Claude equivalent of Codex automations.
+- [2026-04-07] Overnight fleet data reveals structural bimodal failure: resplit-asc fires every 20min but takes 63min per run. 37 resplit-android runs restated "still blocked" at 2-7min each. The REDUCE gate vidux designed (Phase 11) was never actually deployed to live automation prompts — the doctrine exists but the enforcement is missing.
 
 ## Decision Log
 - [DIRECTION] [2026-04-06] Stage indicators use emoji prefixes (🔍📐⚡✅📌) not color-only. Reason: works in terminal, IDE, CI, and copy-paste. Do not switch to color-only.
@@ -138,6 +170,7 @@ Create a net-new plan-first orchestration system that makes quarter-long iOS pro
 - [DIRECTION] [2026-04-06] Automations self-extend plans. Every automation can add tasks to PLAN.md. No writer/reader distinction. Bounded by three-strike rule to prevent recursive overload.
 
 ## Progress
+- [2026-04-07] Cycle 30: 📐 PLAN — Fleet overnight diagnosis complete. Cadence-runtime mismatch is critical: 150+ runs across 4 resplit lanes when 30-40 would ship the same work. Phase 14 added with 7 tasks. Evidence at `projects/vidux-v230/evidence/2026-04-07-fleet-overnight-diagnosis.md`. Next: fix cadences, add REDUCE gates, pause dead lanes.
 - [2026-04-07] Cycle 29: 📐 PLAN — Public Vidux docs had drifted back to a stale DB-only retirement story even though the live machine still runs `26` repo-backed TOMLs plus `34` SQLite rows with an active orchestrator. Added `projects/context-ops/evidence/2026-04-07-public-vidux-control-plane-drift.md` and corrected the Decision Log so the 2026-04-06 DB-only cutover is treated as a historical experiment instead of current truth. Next: return to the `8` DB-only active rows for an explicit archive/promotion decision once a safe approval path exists.
 - [2026-04-06] Cycle 28: ⚡ EXECUTE — Fleet rebuild complete. Deleted 22 old automations, created 11 new burst-mode harnesses (4 resplit + 6 strongyes + 1 vidux-meta). All 30-min cadence except vidux-meta (1hr). Prompts ~2.5-3K chars (down from 5-7K). Burst doctrine, self-extending plans, $picasso + product-taste focus baked into every harness. DB race with Codex app daemon discovered and fixed (close app before writes). Evidence: `projects/context-ops/evidence/2026-04-06-fleet-rebuild-final.md`. Next: verify automations run clean against live plans.
 - [2026-04-06] Cycle 27: ⚡ EXECUTE — Retired repo-backed automation source control. Captured full fleet snapshot (13 active automations, topology, patterns, per-automation essence) into evidence. Deleted ai/automations/ from disk. Added gitignore entry. Decision Log entries recorded. Orchestrator role transferred to interactive Leo + Claude sessions. Next: clean up 11 paused DB rows, investigate endurance/v230 scheduler drift.

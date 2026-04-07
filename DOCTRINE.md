@@ -128,6 +128,14 @@ REDUCE (<2 min, read-only)
 
 **Terminology:** DISPATCH and REDUCE only. Never "burst" or "watch" -- those terms are rejected. The Redux metaphor is load-bearing.
 
+### REDUCE Gate
+
+The REDUCE gate is a literal text block inserted at the top of every automation harness prompt. It forces the agent to evaluate actionable work *before* loading skills or reading authority files. The gate is how Principle 10 (bimodal runs) gets enforced in practice -- agents that have nothing to do never enter the mid-zone because they exit before doing any real work.
+
+Two variants exist: **with-vidux** (runs `vidux-loop.sh`, reads JSON, exits on blocked/complete/stuck) and **standalone** (reads memory + primary state file directly). Both enforce the same contract: steps 1-3 complete in under 60 seconds, and an agent that finds no actionable work writes a one-line `[REDUCE]` memory note and exits immediately.
+
+See `guides/vidux/best-practices.md` Section 12 for the full copy-paste gate blocks and insertion guidance.
+
 ---
 
 ## The Redux Analogy

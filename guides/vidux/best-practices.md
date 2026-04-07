@@ -285,7 +285,68 @@ The code fix is table stakes. The process fix is the valuable output. Over the V
 
 ---
 
-## 12. Quick Reference
+## 12. REDUCE Gate Pattern
+
+The REDUCE gate is a copy-paste block inserted at the top of every automation harness prompt. It forces the agent to evaluate whether there is actionable work *before* loading skills, reading authority files, or doing any other work. The gate is the enforcement mechanism for Doctrine 10 (bimodal runs) -- it structurally eliminates mid-zone exits by making the "nothing to do" path fast and cheap.
+
+**Expected impact:** REDUCE exits drop from ~2 minutes to under 30 seconds. Agents that have nothing to do never load skills or read the authority chain. Over a 10-automation fleet running 30-minute cron intervals, this saves hundreds of wasted agent-minutes per day.
+
+### With-Vidux variant (~850 chars)
+
+Use this when the automation loads `$vidux` and has access to `vidux-loop.sh`. This is the standard variant for all Resplit and StrongYes automations.
+
+```
+REDUCE gate (run FIRST, before any other work):
+1. Run: bash /Users/leokwan/Development/vidux/scripts/vidux-loop.sh <plan-path>
+2. Read the JSON output. If ANY of these are true, checkpoint and exit immediately:
+   - action is "blocked" or "auto_blocked" or "stuck" or "all_blocked"
+   - action is "complete" or type is "done" or "empty"
+   - auto_pause_recommended is true
+   - bimodal_gate is "blocked"
+   - next_action is "none"
+   Write a 1-line memory note: "[REDUCE] <date> <reason>. No dispatch."
+   Do NOT read authority files, load skills, or do any other work. Exit now.
+3. Read the last 3 memory notes. If the top note is a [REDUCE] exit with the
+   same reason as this run's JSON, exit with: "[REDUCE] <date> unchanged. No dispatch."
+4. If next_action is "dispatch": proceed to full execution below.
+Budget: steps 1-3 must complete in under 60 seconds. If you are still in REDUCE
+after 60 seconds, you are in the mid-zone. Checkpoint what you know and exit.
+```
+
+### Standalone variant (~800 chars)
+
+Use this when the automation does not have `vidux-loop.sh` or operates outside the vidux plan-store model. The agent reads its own memory and primary state file directly.
+
+```
+REDUCE gate (run FIRST, before any other work):
+1. Read the last 3 notes from this automation's memory file.
+2. If the most recent note says any of: "blocked", "nothing to do", "unchanged",
+   "no pending", "waiting on human", "same blocker" -- and it was written less
+   than 2 hours ago -- exit immediately with a 1-line note:
+   "[REDUCE] <date> Same state as last run (<quote reason>). No dispatch."
+   Do NOT read authority files, load skills, or gather evidence. Exit now.
+3. Read the single primary state file (plan, queue, or tracker). Count actionable
+   items. If zero actionable items and no new items since the last note, exit with:
+   "[REDUCE] <date> No new work. No dispatch."
+4. If actionable work exists: proceed to full execution below.
+Budget: steps 1-3 must complete in under 60 seconds.
+```
+
+### Insertion point guidance
+
+The REDUCE gate block goes **inside** the prompt string, immediately after the mission and skill-loading lines, and **before** the authority chain or read order. The agent must hit the gate before it starts reading authority files. The gate text is literal -- copy it verbatim, replacing only `<plan-path>` with the automation's actual plan path.
+
+### When to use which variant
+
+| Automation type | Variant |
+|-----------------|---------|
+| Loads `$vidux`, has a PLAN.md | With-Vidux |
+| No vidux, has its own queue/tracker file | Standalone |
+| Pure reader/radar with no plan file | Standalone (use memory file as primary state) |
+
+---
+
+## 13. Quick Reference
 
 **Before coding:** Readiness score 7+? If not, refine the plan.
 
