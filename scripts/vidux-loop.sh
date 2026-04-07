@@ -416,6 +416,12 @@ cat <<ENDJSON
   "exit_criteria_met": $EXIT_CRITERIA_MET,
   "exit_criteria_pending": $EXIT_CRITERIA_PENDING,
   "ledger_available": $([ "${LEDGER_AVAILABLE:-false}" = "true" ] && echo true || echo false),
-  "ledger_conflicts": ${LEDGER_CONFLICT_COUNT:-0}
+  "ledger_conflicts": ${LEDGER_CONFLICT_COUNT:-0},
+  "reduce_contract": {
+    "read_only": true,
+    "max_budget_seconds": 120,
+    "forbidden": ["code_changes", "plan_execution", "file_writes"],
+    "allowed": ["read_plan", "read_evidence", "assess_state", "fire_dispatch"]
+  }
 }
 ENDJSON
