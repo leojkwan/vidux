@@ -212,25 +212,28 @@ if grep -qF "[x] ${TASK}" "$PLAN" || grep -qF "[completed] ${TASK}" "$PLAN" || g
   exit 0
 fi
 
-# --- Escape sed special chars in the task description ---
-ESCAPED_TASK=$(printf '%s\n' "$TASK" | sed 's/[&/\]/\\&/g; s/[][]/\\&/g')
+# --- Find the task by exact string match (no regex), then edit by line number ---
+# This avoids all sed metacharacter issues with task descriptions containing ().*+?{}^$|
+_mark_task() {
+  local from_status="$1" to_prefix="$2" suffix="$3"
+  local line_num
+  line_num=$(grep -Fn "[${from_status}] ${TASK}" "$PLAN" | head -1 | cut -d: -f1)
+  if [[ -n "$line_num" ]]; then
+    sedi "${line_num}s/\[${from_status}\]/[${to_prefix}]/" "$PLAN"
+    [[ -n "$suffix" ]] && sedi "${line_num}s|$| ${suffix}|" "$PLAN"
+    return 0
+  fi
+  return 1
+}
 
-# --- Mark the task based on --status ---
 if [[ "$STATUS" == "blocked" ]]; then
-  # v2: pending -> blocked
-  sedi "s/^[[:space:]]*- \[pending\] ${ESCAPED_TASK}/- [blocked] ${ESCAPED_TASK} [Blocked: ${DATE}]/" "$PLAN"
-  # v2: in_progress -> blocked
-  sedi "s/^[[:space:]]*- \[in_progress\] ${ESCAPED_TASK}/- [blocked] ${ESCAPED_TASK} [Blocked: ${DATE}]/" "$PLAN"
-  # v1: [ ] -> [blocked] (no native v1 equivalent; use [blocked] for semantic clarity)
-  sedi "s/^[[:space:]]*- \[ \] ${ESCAPED_TASK}/- [blocked] ${ESCAPED_TASK} [Blocked: ${DATE}]/" "$PLAN"
+  _mark_task "pending" "blocked" "[Blocked: ${DATE}]" ||
+  _mark_task "in_progress" "blocked" "[Blocked: ${DATE}]" ||
+  _mark_task " " "blocked" "[Blocked: ${DATE}]" || true
 else
-  # done or done_with_concerns: mark completed
-  # v2: pending -> completed
-  sedi "s/^[[:space:]]*- \[pending\] ${ESCAPED_TASK}/- [completed] ${ESCAPED_TASK} [Done: ${DATE}]/" "$PLAN"
-  # v2: in_progress -> completed
-  sedi "s/^[[:space:]]*- \[in_progress\] ${ESCAPED_TASK}/- [completed] ${ESCAPED_TASK} [Done: ${DATE}]/" "$PLAN"
-  # v1: [ ] -> [x]
-  sedi "s/^[[:space:]]*- \[ \] ${ESCAPED_TASK}/- [x] ${ESCAPED_TASK} [Done: ${DATE}]/" "$PLAN"
+  _mark_task "pending" "completed" "[Done: ${DATE}]" ||
+  _mark_task "in_progress" "completed" "[Done: ${DATE}]" ||
+  _mark_task " " "x" "[Done: ${DATE}]" || true
 fi
 
 # --- Verify the substitution worked ---
