@@ -2543,5 +2543,17 @@ class ViduxContractTests(unittest.TestCase):
             os.unlink(tmp)
 
 
+    def test_radar_template_exists_and_has_required_sections(self):
+        """guides/vidux/radar-template.md must exist with template + sizing guidance."""
+        template = ROOT / "guides" / "vidux" / "radar-template.md"
+        self.assertTrue(template.exists(), "radar-template.md missing")
+        text = _read(template)
+        self.assertIn("REDUCE gate", text)
+        self.assertIn("circuit_breaker", text)
+        self.assertIn("{{PLAN_PATH}}", text)
+        self.assertIn("Role boundary", text)
+        self.assertIn("800-1200 chars", text)
+
+
 if __name__ == "__main__":
     unittest.main()
