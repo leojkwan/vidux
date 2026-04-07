@@ -42,14 +42,14 @@ json_escape() {
 # --- Count pending tasks (v1 + v2) ----------------------------------------- #
 count_pending() {
   local count
-  count=$(grep -cE '^[[:space:]]*-\ (\[ \]|\[pending\]) ' "$PLAN" 2>/dev/null || echo 0)
+  count=$(grep -cE '^[[:space:]]*-\ (\[ \]|\[pending\]) ' "$PLAN" 2>/dev/null || true)
   echo "${count:-0}"
 }
 
 # --- Count in-progress tasks ----------------------------------------------- #
 count_in_progress() {
   local count
-  count=$(grep -cE '^[[:space:]]*-\ \[in_progress\] ' "$PLAN" 2>/dev/null || echo 0)
+  count=$(grep -cE '^[[:space:]]*-\ \[in_progress\] ' "$PLAN" 2>/dev/null || true)
   echo "${count:-0}"
 }
 
@@ -70,7 +70,7 @@ current_task() {
 # --- Check Decision Log for contradictions --------------------------------- #
 check_decision_log() {
   local dl_count
-  dl_count=$(grep -cE '^\- \[(DELETION|DIRECTION|RATE-LIMIT|STUCK|WORKTREE)\]' "$PLAN" 2>/dev/null || echo 0)
+  dl_count=$(grep -cE '^\- \[(DELETION|DIRECTION|RATE-LIMIT|STUCK|WORKTREE)\]' "$PLAN" 2>/dev/null || true)
   echo "${dl_count:-0}"
 }
 
@@ -108,15 +108,15 @@ fi
 # The agent reads this JSON and follows the burst protocol.
 
 TASK=$(current_task)
-BLOCKED_COUNT=$(grep -cE '^[[:space:]]*-\ \[blocked\] ' "$PLAN" 2>/dev/null || echo 0)
-COMPLETED_COUNT=$(grep -cE '^[[:space:]]*-\ (\[x\]|\[completed\]) ' "$PLAN" 2>/dev/null || echo 0)
+BLOCKED_COUNT=$(grep -cE '^[[:space:]]*-\ \[blocked\] ' "$PLAN" 2>/dev/null || true)
+COMPLETED_COUNT=$(grep -cE '^[[:space:]]*-\ (\[x\]|\[completed\]) ' "$PLAN" 2>/dev/null || true)
 
 # Check if any task is stuck (appeared in 3+ Progress entries while in_progress)
 STUCK="false"
 if [[ "$IN_PROGRESS_AT_START" -gt 0 ]]; then
   IP_DESC=$(grep -E '^[[:space:]]*-\ \[in_progress\] ' "$PLAN" | head -1 | sed -E 's/^[[:space:]]*-\ \[in_progress\] //' | head -c 60)
   if [[ -n "$IP_DESC" ]]; then
-    MENTION_COUNT=$(grep -cF "$IP_DESC" "$PLAN" 2>/dev/null || echo 0)
+    MENTION_COUNT=$(grep -cF "$IP_DESC" "$PLAN" 2>/dev/null || true)
     [[ "$MENTION_COUNT" -ge 4 ]] && STUCK="true"
   fi
 fi
