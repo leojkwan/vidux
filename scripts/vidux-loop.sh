@@ -426,6 +426,30 @@ if type ledger_bimodal_distribution &>/dev/null 2>&1; then
   fi
 fi
 
+# --- circuit breaker ------------------------------------------------------- #
+# If the last N consecutive Progress entries show no code changes (no commit hash,
+# no "shipped", no "fixed", no file changes), recommend circuit break.
+# Configurable via vidux.config.json backpressure.circuit_breaker_threshold (default 3).
+CIRCUIT_BREAKER="closed"; CIRCUIT_BREAKER_STREAK=0
+CB_THRESHOLD=3
+if [ -f "$CONFIG" ]; then
+  CB_THRESHOLD=$(python3 -c "import json,sys;print(json.load(open(sys.argv[1])).get('backpressure',{}).get('circuit_breaker_threshold',3))" "$CONFIG" 2>/dev/null || echo 3)
+fi
+if [ -f "$PLAN" ]; then
+  # Extract last N progress entries and check for shipping signals
+  _recent_progress=$(grep -E '^\s*-\s*\[' "$PLAN" | grep -i 'Cycle' | head -"$CB_THRESHOLD")
+  _shipping_signals=0
+  while IFS= read -r line; do
+    if echo "$line" | grep -qiE 'shipped|commit|fixed|merged|created|built|added|wrote|pushed'; then
+      _shipping_signals=$((_shipping_signals + 1))
+    fi
+  done <<< "$_recent_progress"
+  if [ -n "$_recent_progress" ] && [ "$_shipping_signals" -eq 0 ]; then
+    CIRCUIT_BREAKER="open"
+    CIRCUIT_BREAKER_STREAK=$CB_THRESHOLD
+  fi
+fi
+
 # --- output ---------------------------------------------------------------- #
 # Field semantics: blocked vs auto_blocked
 #   blocked     = dependency-gated: task's [Depends: X] references an unresolved task
@@ -435,7 +459,7 @@ fi
 NEXT_ACTION="none"
 case "$ACTION" in
   execute|gather_evidence|refine)
-    if [ "$BIMODAL_GATE" = "blocked" ]; then
+    if [ "$BIMODAL_GATE" = "blocked" ] || [ "$CIRCUIT_BREAKER" = "open" ]; then
       NEXT_ACTION="none"
     else
       NEXT_ACTION="dispatch"
@@ -476,6 +500,8 @@ cat <<ENDJSON
   "unproductive_streak": $UNPRODUCTIVE_STREAK,
   "bimodal_score": $BIMODAL_SCORE,
   "bimodal_gate": "$BIMODAL_GATE",
+  "circuit_breaker": "$CIRCUIT_BREAKER",
+  "circuit_breaker_streak": $CIRCUIT_BREAKER_STREAK,
   "reduce_contract": {
     "read_only": true,
     "max_budget_seconds": 120,

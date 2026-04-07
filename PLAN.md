@@ -130,6 +130,18 @@ Create a net-new plan-first orchestration system that makes quarter-long iOS pro
 - [completed] **14.6 Add cadence-runtime health check to vidux-doctor.sh** — CHECK 12 added. Reads rrule BYMINUTE count + memory file runtimes. Doctor now has 14 checks. [Done: 2026-04-07]
 - [completed] **14.7 Fleet restructuring contract tests** — 8 new tests (168 total): cadence-runtime check existence, 14+ doctor checks, REDUCE gate in DOCTRINE.md + best-practices.md, compat.sh functions, prune/witness use compat not raw stat/date. [Done: 2026-04-07]
 
+### Phase 15: Fleet Intelligence & Self-Healing — IN PROGRESS
+
+**Goal:** Make vidux fleets self-healing based on real runtime data. Fix the 32% mid-zone problem, add circuit breakers, implement idle-churn detection, and template the radar pattern.
+
+[Evidence: `projects/vidux-self-investigation/evidence/2026-04-07-fleet-loop-analysis.md`, `projects/vidux-self-investigation/evidence/2026-04-07-agentic-patterns-research.md`]
+
+- [completed] **15.1 Add circuit breaker to vidux-loop.sh** — Scans last N Progress entries for shipping signals (shipped/commit/fixed/merged/etc). If none found, sets `circuit_breaker: open` and blocks dispatch. Configurable via `backpressure.circuit_breaker_threshold` (default 3). 2 contract tests added. [Done: 2026-04-07] [Evidence: agentic-patterns-research.md#5, fleet-loop-analysis.md#4]
+- [pending] **15.2 Add idle-churn detection to vidux-witness.sh** — Flag automations where >50% of runs produce no file changes. Use ledger data (commit counts per automation). Output `idle_churn_pct` per automation. [Evidence: fleet-loop-analysis.md#4] [P]
+- [pending] **15.3 Radar template pattern** — Create a shared radar harness template in guides/vidux/ that the 4 StrongYes radars (and future radars) can reference. Each radar prompt becomes ~800 chars: shared REDUCE block ref + unique mission + unique execution. Saves ~4K chars fleet-wide. [Evidence: fleet-loop-analysis.md#5, prompt analysis]
+- [pending] **15.4 Mid-zone enforcement in harness prompts** — Add a "mid-zone kill" instruction to DOCTRINE.md and best-practices.md: if a cycle has been running >3min with no file write and no pending research, checkpoint and exit. Target: reduce 32% mid-zone to <15%. [Evidence: fleet-loop-analysis.md#3]
+- [completed] **15.5 Contract tests for circuit breaker** — 2 tests: circuit_breaker field exists and is open/closed, idle progress triggers open + blocks dispatch. Merged into 15.1 delivery. [Done: 2026-04-07] [Evidence: coverage-gaps pattern]
+
 ### Phase 10 Open Questions
 - [x] Q6: Max plan nesting depth = 3, 4th allowed but flagged. Enforced by dashboard. [Decision Log entry exists.] [Done: 2026-04-07]
 - [x] Q7: Dashboard refresh = on-demand. Config added in 10.2 (`dashboard.refresh_mode: "on-demand"`). [Done: 2026-04-07]
@@ -170,6 +182,7 @@ Create a net-new plan-first orchestration system that makes quarter-long iOS pro
 - [DIRECTION] [2026-04-06] Automations self-extend plans. Every automation can add tasks to PLAN.md. No writer/reader distinction. Bounded by three-strike rule to prevent recursive overload.
 
 ## Progress
+- [2026-04-07] Cycle 34: 🔍→📐→⚡ FULL LOOP — 3-agent fan-out (fleet memory analysis, ledger runtime patterns, prompt quality audit). Wrote comprehensive fleet loop analysis evidence. Planned Phase 15 (5 tasks). Shipped 15.1 (circuit breaker — scans Progress for shipping signals, blocks dispatch after 3 idle cycles) + 15.5 (2 contract tests). Evidence: `fleet-loop-analysis.md`. Key finding: 32% mid-zone rate, strongyes-content 60% idle churn. Next: 15.2-15.4.
 - [2026-04-07] Cycle 33: ⚡→📌 CHECKPOINT — Phase 13 COMPLETE (10/10 tasks). compat.sh portability layer confirmed done (hooks-created). All PLAN tasks synced to completed state. 159 tests, all scripts portable. Research evidence (MCO, OpenSpec, circuit breakers) committed. Next: Phase 14 (fleet restructuring) or Phase 15 (research-driven: circuit breaker, task DAG, lease ownership from agentic-patterns-research.md).
 - [2026-04-07] Cycle 32: ⚡ EXECUTE — Phase 13 dispatch. Shipped 13.3 (checkpoint sed metachar fix — grep -nF by line number, _mark_task helper), 13.6-13.10 (10 new contract tests: witness JSON validity, compound task docs, doctrine content validation, empty-plan edge case, test-all self-test). 159 total tests. Next: 13.4 (portability layer).
 - [2026-04-07] Cycle 31: 🔍→📐→⚡ FULL LOOP — 3-agent fan-out (agentic patterns, coverage audit, hardening audit). Synthesized into Phase 13 (10 tasks). Shipped 13.1 (json_escape +\r, learned python3 per-call too slow), 13.2 (config path injection — 15 instances/6 scripts), 13.5 (doctor 8→1 python3 calls). 149/149 tests pass. Evidence: `2026-04-07-hardening-audit.md`, `2026-04-07-coverage-gaps.md`. Next: 13.3-13.10.

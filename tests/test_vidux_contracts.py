@@ -1513,6 +1513,43 @@ class ViduxContractTests(unittest.TestCase):
             self.assertEqual(check["status"], "pass")
             self.assertEqual(check["count"], 0)
 
+    def test_doctor_reduce_harness_scope_ignores_dispatch_body_after_reduce_gate(self):
+        """Doctor must not flag valid REDUCE harnesses just because later sections mention implementation work."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = Path(tmpdir)
+            (repo / "projects").mkdir()
+            auto_dir = repo / "automations" / "resplit-web"
+            auto_dir.mkdir(parents=True)
+            (auto_dir / "automation.toml").write_text(textwrap.dedent("""
+                version = 1
+                id = "resplit-web"
+                kind = "cron"
+                status = "ACTIVE"
+                prompt = "Use [$vidux](/tmp/vidux/SKILL.md), [$pilot](/tmp/pilot/SKILL.md), and [$figma-implement-design](/tmp/figma/SKILL.md) for the Resplit web identity overhaul.\n\nREDUCE gate (run FIRST, before any other work):\n1. Run: bash /tmp/vidux-loop.sh /tmp/projects/resplit-web/PLAN.md\n2. Read the JSON output. If next_action is \\\"none\\\", exit immediately.\n4. If next_action is \\\"dispatch\\\": proceed to full execution below.\nBudget: steps 1-3 must complete in under 60 seconds.\n\nAuthority\n- /tmp/projects/resplit-web/PLAN.md\n\nExecution\n- Implement the next queued landing-page improvement after dispatch.\n- Use $figma-implement-design when a node is available.\n\nCheckpoint\n- Keep 3 notes max."
+            """).lstrip(), encoding="utf-8")
+
+            result = subprocess.run(
+                [
+                    "bash",
+                    str(self.SCRIPTS_DIR / "vidux-doctor.sh"),
+                    "--json",
+                    "--repo",
+                    str(repo),
+                    "--automations-dir",
+                    str(repo / "automations"),
+                ],
+                capture_output=True,
+                text=True,
+                timeout=15,
+            )
+            data = json.loads(result.stdout)
+            check = next(
+                check for check in data["checks"] if check["id"] == "reduce_harness_scope"
+            )
+
+            self.assertEqual(check["status"], "pass")
+            self.assertEqual(check["count"], 0)
+
     def test_doctor_stalled_active_automation_rows_warns_on_overdue_zero_run_rows(self):
         """Doctor must flag active scheduler rows that are overdue and still have zero runs."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -2462,6 +2499,48 @@ class ViduxContractTests(unittest.TestCase):
         self.assertIn("compat.sh", content)
         # Should not have raw macOS-only date calls
         self.assertNotIn("date -j -f", content)
+
+
+    # === Phase 15: Fleet Intelligence Contract Tests ===
+
+    def test_loop_has_circuit_breaker_fields(self):
+        """vidux-loop.sh JSON output must include circuit_breaker fields."""
+        result = subprocess.run(
+            ["bash", str(self.SCRIPTS_DIR / "vidux-loop.sh"), str(ROOT / "PLAN.md")],
+            capture_output=True, text=True, timeout=10,
+        )
+        data = json.loads(result.stdout)
+        self.assertIn("circuit_breaker", data)
+        self.assertIn("circuit_breaker_streak", data)
+        self.assertIn(data["circuit_breaker"], ["open", "closed"])
+
+    def test_loop_circuit_breaker_blocks_dispatch_when_open(self):
+        """vidux-loop.sh must block dispatch when circuit breaker is open."""
+        import tempfile, os
+        # Plan with idle progress entries (no shipping signals)
+        plan_text = textwrap.dedent("""\
+            # Test Plan
+            ## Tasks
+            - [pending] Do something [Evidence: test]
+            ## Decision Log
+            ## Progress
+            - [2026-04-07] Cycle 3: Assessed state. No changes needed.
+            - [2026-04-07] Cycle 2: Reviewed plan. Nothing to do.
+            - [2026-04-07] Cycle 1: Read plan. All good.
+        """)
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
+            f.write(plan_text)
+            tmp = f.name
+        try:
+            result = subprocess.run(
+                ["bash", str(self.SCRIPTS_DIR / "vidux-loop.sh"), tmp],
+                capture_output=True, text=True, timeout=30,
+            )
+            data = json.loads(result.stdout)
+            self.assertEqual(data["circuit_breaker"], "open")
+            self.assertEqual(data["next_action"], "none")
+        finally:
+            os.unlink(tmp)
 
 
 if __name__ == "__main__":
