@@ -76,7 +76,21 @@ Full AI-powered diagnostic of a project's vidux health. READ-ONLY — never modi
    - Detect stale automations: last entry older than 24 hours.
    - Detect coordinator blindness: coordinator exists but missed a stuck-in-middle pattern.
 
-5. **📌 CHECKPOINT — Generate diagnostic report.**
+5. **📐 PLAN — Self-extension quality metric (Doctrine 12).**
+   Count tasks in PLAN.md that were added by automations (look for `[Added-by: <automation-name>]`
+   tags or tasks added in Progress entries after the initial plan creation).
+   Compare against completed task count to compute the self-extension ratio:
+   ```
+   ratio = tasks_added_by_automations / tasks_completed_by_automations
+   ```
+   - **Healthy:** ratio ≤ 1.5 — automation adds proportionate work
+   - **Warning:** ratio 1.5–3.0 — automation adds more than it ships
+   - **Recursive overload:** ratio > 3.0 — Doctrine 12 violation, flag immediately
+   
+   If no `[Added-by:]` tags exist, fall back to counting tasks added in Progress entries
+   that mention "added task" or "self-extended" vs entries that mention "completed" or "done."
+
+6. **📌 CHECKPOINT — Generate diagnostic report.**
 
    ```
    Vidux Diagnostic Report: <project>
@@ -88,6 +102,7 @@ Full AI-powered diagnostic of a project's vidux health. READ-ONLY — never modi
    Prompts:    4/5 clean, 1 over 15 lines
    Doctrine:   3% restatement (target: 0%)
    Memory:     2 handoff gaps, 0 stale
+   Self-ext:   ratio 1.2 (6 added / 5 completed) ✓
    ────────────────────────────────────
    Remediation:
      1. resplit-flow-radar: 3 mid-zone runs — task granularity issue, review PLAN.md tasks
