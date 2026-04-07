@@ -139,9 +139,9 @@ Create a net-new plan-first orchestration system that makes quarter-long iOS pro
 - [completed] Task 12.6: Contract tests for Phase 12 — 11 new tests (149 total): merge-gate mode, auto-pause fields, bimodal gate, reduce contract, codex-db lib, queue-jsonl lib, witness script, lifecycle hooks, config backpressure/pruning, self-extension metric. [Done: 2026-04-07]
 
 ### Phase 10 Open Questions
-- [ ] Q6: Max plan nesting depth — research says 3, stage indicators support 4. Decision: 3 enforced by dashboard, 4th level allowed but flagged as "consider splitting."
-- [ ] Q7: Dashboard refresh — real-time (tail -f) vs polling (5s interval) vs on-demand only? Start with on-demand for simplicity, add reduce mode later.
-- [ ] Q8: Ledger as vendored dependency or external install? Start vendored (scripts/lib/), extract to separate package if community adopts.
+- [x] Q6: Max plan nesting depth = 3, 4th allowed but flagged. Enforced by dashboard. [Decision Log entry exists.] [Done: 2026-04-07]
+- [x] Q7: Dashboard refresh = on-demand. Config added in 10.2 (`dashboard.refresh_mode: "on-demand"`). [Done: 2026-04-07]
+- [x] Q8: Ledger = vendored in scripts/lib/. Extract if community adopts. [Done: 2026-04-07]
 
 ## Open Questions
 - [x] Q1: EARS for acceptance criteria only, not tasks/constraints/evidence. Add optional `[Done-When: EARS statement]` per task or phase-level acceptance criteria blocks. Current task format (checkbox + evidence + depends) is better for agent execution. Kiro validates: EARS for specs, free-form for tasks. [Done: 2026-04-01]
