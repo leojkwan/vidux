@@ -55,7 +55,19 @@ The code fix is the immediate repair. The process fix is a new constraint, test,
 
 **Run quick or run deep, never in between. Self-extend the plan with taste. Stop when good enough is good enough.**
 
-Healthy automation runs are bimodal: under 2 minutes (nothing pending, checkpoint and exit) or 15+ minutes (real work, full e2e cycle). Mid-zone exits are stuck agents quitting at the first natural milestone. Inside a long run, the agent should self-extend the plan as it spots related bugs, polish, and edge-cases — don't wait for the user to enumerate work. But self-extension needs a brake: when a surface is honestly good, stop adding polish tasks for it and move to the next mission gap. See `SKILL.md` principles 10, 11, 12 for full text, evidence, and harness language.
+Healthy automation runs are bimodal: reduce (<2 min, read-only, checkpoint and exit) or dispatch (15+ min, real work, full e2e cycle). Mid-zone exits are stuck agents quitting at the first natural milestone. Inside a dispatch run, the agent should self-extend the plan as it spots related bugs, polish, and edge-cases — don't wait for the user to enumerate work. But self-extension needs the three-strike brake (Doctrine 11): when a surface has 3+ queued polish tasks, ship the most impactful and move on. See Doctrines 10-11 below and `SKILL.md` principles 10, 11, 12 for full text.
+
+## 10. Dispatch/Reduce — loop duration is structural, not judgmental
+
+**DISPATCH mode = deep work, drain the queue, no upper time bound. REDUCE mode = read-only, feed evidence back into the store, <2 min.**
+
+The cron fires REDUCE. REDUCE decides whether to fire DISPATCH. Mid-zone (3-8 min) is structurally eliminated — the agent never has to decide when to stop because the mode already decided. This is the Redux cycle: `dispatch(action)` fires a long execution; `reducer(state, action)` reads the result and produces new state. DISPATCH yields only on queue drain, hard blocker, or context budget. REDUCE yields always — it is a pure function of the current store.
+
+## 11. Self-extending plans with bounded recursion
+
+**Every automation can add tasks to PLAN.md — do not wait for Leo. But know when good enough: three-strike rule prevents recursive overload.**
+
+Agents that spot related bugs, edge cases, or polish opportunities during execution should add them to the plan immediately. The brake: if a surface already has 3+ queued polish tasks, ship the most impactful one and move on. This prevents the recursive trap where an agent endlessly discovers work faster than it ships. The goal is net progress, not exhaustive coverage.
 
 ---
 
