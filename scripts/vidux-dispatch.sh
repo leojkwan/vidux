@@ -39,32 +39,77 @@ json_escape() {
   printf '%s' "$s"
 }
 
-# --- Count pending tasks (v1 + v2) ----------------------------------------- #
+# --- Exit Criteria parsing -------------------------------------------------- #
+# Count unchecked `- [ ]` lines inside the ## Exit Criteria section.
+# Also computes EC_LINE_START/END so task searches can exclude EC lines.
+EC_LINE_START=0; EC_LINE_END=0
+parse_exit_criteria() {
+  local ec_pending=0 ec_total=0
+  if grep -q '^## Exit Criteria' "$PLAN" 2>/dev/null; then
+    EC_LINE_START="$(grep -n '^## Exit Criteria' "$PLAN" | head -1 | cut -d: -f1)"
+    EC_LINE_END="$(awk -v start="$EC_LINE_START" 'NR>start && /^## /{print NR; exit}' "$PLAN")"
+    [ -z "$EC_LINE_END" ] && EC_LINE_END="$(( $(wc -l < "$PLAN" | tr -d ' ') + 1 ))"
+    local ec_block
+    ec_block="$(awk '/^## Exit Criteria/{found=1; next} found && /^## /{found=0} found{print}' "$PLAN")"
+    ec_total=$(printf '%s\n' "$ec_block" | grep -cE '^\- \[[ x]\] ' || true)
+    ec_pending=$(printf '%s\n' "$ec_block" | grep -cE '^\- \[ \] ' || true)
+  fi
+  EXIT_CRITERIA_TOTAL="${ec_total:-0}"
+  EXIT_CRITERIA_PENDING="${ec_pending:-0}"
+  if [ "$EXIT_CRITERIA_PENDING" -gt 0 ]; then
+    EXIT_CRITERIA_MET="false"
+  else
+    EXIT_CRITERIA_MET="true"
+  fi
+}
+
+# Helper: filter out Exit Criteria line range from grep -n output
+_exclude_ec_lines() {
+  if [ "$EC_LINE_START" -gt 0 ]; then
+    while IFS= read -r line; do
+      local lnum="${line%%:*}"
+      if [ "$lnum" -ge "$EC_LINE_START" ] && [ "$lnum" -lt "$EC_LINE_END" ]; then
+        continue
+      fi
+      printf '%s\n' "$line"
+    done
+  else
+    cat
+  fi
+}
+
+# --- Count pending tasks (v1 + v2) — excludes Exit Criteria lines ---------- #
 count_pending() {
   local count
-  count=$(grep -cE '^[[:space:]]*-\ (\[ \]|\[pending\]) ' "$PLAN" 2>/dev/null || true)
+  count=$(grep -nE '^[[:space:]]*-\ (\[ \]|\[pending\]) ' "$PLAN" 2>/dev/null | _exclude_ec_lines | grep -c '.' || true)
   echo "${count:-0}"
 }
 
 # --- Count in-progress tasks ----------------------------------------------- #
 count_in_progress() {
   local count
-  count=$(grep -cE '^[[:space:]]*-\ \[in_progress\] ' "$PLAN" 2>/dev/null || true)
+  count=$(grep -nE '^[[:space:]]*-\ \[in_progress\] ' "$PLAN" 2>/dev/null | _exclude_ec_lines | grep -c '.' || true)
   echo "${count:-0}"
 }
 
 # --- Get the current task description -------------------------------------- #
 current_task() {
-  # First: any in_progress task
-  local task
-  task=$(grep -E '^[[:space:]]*-\ \[in_progress\] ' "$PLAN" | head -1 | sed -E 's/^[[:space:]]*-\ \[in_progress\] //' || true)
-  if [[ -n "$task" ]]; then
+  # First: any in_progress task (excluding Exit Criteria section)
+  local task line
+  line=$(grep -nE '^[[:space:]]*-\ \[in_progress\] ' "$PLAN" | _exclude_ec_lines | head -1 || true)
+  if [[ -n "$line" ]]; then
+    task=$(printf '%s' "$line" | sed -E 's/^[0-9]+:[[:space:]]*-\ \[in_progress\] //')
     echo "$task"
     return
   fi
-  # Otherwise: first pending task
-  task=$(grep -E '^[[:space:]]*-\ (\[ \]|\[pending\]) ' "$PLAN" | head -1 | sed -E 's/^[[:space:]]*-\ (\[ \]|\[pending\]) //' || true)
-  echo "$task"
+  # Otherwise: first pending task (excluding Exit Criteria section)
+  line=$(grep -nE '^[[:space:]]*-\ (\[ \]|\[pending\]) ' "$PLAN" | _exclude_ec_lines | head -1 || true)
+  if [[ -n "$line" ]]; then
+    task=$(printf '%s' "$line" | sed -E 's/^[0-9]+:[[:space:]]*-\ (\[ \]|\[pending\]) //')
+    echo "$task"
+    return
+  fi
+  echo ""
 }
 
 # --- Check Decision Log for contradictions --------------------------------- #
@@ -76,6 +121,10 @@ check_decision_log() {
 
 # --- Emit burst start event ------------------------------------------------ #
 DISPATCH_START=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+# Parse exit criteria FIRST — count_pending/count_in_progress depend on EC line range
+parse_exit_criteria
+
 PENDING_AT_START=$(count_pending)
 IN_PROGRESS_AT_START=$(count_in_progress)
 DECISION_LOG_COUNT=$(check_decision_log)
@@ -87,6 +136,14 @@ fi
 # --- Dry-run mode ---------------------------------------------------------- #
 if [[ "$MODE" == "--dry-run" ]]; then
   TASK=$(current_task)
+  # Dry-run recommendation: fire if pending tasks exist OR exit criteria unmet
+  if [[ "$PENDING_AT_START" -gt 0 ]]; then
+    DRY_RUN_REC="fire_dispatch"
+  elif [[ "$EXIT_CRITERIA_MET" == "false" ]]; then
+    DRY_RUN_REC="exit_criteria_pending"
+  else
+    DRY_RUN_REC="nothing_pending"
+  fi
   cat <<EOF
 {
   "mode": "dry_run",
@@ -95,8 +152,10 @@ if [[ "$MODE" == "--dry-run" ]]; then
   "pending": $PENDING_AT_START,
   "in_progress": $IN_PROGRESS_AT_START,
   "decision_log_entries": $DECISION_LOG_COUNT,
+  "exit_criteria_met": $EXIT_CRITERIA_MET,
+  "exit_criteria_pending": $EXIT_CRITERIA_PENDING,
   "next_task": "$(json_escape "${TASK:-none}")",
-  "recommendation": "$([ "$PENDING_AT_START" -gt 0 ] && echo "fire_dispatch" || echo "nothing_pending")"
+  "recommendation": "$DRY_RUN_REC"
 }
 EOF
   exit 0
@@ -108,13 +167,13 @@ fi
 # The agent reads this JSON and follows the burst protocol.
 
 TASK=$(current_task)
-BLOCKED_COUNT=$(grep -cE '^[[:space:]]*-\ \[blocked\] ' "$PLAN" 2>/dev/null || true)
-COMPLETED_COUNT=$(grep -cE '^[[:space:]]*-\ (\[x\]|\[completed\]) ' "$PLAN" 2>/dev/null || true)
+BLOCKED_COUNT=$(grep -nE '^[[:space:]]*-\ \[blocked\] ' "$PLAN" 2>/dev/null | _exclude_ec_lines | grep -c '.' || true)
+COMPLETED_COUNT=$(grep -nE '^[[:space:]]*-\ (\[x\]|\[completed\]) ' "$PLAN" 2>/dev/null | _exclude_ec_lines | grep -c '.' || true)
 
 # Check if any task is stuck (appeared in 3+ Progress entries while in_progress)
 STUCK="false"
 if [[ "$IN_PROGRESS_AT_START" -gt 0 ]]; then
-  IP_DESC=$(grep -E '^[[:space:]]*-\ \[in_progress\] ' "$PLAN" | head -1 | sed -E 's/^[[:space:]]*-\ \[in_progress\] //' | head -c 60)
+  IP_DESC=$(grep -nE '^[[:space:]]*-\ \[in_progress\] ' "$PLAN" | _exclude_ec_lines | head -1 | sed -E 's/^[0-9]+:[[:space:]]*-\ \[in_progress\] //' | head -c 60)
   if [[ -n "$IP_DESC" ]]; then
     MENTION_COUNT=$(grep -cF "$IP_DESC" "$PLAN" 2>/dev/null || true)
     [[ "$MENTION_COUNT" -ge 4 ]] && STUCK="true"
@@ -130,8 +189,10 @@ elif [[ "$PENDING_AT_START" -gt 0 ]]; then
   ACTION="execute_dispatch"
 elif [[ "$PENDING_AT_START" -eq 0 && "$BLOCKED_COUNT" -gt 0 ]]; then
   ACTION="all_blocked"
-elif [[ "$PENDING_AT_START" -eq 0 && "$BLOCKED_COUNT" -eq 0 ]]; then
+elif [[ "$PENDING_AT_START" -eq 0 && "$BLOCKED_COUNT" -eq 0 && "$EXIT_CRITERIA_MET" == "true" ]]; then
   ACTION="queue_empty"
+elif [[ "$PENDING_AT_START" -eq 0 && "$BLOCKED_COUNT" -eq 0 && "$EXIT_CRITERIA_MET" == "false" ]]; then
+  ACTION="exit_criteria_pending"
 else
   ACTION="checkpoint_only"
 fi
@@ -156,9 +217,11 @@ cat <<EOF
   "stuck": $STUCK,
   "decision_log_entries": $DECISION_LOG_COUNT,
   "current_task": "$(json_escape "${TASK:-none}")",
+  "exit_criteria_met": $EXIT_CRITERIA_MET,
+  "exit_criteria_pending": $EXIT_CRITERIA_PENDING,
   "dispatch_protocol": {
-    "stop_conditions": ["queue_empty", "hard_external_blocker", "context_budget_exceeded"],
-    "forbidden": ["mid_zone_exit", "stop_after_one_task", "stop_at_natural_milestone"],
+    "stop_conditions": ["queue_empty_and_exit_criteria_met", "hard_external_blocker", "context_budget_exceeded"],
+    "forbidden": ["mid_zone_exit", "stop_after_one_task", "stop_at_natural_milestone", "ignore_exit_criteria"],
     "required": ["checkpoint_per_task", "self_extend_plan", "screenshot_proof_for_ui"]
   },
   "ledger_available": $([ "${LEDGER_AVAILABLE:-false}" = "true" ] && echo true || echo false)

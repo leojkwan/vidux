@@ -1726,5 +1726,195 @@ class ViduxContractTests(unittest.TestCase):
             os.unlink(ledger_path)
 
 
+    # ===== v2.4.0: Exit Criteria Hook (Task 11.4) ===== #
+
+    def test_exit_criteria_fields_present_in_loop_output(self):
+        """vidux-loop.sh must include exit_criteria_met and exit_criteria_pending in JSON output."""
+        data = self._run_loop_on("""\
+            # Test Plan
+            ## Tasks
+            - [pending] Task 1: Build feature [Evidence: src]
+            ## Progress
+        """)
+        self.assertIn("exit_criteria_met", data)
+        self.assertIn("exit_criteria_pending", data)
+
+    def test_exit_criteria_met_when_no_section(self):
+        """Plans without ## Exit Criteria must default to exit_criteria_met=true, pending=0."""
+        data = self._run_loop_on("""\
+            # Test Plan
+            ## Tasks
+            - [completed] Task 1: Done [Evidence: src]
+            ## Progress
+        """)
+        self.assertTrue(data["exit_criteria_met"])
+        self.assertEqual(data["exit_criteria_pending"], 0)
+
+    def test_exit_criteria_met_when_all_checked(self):
+        """All checked exit criteria must yield exit_criteria_met=true."""
+        data = self._run_loop_on("""\
+            # Test Plan
+            ## Tasks
+            - [completed] Task 1: Done [Evidence: src]
+            ## Exit Criteria
+            - [x] All tests pass
+            - [x] No TODOs in src/
+            ## Progress
+        """)
+        self.assertTrue(data["exit_criteria_met"])
+        self.assertEqual(data["exit_criteria_pending"], 0)
+
+    def test_exit_criteria_pending_when_unchecked(self):
+        """Unchecked exit criteria must yield exit_criteria_met=false and correct pending count."""
+        data = self._run_loop_on("""\
+            # Test Plan
+            ## Tasks
+            - [completed] Task 1: Done [Evidence: src]
+            ## Exit Criteria
+            - [x] All tests pass
+            - [ ] No TODOs in src/
+            - [ ] Coverage > 80%
+            ## Progress
+        """)
+        self.assertFalse(data["exit_criteria_met"])
+        self.assertEqual(data["exit_criteria_pending"], 2)
+
+    def test_exit_criteria_blocks_done_signal(self):
+        """When all tasks are done but exit criteria unmet, action must NOT be 'complete'."""
+        data = self._run_loop_on("""\
+            # Test Plan
+            ## Tasks
+            - [completed] Task 1: Done [Evidence: src]
+            ## Exit Criteria
+            - [ ] All tests pass
+            ## Progress
+        """)
+        self.assertNotEqual(data["action"], "complete")
+        self.assertEqual(data["type"], "exit_criteria_pending")
+        self.assertEqual(data["next_action"], "burst")
+
+    def test_exit_criteria_allows_done_when_all_met(self):
+        """When all tasks done AND all exit criteria checked, action must be 'complete'."""
+        data = self._run_loop_on("""\
+            # Test Plan
+            ## Tasks
+            - [completed] Task 1: Done [Evidence: src]
+            ## Exit Criteria
+            - [x] All tests pass
+            - [x] No TODOs in src/
+            ## Progress
+        """)
+        self.assertEqual(data["action"], "complete")
+        self.assertEqual(data["type"], "done")
+        self.assertEqual(data["next_action"], "none")
+
+    def test_dispatch_exit_criteria_in_output(self):
+        """vidux-dispatch.sh must include exit_criteria fields in JSON output."""
+        plan_text = textwrap.dedent("""\
+            # Test Plan
+            ## Tasks
+            - [pending] Task 1: Build feature [Evidence: src]
+            ## Exit Criteria
+            - [ ] All tests pass
+            ## Progress
+        """)
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
+            f.write(plan_text)
+            tmp = f.name
+        try:
+            result = subprocess.run(
+                ["bash", str(self.SCRIPTS_DIR / "vidux-dispatch.sh"), tmp],
+                capture_output=True, text=True, timeout=10,
+            )
+            self.assertEqual(result.returncode, 0, f"vidux-dispatch.sh failed: {result.stderr}")
+            data = json.loads(result.stdout)
+            self.assertIn("exit_criteria_met", data)
+            self.assertIn("exit_criteria_pending", data)
+            self.assertFalse(data["exit_criteria_met"])
+            self.assertEqual(data["exit_criteria_pending"], 1)
+        finally:
+            os.unlink(tmp)
+
+    def test_dispatch_rejects_queue_empty_when_criteria_unmet(self):
+        """vidux-dispatch.sh must not declare queue_empty when exit criteria are pending."""
+        plan_text = textwrap.dedent("""\
+            # Test Plan
+            ## Tasks
+            - [completed] Task 1: Done [Evidence: src]
+            ## Exit Criteria
+            - [ ] All tests pass
+            ## Progress
+        """)
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
+            f.write(plan_text)
+            tmp = f.name
+        try:
+            result = subprocess.run(
+                ["bash", str(self.SCRIPTS_DIR / "vidux-dispatch.sh"), tmp],
+                capture_output=True, text=True, timeout=10,
+            )
+            self.assertEqual(result.returncode, 0, f"vidux-dispatch.sh failed: {result.stderr}")
+            data = json.loads(result.stdout)
+            self.assertNotEqual(data["action"], "queue_empty")
+            self.assertEqual(data["action"], "exit_criteria_pending")
+        finally:
+            os.unlink(tmp)
+
+    def test_dispatch_allows_queue_empty_when_criteria_met(self):
+        """vidux-dispatch.sh must declare queue_empty when all exit criteria are satisfied."""
+        plan_text = textwrap.dedent("""\
+            # Test Plan
+            ## Tasks
+            - [completed] Task 1: Done [Evidence: src]
+            ## Exit Criteria
+            - [x] All tests pass
+            ## Progress
+        """)
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
+            f.write(plan_text)
+            tmp = f.name
+        try:
+            result = subprocess.run(
+                ["bash", str(self.SCRIPTS_DIR / "vidux-dispatch.sh"), tmp],
+                capture_output=True, text=True, timeout=10,
+            )
+            self.assertEqual(result.returncode, 0, f"vidux-dispatch.sh failed: {result.stderr}")
+            data = json.loads(result.stdout)
+            self.assertEqual(data["action"], "queue_empty")
+        finally:
+            os.unlink(tmp)
+
+    def test_dispatch_dry_run_exit_criteria_pending_recommendation(self):
+        """vidux-dispatch.sh --dry-run must recommend exit_criteria_pending when tasks done but criteria unmet."""
+        plan_text = textwrap.dedent("""\
+            # Test Plan
+            ## Tasks
+            - [completed] Task 1: Done [Evidence: src]
+            ## Exit Criteria
+            - [ ] All tests pass
+            ## Progress
+        """)
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
+            f.write(plan_text)
+            tmp = f.name
+        try:
+            result = subprocess.run(
+                ["bash", str(self.SCRIPTS_DIR / "vidux-dispatch.sh"), tmp, "--dry-run"],
+                capture_output=True, text=True, timeout=10,
+            )
+            self.assertEqual(result.returncode, 0, f"vidux-dispatch.sh --dry-run failed: {result.stderr}")
+            data = json.loads(result.stdout)
+            self.assertEqual(data["recommendation"], "exit_criteria_pending")
+            self.assertFalse(data["exit_criteria_met"])
+        finally:
+            os.unlink(tmp)
+
+    def test_skill_has_exit_criteria_in_plan_template(self):
+        """SKILL.md PLAN.md template must include ## Exit Criteria as an optional section."""
+        text = _read(SKILL)
+        self.assertIn("## Exit Criteria", text)
+        self.assertIn("Optional", text.split("## Exit Criteria")[1].split("##")[0])
+
+
 if __name__ == "__main__":
     unittest.main()

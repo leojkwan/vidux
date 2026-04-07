@@ -566,6 +566,14 @@ Status FSM: pending -> in_progress -> completed (or pending -> blocked -> pendin
 > **Backward compatibility:** v1 checkbox format (`- [ ]` / `- [x]`) is still accepted.
 > `- [ ]` maps to `pending`, `- [x]` maps to `completed`.
 
+## Exit Criteria
+*(Optional.)* Machine-verifiable conditions that must be true before the plan is considered done.
+Each criterion is a grep-testable checkbox. vidux-loop.sh and vidux-dispatch.sh parse this section
+and reject "done" signals if any criteria remain unchecked.
+- [ ] [criteria 1 — grep-testable condition, e.g. "All contract tests pass"]
+- [ ] [criteria 2 — e.g. "No TODO comments in src/"]
+- [x] [criteria 3 — already satisfied]
+
 ## Open Questions
 What we don't know yet. Each needs a research action.
 - [ ] Q1: [question] -> Action: [what to search/ask]

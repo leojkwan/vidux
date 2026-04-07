@@ -70,11 +70,45 @@ if type vidux_emit_loop_start &>/dev/null; then
   vidux_emit_loop_start "$PROJECT_NAME" "$PLAN" "" 2>/dev/null || true
 fi
 
+# --- Exit Criteria parsing (early — needed by task-counting below) ---------- #
+# Count unchecked `- [ ]` lines inside the ## Exit Criteria section.
+# If the section exists, exit_criteria_met is true only when all are checked.
+# Also compute the line range so task search can exclude exit criteria lines.
+EXIT_CRITERIA_MET=true; EXIT_CRITERIA_PENDING=0; EXIT_CRITERIA_TOTAL=0
+EC_LINE_START=0; EC_LINE_END=0
+if grep -q '^## Exit Criteria' "$PLAN" 2>/dev/null; then
+  EC_LINE_START="$(grep -n '^## Exit Criteria' "$PLAN" | head -1 | cut -d: -f1)"
+  # End = next ## heading after EC, or EOF+1
+  EC_LINE_END="$(awk -v start="$EC_LINE_START" 'NR>start && /^## /{print NR; exit}' "$PLAN")"
+  [ -z "$EC_LINE_END" ] && EC_LINE_END="$(( $(wc -l < "$PLAN" | tr -d ' ') + 1 ))"
+  EC_BLOCK="$(awk '/^## Exit Criteria/{found=1; next} found && /^## /{found=0} found{print}' "$PLAN")"
+  EXIT_CRITERIA_TOTAL="$(printf '%s\n' "$EC_BLOCK" | grep -cE '^\- \[[ x]\] ' || true)"
+  EXIT_CRITERIA_PENDING="$(printf '%s\n' "$EC_BLOCK" | grep -cE '^\- \[ \] ' || true)"
+  if [ "$EXIT_CRITERIA_PENDING" -gt 0 ]; then
+    EXIT_CRITERIA_MET=false
+  fi
+fi
+
+# Helper: filter out Exit Criteria line range from grep -n output
+_exclude_ec_lines() {
+  if [ "$EC_LINE_START" -gt 0 ]; then
+    while IFS= read -r line; do
+      _ec_lnum="${line%%:*}"
+      if [ "$_ec_lnum" -ge "$EC_LINE_START" ] && [ "$_ec_lnum" -lt "$EC_LINE_END" ]; then
+        continue
+      fi
+      printf '%s\n' "$line"
+    done
+  else
+    cat
+  fi
+}
+
 # --- hot/cold window (read-only context budget awareness) ----------------- #
-# HOT = pending + in_progress (v1 and v2)
-HOT_TASKS="$(grep -cE '^\- (\[ \]|\[(pending|in_progress)\]) ' "$PLAN" || true)"
-# COLD = completed (v1 and v2)
-COLD_TASKS="$(grep -cE '^\- (\[x\]|\[completed\]) ' "$PLAN" || true)"
+# HOT = pending + in_progress (v1 and v2) — excludes Exit Criteria lines
+HOT_TASKS="$(grep -nE '^\- (\[ \]|\[(pending|in_progress)\]) ' "$PLAN" | _exclude_ec_lines | grep -c '.' || true)"
+# COLD = completed (v1 and v2) — excludes Exit Criteria lines
+COLD_TASKS="$(grep -nE '^\- (\[x\]|\[completed\]) ' "$PLAN" | _exclude_ec_lines | grep -c '.' || true)"
 TOTAL_LINES="$(wc -l < "$PLAN" | tr -d ' ')"
 CONTEXT_WARNING=false; CONTEXT_NOTE=""
 if [ "$TOTAL_LINES" -gt "$CONTEXT_WARNING_LINES" ] || [ "$COLD_TASKS" -gt "$ARCHIVE_THRESHOLD" ]; then
@@ -102,7 +136,7 @@ PROCESS_FIX_DECLARED=""
 
 # --- read: find first actionable task ------------------------------------- #
 # Priority 1: resume an in_progress task (session may have died mid-task)
-TASK_LINE="$(grep -nE '^\- \[in_progress\] ' "$PLAN" | head -1 || true)"
+TASK_LINE="$(grep -nE '^\- \[in_progress\] ' "$PLAN" | _exclude_ec_lines | head -1 || true)"
 IS_RESUMING=false
 if [ -n "$TASK_LINE" ]; then
   IS_RESUMING=true
@@ -110,20 +144,25 @@ fi
 
 # Priority 2: first pending task (v2 FSM or v1 checkbox)
 if [ -z "$TASK_LINE" ]; then
-  TASK_LINE="$(grep -nE '^\- (\[ \]|\[pending\]) ' "$PLAN" | head -1 || true)"
+  TASK_LINE="$(grep -nE '^\- (\[ \]|\[pending\]) ' "$PLAN" | _exclude_ec_lines | head -1 || true)"
 fi
 
 if [ -z "$TASK_LINE" ]; then
   # Check if there are blocked tasks left (not "done" — escalate)
-  BLOCKED_COUNT="$(grep -cE '^\- \[blocked\] ' "$PLAN" || true)"
+  BLOCKED_COUNT="$(grep -nE '^\- \[blocked\] ' "$PLAN" | _exclude_ec_lines | grep -c '.' || true)"
   if [ "$BLOCKED_COUNT" -gt 0 ]; then
     json "{\"mode\":\"watch\", \"cycle\": 0, \"task\": \"none\", \"type\": \"all_blocked\", \"action\": \"escalate\", \"next_action\": \"none\", \"context\": \"$BLOCKED_COUNT task(s) blocked — escalate blockers to human\", \"hot_tasks\": $HOT_TASKS, \"cold_tasks\": $COLD_TASKS, \"context_warning\": $CONTEXT_WARNING, \"context_note\": \"$(json_escape "$CONTEXT_NOTE")\", \"decision_log_count\": $DL_COUNT, \"decision_log_warning\": $DL_WARNING, \"decision_log_entries\": \"$(json_escape "$DL_ENTRIES")\", \"contradiction_warning\": $CONTRADICTION_WARNING, \"contradiction_matches\": \"$(json_escape "$CONTRADICTION_MATCHES")\", \"contradicts_tag\": \"$(json_escape "$CONTRADICTS_TAG")\", \"process_fix_declared\": \"$(json_escape "$PROCESS_FIX_DECLARED")\"}"
     exit 0
   fi
-  # Check if there are ANY tasks at all (any FSM state)
-  HAS_TASKS="$(grep -cE '^\- (\[.\]|\[(pending|in_progress|completed|blocked)\]) ' "$PLAN" || true)"
+  # Check if there are ANY tasks at all (any FSM state) — excludes Exit Criteria lines
+  HAS_TASKS="$(grep -nE '^\- (\[.\]|\[(pending|in_progress|completed|blocked)\]) ' "$PLAN" | _exclude_ec_lines | grep -c '.' || true)"
   if [ "$HAS_TASKS" -gt 0 ]; then
-    json "{\"mode\":\"watch\", \"cycle\": 0, \"task\": \"none\", \"type\": \"done\", \"action\": \"complete\", \"next_action\": \"none\", \"context\": \"All tasks done\", \"hot_tasks\": $HOT_TASKS, \"cold_tasks\": $COLD_TASKS, \"context_warning\": $CONTEXT_WARNING, \"context_note\": \"$(json_escape "$CONTEXT_NOTE")\", \"decision_log_count\": $DL_COUNT, \"decision_log_warning\": $DL_WARNING, \"decision_log_entries\": \"$(json_escape "$DL_ENTRIES")\", \"contradiction_warning\": $CONTRADICTION_WARNING, \"contradiction_matches\": \"$(json_escape "$CONTRADICTION_MATCHES")\", \"contradicts_tag\": \"$(json_escape "$CONTRADICTS_TAG")\", \"process_fix_declared\": \"$(json_escape "$PROCESS_FIX_DECLARED")\"}"
+    # Gate on exit criteria: if criteria exist and aren't all checked, keep working
+    if [ "$EXIT_CRITERIA_MET" = false ]; then
+      json "{\"mode\":\"watch\", \"cycle\": 0, \"task\": \"none\", \"type\": \"exit_criteria_pending\", \"action\": \"execute\", \"next_action\": \"burst\", \"context\": \"All tasks done but $EXIT_CRITERIA_PENDING exit criteria unmet\", \"hot_tasks\": $HOT_TASKS, \"cold_tasks\": $COLD_TASKS, \"context_warning\": $CONTEXT_WARNING, \"context_note\": \"$(json_escape "$CONTEXT_NOTE")\", \"decision_log_count\": $DL_COUNT, \"decision_log_warning\": $DL_WARNING, \"decision_log_entries\": \"$(json_escape "$DL_ENTRIES")\", \"contradiction_warning\": $CONTRADICTION_WARNING, \"contradiction_matches\": \"$(json_escape "$CONTRADICTION_MATCHES")\", \"contradicts_tag\": \"$(json_escape "$CONTRADICTS_TAG")\", \"process_fix_declared\": \"$(json_escape "$PROCESS_FIX_DECLARED")\", \"exit_criteria_met\": $EXIT_CRITERIA_MET, \"exit_criteria_pending\": $EXIT_CRITERIA_PENDING}"
+    else
+      json "{\"mode\":\"watch\", \"cycle\": 0, \"task\": \"none\", \"type\": \"done\", \"action\": \"complete\", \"next_action\": \"none\", \"context\": \"All tasks done\", \"hot_tasks\": $HOT_TASKS, \"cold_tasks\": $COLD_TASKS, \"context_warning\": $CONTEXT_WARNING, \"context_note\": \"$(json_escape "$CONTEXT_NOTE")\", \"decision_log_count\": $DL_COUNT, \"decision_log_warning\": $DL_WARNING, \"decision_log_entries\": \"$(json_escape "$DL_ENTRIES")\", \"contradiction_warning\": $CONTRADICTION_WARNING, \"contradiction_matches\": \"$(json_escape "$CONTRADICTION_MATCHES")\", \"contradicts_tag\": \"$(json_escape "$CONTRADICTS_TAG")\", \"process_fix_declared\": \"$(json_escape "$PROCESS_FIX_DECLARED")\", \"exit_criteria_met\": $EXIT_CRITERIA_MET, \"exit_criteria_pending\": $EXIT_CRITERIA_PENDING}"
+    fi
   else
     json "{\"mode\":\"watch\", \"cycle\": 0, \"task\": \"none\", \"type\": \"empty\", \"action\": \"create_tasks\", \"next_action\": \"none\", \"context\": \"Plan has no tasks\", \"hot_tasks\": $HOT_TASKS, \"cold_tasks\": $COLD_TASKS, \"context_warning\": $CONTEXT_WARNING, \"context_note\": \"$(json_escape "$CONTEXT_NOTE")\", \"decision_log_count\": $DL_COUNT, \"decision_log_warning\": $DL_WARNING, \"decision_log_entries\": \"$(json_escape "$DL_ENTRIES")\", \"contradiction_warning\": $CONTRADICTION_WARNING, \"contradiction_matches\": \"$(json_escape "$CONTRADICTION_MATCHES")\", \"contradicts_tag\": \"$(json_escape "$CONTRADICTS_TAG")\", \"process_fix_declared\": \"$(json_escape "$PROCESS_FIX_DECLARED")\"}"
   fi
@@ -301,7 +340,7 @@ $DL_ENTRY\\
 fi
 
 # --- recompute hot_tasks after mutations (stuck-loop may have auto-blocked) - #
-HOT_TASKS="$(grep -cE '^\- (\[ \]|\[(pending|in_progress)\]) ' "$PLAN" || true)"
+HOT_TASKS="$(grep -nE '^\- (\[ \]|\[(pending|in_progress)\]) ' "$PLAN" | _exclude_ec_lines | grep -c '.' || true)"
 
 # --- checkpoint mode ------------------------------------------------------- #
 if [ "$MODE" = "--checkpoint" ]; then
@@ -374,6 +413,8 @@ cat <<ENDJSON
   "contradiction_matches": "$(json_escape "$CONTRADICTION_MATCHES")",
   "contradicts_tag": "$(json_escape "$CONTRADICTS_TAG")",
   "process_fix_declared": "$(json_escape "$PROCESS_FIX_DECLARED")",
+  "exit_criteria_met": $EXIT_CRITERIA_MET,
+  "exit_criteria_pending": $EXIT_CRITERIA_PENDING,
   "ledger_available": $([ "${LEDGER_AVAILABLE:-false}" = "true" ] && echo true || echo false),
   "ledger_conflicts": ${LEDGER_CONFLICT_COUNT:-0}
 }
