@@ -1,6 +1,6 @@
 # Vidux Doctrine
 
-> If an agent reads one file, this is it. 11 principles, each battle-tested across 28+ cycles building Vidux itself, a 10-automation fleet across Resplit and StrongYes, and overnight cron loops that run unsupervised.
+> If an agent reads one file, this is it. 12 principles, each battle-tested across 28+ cycles building Vidux itself, a 10-automation fleet across Resplit and StrongYes, and overnight cron loops that run unsupervised.
 
 ## 1. Plan is the store
 
@@ -64,11 +64,45 @@ Fan out research (4 parallel agents, each writes its own file). Fan in through o
 
 *Why this matters: 17x error amplification beyond 4 parallel agents without hierarchy. The Vidux build ran 9 research agents successfully because they were read-only.*
 
-## 10. Dispatch/Reduce -- loop duration is structural, not judgmental
+---
 
-DISPATCH = deep work, drain the queue, ship code, no upper time bound. REDUCE = read-only, feed evidence back into the store, under 2 minutes. The cron fires REDUCE. REDUCE decides whether to fire DISPATCH. Mid-zone (3-8 min) is structurally eliminated -- the agent never decides when to stop because the mode already decided.
+## Loop Discipline (Principles 10-12)
 
-This IS the Redux cycle: `dispatch(action)` fires a long execution; `reducer(state, action)` reads the result and produces new state. DISPATCH yields only on queue drain, hard blocker, or context budget. REDUCE yields always.
+These three principles form a closed loop: 10 defines the two execution modes, 11 says agents must extend the plan as they work, and 12 brakes self-extension before it becomes recursive optimization. Together they eliminate the two failure modes of autonomous agents -- quitting too early and never quitting at all.
+
+## 10. Run quick or run deep -- never in between
+
+Healthy runs are bimodal: <2 min (nothing to do, checkpoint and exit) or 15+ min (real work, full e2e cycle). Mid-zone runs (3-8 min) are the disease. Agents have a learned closure bias: they hit the first natural milestone (a commit, a sub-task, a build pass) and invent reasons to quit. The bimodal distribution model eliminates this structurally -- the mode decides when to stop, not the agent.
+
+Every harness must say "if you checkpoint in under 5 minutes and pending work remains, you stopped too early -- pick up the next task." Quick exits are healthy when nothing is pending; mid-zone exits are stuck agents masquerading as polite ones.
+
+*Why this matters: Claude Code #34238 documents the closure bias pattern. Gastown's dispatch/reduce research found the same bimodal shape: short reduce cycles that find nothing, or long dispatch runs that finish real work, with very little in between.*
+
+## 11. Self-extending plans with taste
+
+Don't wait for the user to enumerate work. Think N steps ahead, add tasks you spot, and apologize later if wrong. When you fix a bug, log the related bugs you saw on the same surface and queue them. When you add a feature, log the polish and edge-cases you spotted. If you are not extending the plan, you are not paying attention.
+
+Agents are good at functional code (Stripe wiring, schema migrations, build configs). They are bad at taste -- anticipating what the user wants without being told, noticing the related polish on the same surface, thinking two or three steps past the current task. Vidux automations are the *amp* for product taste, not just a build runner.
+
+*Why this matters: Readers AND writers can self-extend the plan as they discover things. Definition of done for UI work is a simulator screenshot or visual proof, never just "the build passes."*
+
+## 12. Bounded recursion -- know when good enough is good enough
+
+Self-extension without a brake becomes recursive optimization forever. A good automation knows when a surface is honestly good and stops adding work to its own queue. Three-strike rule: if a surface already has 3+ queued polish tasks, ship the most impactful one and move on. Don't optimize already-good surfaces. If overall mission has gaps elsewhere, polish on a done surface is procrastination.
+
+*Why this matters: A Resplit automation discovered 14 polish tasks on a single view controller. Without the three-strike brake it would still be polishing. With the brake it shipped the top 3 and moved to the next gap in the mission.*
+
+---
+
+## Dispatch / Reduce
+
+The two execution modes follow the Redux analogy exactly.
+
+**DISPATCH** = deep work mode. Fire actions, drain the queue, ship code. No upper time bound. DISPATCH yields only on queue drain, hard blocker, or context budget. This is `dispatch(action)` -- it fires a long execution.
+
+**REDUCE** = feedback mode. Read results, feed evidence back into the store, improve the plan. Under 2 minutes, always read-only. The cron fires REDUCE. REDUCE decides whether to fire DISPATCH. This is `reducer(state, action)` -- it reads the result and produces new state.
+
+Mid-zone (3-8 min) is structurally eliminated -- the agent never decides when to stop because the mode already decided.
 
 ```
 Cron
@@ -92,15 +126,7 @@ REDUCE (<2 min, read-only)
                     checkpoint, exit
 ```
 
-*Why this matters: Claude Code #34238 -- agents have a learned closure bias. They hit the first natural milestone and invent reasons to quit. Bimodal enforcement kills the mid-zone where stuck agents masquerade as polite ones.*
-
-## 11. Self-extending plans with bounded recursion
-
-Automations add tasks to PLAN.md themselves -- do not wait for the human. When you fix a bug, log the related bugs you saw. When you add a feature, log the polish and edge-cases. Think N steps ahead.
-
-The brake: three-strike rule. If a surface already has 3+ queued polish tasks, ship the most impactful one and move on. Self-extension without a brake becomes recursive optimization forever. A good automation knows when a surface is honestly good and stops adding work to its own queue.
-
-*Why this matters: A Resplit automation discovered 14 polish tasks on a single view controller. Without the three-strike brake it would still be polishing. With the brake it shipped the top 3 and moved to the next gap in the mission.*
+**Terminology:** DISPATCH and REDUCE only. Never "burst" or "watch" -- those terms are rejected. The Redux metaphor is load-bearing.
 
 ---
 
