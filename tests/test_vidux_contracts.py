@@ -46,10 +46,10 @@ class ViduxContractTests(unittest.TestCase):
     # SKILL.md contracts
     # -----------------------------------------------------------------------
 
-    def test_skill_has_eight_doctrine_principles(self):
-        """SKILL.md must contain all 8 numbered doctrine principles."""
+    def test_skill_has_twelve_doctrine_principles(self):
+        """SKILL.md must contain all 12 numbered doctrine principles."""
         text = _read(SKILL)
-        for n in range(1, 9):
+        for n in range(1, 13):
             self.assertRegex(
                 text, rf"###\s+{n}\.",
                 f"SKILL.md missing doctrine principle #{n}",
@@ -311,10 +311,11 @@ class ViduxContractTests(unittest.TestCase):
     SCRIPTS_DIR = ROOT / "scripts"
 
     def test_scripts_exist_and_executable(self):
-        """All 4 vidux scripts must exist and be executable."""
+        """All vidux scripts must exist and be executable."""
         expected = [
             "vidux-loop.sh", "vidux-checkpoint.sh",
-            "vidux-gather.sh", "install-hooks.sh", "vidux-burst.sh",
+            "vidux-gather.sh", "install-hooks.sh", "vidux-dispatch.sh",
+            "vidux-prune.sh", "vidux-fleet-quality.sh",
         ]
         for name in expected:
             script = self.SCRIPTS_DIR / name
@@ -387,7 +388,7 @@ class ViduxContractTests(unittest.TestCase):
         self.assertEqual(data["process_fix_declared"], "test")
 
     def test_vidux_burst_dry_run_exposes_contract(self):
-        """vidux-burst.sh --dry-run must emit the burst contract surface."""
+        """vidux-dispatch.sh --dry-run must emit the dispatch contract surface."""
         import tempfile, os
         plan_text = textwrap.dedent("""\
             # Test Plan
@@ -400,19 +401,19 @@ class ViduxContractTests(unittest.TestCase):
             tmp = f.name
         try:
             result = subprocess.run(
-                ["bash", str(self.SCRIPTS_DIR / "vidux-burst.sh"), tmp, "--dry-run"],
+                ["bash", str(self.SCRIPTS_DIR / "vidux-dispatch.sh"), tmp, "--dry-run"],
                 capture_output=True, text=True, timeout=10,
             )
-            self.assertEqual(result.returncode, 0, f"vidux-burst.sh failed: {result.stderr}")
+            self.assertEqual(result.returncode, 0, f"vidux-dispatch.sh failed: {result.stderr}")
             data = json.loads(result.stdout)
             self.assertEqual(data["mode"], "dry_run")
-            self.assertEqual(data["recommendation"], "fire_burst")
+            self.assertEqual(data["recommendation"], "fire_dispatch")
             self.assertIn("next_task", data)
         finally:
             os.unlink(tmp)
 
     def test_vidux_burst_assessment_exposes_protocol(self):
-        """vidux-burst.sh must expose burst-mode action and protocol fields."""
+        """vidux-dispatch.sh must expose dispatch-mode action and protocol fields."""
         import tempfile, os
         plan_text = textwrap.dedent("""\
             # Test Plan
@@ -425,15 +426,15 @@ class ViduxContractTests(unittest.TestCase):
             tmp = f.name
         try:
             result = subprocess.run(
-                ["bash", str(self.SCRIPTS_DIR / "vidux-burst.sh"), tmp],
+                ["bash", str(self.SCRIPTS_DIR / "vidux-dispatch.sh"), tmp],
                 capture_output=True, text=True, timeout=10,
             )
-            self.assertEqual(result.returncode, 0, f"vidux-burst.sh failed: {result.stderr}")
+            self.assertEqual(result.returncode, 0, f"vidux-dispatch.sh failed: {result.stderr}")
             data = json.loads(result.stdout)
-            self.assertEqual(data["mode"], "burst")
-            self.assertEqual(data["action"], "execute_burst")
-            self.assertIn("burst_protocol", data)
-            self.assertIn("stop_conditions", data["burst_protocol"])
+            self.assertEqual(data["mode"], "dispatch")
+            self.assertEqual(data["action"], "execute_dispatch")
+            self.assertIn("dispatch_protocol", data)
+            self.assertIn("stop_conditions", data["dispatch_protocol"])
         finally:
             os.unlink(tmp)
 
@@ -455,13 +456,19 @@ class ViduxContractTests(unittest.TestCase):
     COMMANDS_DIR = ROOT / "commands"
 
     def test_commands_exist(self):
-        """All 3 vidux commands must exist."""
-        for name in ["vidux.md", "vidux-plan.md", "vidux-status.md"]:
+        """All vidux commands must exist."""
+        for name in [
+            "vidux.md", "vidux-plan.md", "vidux-status.md",
+            "vidux-dashboard.md", "vidux-manager.md", "vidux-recipes.md",
+        ]:
             self.assertTrue((self.COMMANDS_DIR / name).exists(), f"Command missing: {name}")
 
     def test_commands_have_frontmatter(self):
         """Each command file must have YAML frontmatter with name and description."""
-        for name in ["vidux.md", "vidux-plan.md", "vidux-status.md"]:
+        for name in [
+            "vidux.md", "vidux-plan.md", "vidux-status.md",
+            "vidux-dashboard.md", "vidux-manager.md", "vidux-recipes.md",
+        ]:
             text = _read(self.COMMANDS_DIR / name)
             self.assertTrue(text.startswith("---"), f"{name} missing frontmatter")
             end = text.index("---", 3)
@@ -1914,6 +1921,271 @@ class ViduxContractTests(unittest.TestCase):
         text = _read(SKILL)
         self.assertIn("## Exit Criteria", text)
         self.assertIn("Optional", text.split("## Exit Criteria")[1].split("##")[0])
+
+    # ===================================================================== #
+    # Phase 10-12 contract tests
+    # ===================================================================== #
+
+    # -----------------------------------------------------------------------
+    # DOCTRINE.md: 12 principles
+    # -----------------------------------------------------------------------
+
+    def test_doctrine_has_twelve_principles(self):
+        """DOCTRINE.md must contain all 12 numbered principles."""
+        text = _read(DOCTRINE)
+        for n in range(1, 13):
+            self.assertTrue(
+                re.search(rf"^## {n}\.", text, re.MULTILINE),
+                f"DOCTRINE.md missing principle #{n}",
+            )
+
+    def test_doctrine_has_loop_discipline_section(self):
+        """DOCTRINE.md must contain the Loop Discipline section covering principles 10-12."""
+        text = _read(DOCTRINE)
+        self.assertIn("Loop Discipline", text)
+        self.assertIn("Principles 10-12", text)
+
+    def test_doctrine_has_dispatch_reduce_section(self):
+        """DOCTRINE.md must contain the Dispatch / Reduce section."""
+        text = _read(DOCTRINE)
+        self.assertIn("Dispatch / Reduce", text)
+        self.assertIn("DISPATCH", text)
+        self.assertIn("REDUCE", text)
+
+    # -----------------------------------------------------------------------
+    # Ledger library contracts (sourced, not executed)
+    # -----------------------------------------------------------------------
+
+    LEDGER_LIB_DIR = ROOT / "scripts" / "lib"
+
+    def test_ledger_lib_scripts_exist(self):
+        """All 3 ledger library scripts must exist."""
+        for name in ["ledger-config.sh", "ledger-emit.sh", "ledger-query.sh"]:
+            lib = self.LEDGER_LIB_DIR / name
+            self.assertTrue(lib.exists(), f"Ledger lib script missing: {name}")
+
+    def test_ledger_lib_scripts_are_sourceable(self):
+        """Ledger library scripts must be sourceable (not directly executable)."""
+        for name in ["ledger-config.sh", "ledger-emit.sh", "ledger-query.sh"]:
+            lib = self.LEDGER_LIB_DIR / name
+            text = _read(lib)
+            self.assertIn(
+                "Source this file; do not execute directly",
+                text,
+                f"{name} missing source-only guard comment",
+            )
+
+    def test_ledger_config_exports_expected_vars(self):
+        """ledger-config.sh must export LEDGER_FILE, LEDGER_DIR, LEDGER_AVAILABLE."""
+        text = _read(self.LEDGER_LIB_DIR / "ledger-config.sh")
+        for var in ["LEDGER_FILE", "LEDGER_DIR", "LEDGER_AVAILABLE"]:
+            self.assertIn(var, text, f"ledger-config.sh missing export: {var}")
+
+    def test_ledger_config_has_double_source_guard(self):
+        """ledger-config.sh must guard against double-sourcing."""
+        text = _read(self.LEDGER_LIB_DIR / "ledger-config.sh")
+        self.assertIn("_VIDUX_LEDGER_CONFIG_LOADED", text)
+
+    def test_ledger_emit_provides_expected_functions(self):
+        """ledger-emit.sh must define the expected emitter functions."""
+        text = _read(self.LEDGER_LIB_DIR / "ledger-emit.sh")
+        for func in [
+            "vidux_emit",
+            "vidux_emit_loop_start",
+            "vidux_emit_loop_end",
+            "vidux_emit_checkpoint",
+            "vidux_emit_plan_modified",
+            "vidux_emit_fleet_health",
+        ]:
+            self.assertIn(func, text, f"ledger-emit.sh missing function: {func}")
+
+    def test_ledger_emit_has_double_source_guard(self):
+        """ledger-emit.sh must guard against double-sourcing."""
+        text = _read(self.LEDGER_LIB_DIR / "ledger-emit.sh")
+        self.assertIn("_VIDUX_LEDGER_EMIT_LOADED", text)
+
+    def test_ledger_query_provides_expected_functions(self):
+        """ledger-query.sh must define the expected query functions."""
+        text = _read(self.LEDGER_LIB_DIR / "ledger-query.sh")
+        for func in [
+            "ledger_bimodal_distribution",
+            "ledger_automation_runs",
+            "ledger_handoff_gaps",
+            "ledger_fleet_health",
+            "ledger_recent_activity",
+            "ledger_conflict_check",
+        ]:
+            self.assertIn(func, text, f"ledger-query.sh missing function: {func}")
+
+    def test_ledger_query_has_double_source_guard(self):
+        """ledger-query.sh must guard against double-sourcing."""
+        text = _read(self.LEDGER_LIB_DIR / "ledger-query.sh")
+        self.assertIn("_VIDUX_LEDGER_QUERY_LOADED", text)
+
+    def test_ledger_config_sources_without_error(self):
+        """ledger-config.sh must source cleanly without producing errors."""
+        result = subprocess.run(
+            ["bash", "-lc", f"source {self.LEDGER_LIB_DIR / 'ledger-config.sh'}"],
+            capture_output=True, text=True, timeout=10,
+        )
+        self.assertEqual(result.returncode, 0, f"ledger-config.sh source failed: {result.stderr}")
+
+    def test_ledger_emit_sources_without_error(self):
+        """ledger-emit.sh must source cleanly (it chains to ledger-config.sh)."""
+        result = subprocess.run(
+            ["bash", "-lc", f"source {self.LEDGER_LIB_DIR / 'ledger-emit.sh'}"],
+            capture_output=True, text=True, timeout=10,
+        )
+        self.assertEqual(result.returncode, 0, f"ledger-emit.sh source failed: {result.stderr}")
+
+    def test_ledger_query_sources_without_error(self):
+        """ledger-query.sh must source cleanly (it chains to ledger-config.sh)."""
+        result = subprocess.run(
+            ["bash", "-lc", f"source {self.LEDGER_LIB_DIR / 'ledger-query.sh'}"],
+            capture_output=True, text=True, timeout=10,
+        )
+        self.assertEqual(result.returncode, 0, f"ledger-query.sh source failed: {result.stderr}")
+
+    # -----------------------------------------------------------------------
+    # vidux-prune.sh contracts
+    # -----------------------------------------------------------------------
+
+    def test_prune_script_exits_with_usage_on_no_args(self):
+        """vidux-prune.sh with no subcommand must print usage and exit 2."""
+        result = subprocess.run(
+            ["bash", str(self.SCRIPTS_DIR / "vidux-prune.sh")],
+            capture_output=True, text=True, timeout=10,
+        )
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("Usage:", result.stderr)
+
+    def test_prune_pressure_produces_json(self):
+        """vidux-prune.sh pressure --json must produce valid JSON with required fields."""
+        result = subprocess.run(
+            ["bash", str(self.SCRIPTS_DIR / "vidux-prune.sh"), "pressure", "--json"],
+            capture_output=True, text=True, timeout=15,
+        )
+        self.assertEqual(result.returncode, 0, f"vidux-prune.sh pressure failed: {result.stderr}")
+        data = json.loads(result.stdout)
+        for key in ("subcommand", "score", "level", "signals"):
+            self.assertIn(key, data, f"prune pressure output missing key: {key}")
+        self.assertEqual(data["subcommand"], "pressure")
+        self.assertIn(data["level"], ("normal", "warning", "critical"))
+
+    def test_prune_pressure_simulate_is_safe(self):
+        """vidux-prune.sh pressure --simulate --json must not modify anything."""
+        result = subprocess.run(
+            ["bash", str(self.SCRIPTS_DIR / "vidux-prune.sh"), "pressure", "--simulate", "--json"],
+            capture_output=True, text=True, timeout=15,
+        )
+        self.assertEqual(result.returncode, 0)
+        data = json.loads(result.stdout)
+        self.assertEqual(data["subcommand"], "pressure")
+
+    def test_prune_has_five_subcommands(self):
+        """vidux-prune.sh must support plans, worktrees, ledger, all, pressure subcommands."""
+        text = _read(self.SCRIPTS_DIR / "vidux-prune.sh")
+        for sub in ["plans", "worktrees", "ledger", "all", "pressure"]:
+            self.assertIn(sub, text, f"vidux-prune.sh missing subcommand: {sub}")
+
+    # -----------------------------------------------------------------------
+    # vidux-fleet-quality.sh contracts
+    # -----------------------------------------------------------------------
+
+    def test_fleet_quality_produces_json_with_no_automations_dir(self):
+        """vidux-fleet-quality.sh --json with no automations dir must produce valid JSON."""
+        result = subprocess.run(
+            ["bash", str(self.SCRIPTS_DIR / "vidux-fleet-quality.sh"), "--json",
+             "--dir", "/tmp/nonexistent-vidux-automations"],
+            capture_output=True, text=True, timeout=10,
+        )
+        self.assertEqual(result.returncode, 0)
+        data = json.loads(result.stdout)
+        self.assertIn("error", data)
+        self.assertIn("automations", data)
+
+    def test_fleet_quality_classifies_bimodal_buckets(self):
+        """vidux-fleet-quality.sh source must define the bimodal classification buckets."""
+        text = _read(self.SCRIPTS_DIR / "vidux-fleet-quality.sh")
+        for bucket in ["quick", "deep", "mid", "normal"]:
+            self.assertIn(bucket, text, f"vidux-fleet-quality.sh missing bucket: {bucket}")
+
+    # -----------------------------------------------------------------------
+    # Phase 10-12 commands: frontmatter + required sections
+    # -----------------------------------------------------------------------
+
+    def test_dashboard_command_has_steps_section(self):
+        """vidux-dashboard.md must have a Steps section."""
+        text = _read(self.COMMANDS_DIR / "vidux-dashboard.md")
+        self.assertIn("## Steps", text)
+
+    def test_dashboard_command_has_flags_section(self):
+        """vidux-dashboard.md must have a Flags section."""
+        text = _read(self.COMMANDS_DIR / "vidux-dashboard.md")
+        self.assertIn("## Flags", text)
+
+    def test_manager_command_has_subcommands_section(self):
+        """vidux-manager.md must have a Subcommands section."""
+        text = _read(self.COMMANDS_DIR / "vidux-manager.md")
+        self.assertIn("## Subcommands", text)
+
+    def test_manager_command_has_stage_system(self):
+        """vidux-manager.md must define the stage system."""
+        text = _read(self.COMMANDS_DIR / "vidux-manager.md")
+        self.assertIn("## Stage System", text)
+        for stage in ["GATHER", "PLAN", "EXECUTE", "VERIFY", "CHECKPOINT", "COMPLETE"]:
+            self.assertIn(stage, text, f"vidux-manager.md missing stage: {stage}")
+
+    def test_recipes_command_has_subcommands_section(self):
+        """vidux-recipes.md must have a Subcommands section."""
+        text = _read(self.COMMANDS_DIR / "vidux-recipes.md")
+        self.assertIn("## Subcommands", text)
+
+    def test_recipes_command_has_stage_system(self):
+        """vidux-recipes.md must define the stage system."""
+        text = _read(self.COMMANDS_DIR / "vidux-recipes.md")
+        self.assertIn("## Stage System", text)
+
+    def test_recipes_command_mentions_automation_doctrine(self):
+        """vidux-recipes.md must reference automation doctrine concepts."""
+        text = _read(self.COMMANDS_DIR / "vidux-recipes.md")
+        self.assertTrue(
+            "no mid-zone" in text.lower() or "no mid zone" in text.lower()
+            or "mid-zone" in text.lower(),
+            "vidux-recipes.md missing mid-zone doctrine reference",
+        )
+
+    # -----------------------------------------------------------------------
+    # Cross-doc: SKILL.md must reference Phase 10-12 concepts
+    # -----------------------------------------------------------------------
+
+    def test_skill_has_dispatch_reduce_terminology(self):
+        """SKILL.md must use dispatch/reduce terminology (not burst/watch)."""
+        text = _read(SKILL)
+        self.assertTrue(
+            "dispatch" in text.lower() or "DISPATCH" in text,
+            "SKILL.md missing dispatch terminology",
+        )
+        self.assertTrue(
+            "reduce" in text.lower() or "REDUCE" in text,
+            "SKILL.md missing reduce terminology",
+        )
+
+    def test_skill_has_bimodal_concept(self):
+        """SKILL.md must reference the bimodal distribution concept from Doctrine 10."""
+        text = _read(SKILL)
+        self.assertTrue(
+            "bimodal" in text.lower() or "Bimodal" in text,
+            "SKILL.md missing bimodal distribution concept",
+        )
+
+    def test_skill_has_bounded_recursion_concept(self):
+        """SKILL.md must reference bounded recursion from Doctrine 12."""
+        text = _read(SKILL)
+        self.assertTrue(
+            "bounded recursion" in text.lower() or "Bounded recursion" in text,
+            "SKILL.md missing bounded recursion concept",
+        )
 
 
 if __name__ == "__main__":
