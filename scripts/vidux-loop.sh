@@ -402,6 +402,23 @@ if type ledger_conflict_check &>/dev/null 2>&1; then
   fi
 fi
 
+# --- bimodal enforcement --------------------------------------------------- #
+# If fleet bimodal score is below critical threshold, refuse to fire dispatch.
+# Threshold from vidux.config.json backpressure.bimodal_critical_threshold (default 70).
+BIMODAL_SCORE=-1; BIMODAL_GATE="pass"
+BIMODAL_CRITICAL=70
+if [ -f "$CONFIG" ]; then
+  BIMODAL_CRITICAL=$(python3 -c "import json;print(json.load(open('$CONFIG')).get('backpressure',{}).get('bimodal_critical_threshold',70))" 2>/dev/null || echo 70)
+fi
+if type ledger_bimodal_distribution &>/dev/null 2>&1; then
+  _REPO_NAME="${_REPO_NAME:-$(basename "$(git -C "$PLAN_DIR" rev-parse --show-toplevel 2>/dev/null || echo "$PLAN_DIR")")}"
+  _BIMODAL_JSON=$(ledger_bimodal_distribution "$_REPO_NAME" 24 2>/dev/null || echo '{}')
+  BIMODAL_SCORE=$(printf '%s' "$_BIMODAL_JSON" | jq '.bimodal_score // -1' 2>/dev/null || echo -1)
+  if [ "$BIMODAL_SCORE" != "-1" ] && [ "$BIMODAL_SCORE" -lt "$BIMODAL_CRITICAL" ] 2>/dev/null; then
+    BIMODAL_GATE="blocked"
+  fi
+fi
+
 # --- output ---------------------------------------------------------------- #
 # Field semantics: blocked vs auto_blocked
 #   blocked     = dependency-gated: task's [Depends: X] references an unresolved task
@@ -410,7 +427,13 @@ fi
 #   Both are booleans. A task can be auto_blocked=true with blocked=false (stuck, not dep-gated).
 NEXT_ACTION="none"
 case "$ACTION" in
-  execute|gather_evidence|refine) NEXT_ACTION="dispatch" ;;
+  execute|gather_evidence|refine)
+    if [ "$BIMODAL_GATE" = "blocked" ]; then
+      NEXT_ACTION="none"
+    else
+      NEXT_ACTION="dispatch"
+    fi
+    ;;
 esac
 cat <<ENDJSON
 {
@@ -444,6 +467,8 @@ cat <<ENDJSON
   "ledger_conflicts": ${LEDGER_CONFLICT_COUNT:-0},
   "auto_pause_recommended": $AUTO_PAUSE_RECOMMENDED,
   "unproductive_streak": $UNPRODUCTIVE_STREAK,
+  "bimodal_score": $BIMODAL_SCORE,
+  "bimodal_gate": "$BIMODAL_GATE",
   "reduce_contract": {
     "read_only": true,
     "max_budget_seconds": 120,
