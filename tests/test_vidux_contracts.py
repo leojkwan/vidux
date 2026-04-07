@@ -311,7 +311,7 @@ class ViduxContractTests(unittest.TestCase):
         """All 4 vidux scripts must exist and be executable."""
         expected = [
             "vidux-loop.sh", "vidux-checkpoint.sh",
-            "vidux-gather.sh", "install-hooks.sh",
+            "vidux-gather.sh", "install-hooks.sh", "vidux-burst.sh",
         ]
         for name in expected:
             script = self.SCRIPTS_DIR / name
@@ -337,6 +337,92 @@ class ViduxContractTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0)
         data = json.loads(result.stdout)
         self.assertTrue(data.get("action") == "create_plan" or "error" in data)
+
+    def test_vidux_loop_exposes_watch_mode_contract(self):
+        """vidux-loop.sh must expose explicit watch-mode routing metadata."""
+        result = subprocess.run(
+            ["bash", str(self.SCRIPTS_DIR / "vidux-loop.sh"), str(PLAN)],
+            capture_output=True, text=True, timeout=10,
+        )
+        self.assertEqual(result.returncode, 0, f"vidux-loop.sh failed: {result.stderr}")
+        data = json.loads(result.stdout)
+        self.assertEqual(data.get("mode"), "watch")
+        self.assertIn(data.get("next_action"), {"burst", "none"})
+
+    def test_vidux_loop_routes_pending_work_to_burst(self):
+        """Watch mode must recommend burst when a runnable task exists."""
+        data = self._run_loop_on("""\
+            # Test Plan
+            ## Tasks
+            - [pending] Task 1: Build feature [Evidence: src]
+            ## Progress
+        """)
+        self.assertEqual(data["mode"], "watch")
+        self.assertEqual(data["action"], "execute")
+        self.assertEqual(data["next_action"], "burst")
+
+    def test_vidux_loop_routes_done_plan_to_none(self):
+        """Watch mode must return next_action=none when the queue is empty."""
+        data = self._run_loop_on("""\
+            # Test Plan
+            ## Tasks
+            - [completed] Task 1: Build feature [Done: 2026-04-07]
+            ## Progress
+        """)
+        self.assertEqual(data["mode"], "watch")
+        self.assertEqual(data["action"], "complete")
+        self.assertEqual(data["next_action"], "none")
+
+    def test_vidux_burst_dry_run_exposes_contract(self):
+        """vidux-burst.sh --dry-run must emit the burst contract surface."""
+        import tempfile, os
+        plan_text = textwrap.dedent("""\
+            # Test Plan
+            ## Tasks
+            - [pending] Task 1: Build feature [Evidence: src]
+            ## Progress
+        """)
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
+            f.write(plan_text)
+            tmp = f.name
+        try:
+            result = subprocess.run(
+                ["bash", str(self.SCRIPTS_DIR / "vidux-burst.sh"), tmp, "--dry-run"],
+                capture_output=True, text=True, timeout=10,
+            )
+            self.assertEqual(result.returncode, 0, f"vidux-burst.sh failed: {result.stderr}")
+            data = json.loads(result.stdout)
+            self.assertEqual(data["mode"], "dry_run")
+            self.assertEqual(data["recommendation"], "fire_burst")
+            self.assertIn("next_task", data)
+        finally:
+            os.unlink(tmp)
+
+    def test_vidux_burst_assessment_exposes_protocol(self):
+        """vidux-burst.sh must expose burst-mode action and protocol fields."""
+        import tempfile, os
+        plan_text = textwrap.dedent("""\
+            # Test Plan
+            ## Tasks
+            - [pending] Task 1: Build feature [Evidence: src]
+            ## Progress
+        """)
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
+            f.write(plan_text)
+            tmp = f.name
+        try:
+            result = subprocess.run(
+                ["bash", str(self.SCRIPTS_DIR / "vidux-burst.sh"), tmp],
+                capture_output=True, text=True, timeout=10,
+            )
+            self.assertEqual(result.returncode, 0, f"vidux-burst.sh failed: {result.stderr}")
+            data = json.loads(result.stdout)
+            self.assertEqual(data["mode"], "burst")
+            self.assertEqual(data["action"], "execute_burst")
+            self.assertIn("burst_protocol", data)
+            self.assertIn("stop_conditions", data["burst_protocol"])
+        finally:
+            os.unlink(tmp)
 
     def test_vidux_gather_produces_output(self):
         """vidux-gather.sh must produce non-empty output with tier structure."""
