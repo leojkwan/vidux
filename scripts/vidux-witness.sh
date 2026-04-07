@@ -14,6 +14,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "$SCRIPT_DIR/lib/compat.sh"
 
 # --- helpers ---------------------------------------------------------------- #
 json_escape() {
@@ -191,8 +192,7 @@ _classify_memory() {
   if [[ -n "$ts" ]]; then
     local now_epoch entry_epoch
     now_epoch="$(date +%s 2>/dev/null)"
-    entry_epoch="$(date -j -f "%Y-%m-%dT%H:%M:%SZ" "$ts" +%s 2>/dev/null || \
-                   date -d "$ts" +%s 2>/dev/null || echo "0")"
+    entry_epoch="$(parse_iso_epoch "$ts")"
     if [[ "$entry_epoch" -gt 0 && "$now_epoch" -gt 0 ]]; then
       local diff_hours=$(( (now_epoch - entry_epoch) / 3600 ))
       [[ "$diff_hours" -ge "$idle_hours" ]] && { echo "IDLE"; return; }

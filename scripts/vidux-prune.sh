@@ -15,8 +15,11 @@
 #   --json      Output as JSON
 set -euo pipefail
 
-# --- defaults --------------------------------------------------------------- #
+# --- portability layer ------------------------------------------------------ #
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "$SCRIPT_DIR/lib/compat.sh"
+
+# --- defaults --------------------------------------------------------------- #
 VIDUX_ROOT="$SCRIPT_DIR/.."
 CONFIG="$VIDUX_ROOT/vidux.config.json"
 PROJECTS_DIR="$VIDUX_ROOT/projects"
@@ -85,7 +88,7 @@ prune_plans() {
       local dl_dates; dl_dates="$(awk '/^## Decision Log/{f=1;next} f&&/^## /{f=0} f{print}' "$plan" \
         | grep -oE '\[20[0-9]{2}-[0-9]{2}-[0-9]{2}\]' | tr -d '[]' | sort | head -1 || true)"
       if [[ -n "$dl_dates" ]]; then
-        local oldest_epoch; oldest_epoch="$(date -j -f "%Y-%m-%d" "$dl_dates" "+%s" 2>/dev/null || date -d "$dl_dates" "+%s" 2>/dev/null || echo 0)"
+        local oldest_epoch; oldest_epoch="$(parse_date_epoch "%Y-%m-%d" "$dl_dates")"
         local now_epoch; now_epoch="$(_now_epoch)"
         local age_days=$(( (now_epoch - oldest_epoch) / 86400 ))
         if [[ "$age_days" -gt "$DECISION_LOG_MAX_DAYS" ]]; then
@@ -191,10 +194,8 @@ _classify_worktree() {
   # Determine age from most recent file modification in worktree
   local latest_mod=0
   if [[ -d "$path" ]]; then
-    latest_mod="$(find "$path" -maxdepth 2 -type f -newer "$path/.git" -print0 2>/dev/null \
-      | xargs -0 stat -f '%m' 2>/dev/null | sort -rn | head -1 || \
-      stat -f '%m' "$path" 2>/dev/null || echo 0)"
-    [[ -z "$latest_mod" ]] && latest_mod="$(stat -f '%m' "$path" 2>/dev/null || echo 0)"
+    latest_mod="$(dir_newest_mtime "$path")"
+    [[ -z "$latest_mod" || "$latest_mod" == "0" ]] && latest_mod="$(file_mtime_epoch "$path")"
   fi
 
   if [[ "$latest_mod" -gt 0 ]]; then
@@ -248,8 +249,7 @@ prune_ledger() {
   # Find oldest entry timestamp
   local oldest_ts; oldest_ts="$(head -1 "$LEDGER_PATH" | python3 -c "import sys,json;print(json.load(sys.stdin).get('ts',''))" 2>/dev/null || true)"
   if [[ -n "$oldest_ts" ]]; then
-    local oldest_epoch; oldest_epoch="$(date -j -f "%Y-%m-%dT%H:%M:%S" "${oldest_ts%%.*}" "+%s" 2>/dev/null || \
-      date -d "${oldest_ts}" "+%s" 2>/dev/null || echo 0)"
+    local oldest_epoch; oldest_epoch="$(parse_iso_epoch "$oldest_ts")"
     if [[ "$oldest_epoch" -gt 0 ]]; then
       local now_epoch; now_epoch="$(_now_epoch)"
       oldest_age_days=$(( (now_epoch - oldest_epoch) / 86400 ))
