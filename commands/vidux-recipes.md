@@ -119,7 +119,7 @@ Failure mode:   Project goes cold and forgotten. Calendar a manual review weekly
 
 ```
 Dispatch Mode  (single long persistent session, no cron)
-─────────────
+──────────
 When to use:    Active development sprint — Leo is heads-down for hours, doesn't want
                 cron interruptions. Vidux runs as a single long-lived agent in one
                 session, picking tasks continuously until human stops it.

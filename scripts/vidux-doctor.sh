@@ -197,7 +197,7 @@ print(json.dumps({
 PY
 }
 
-_watch_harness_prompt_scan() {
+_reduce_harness_prompt_scan() {
   local toml="$1"
   python3 - "$toml" <<'PY'
 import json
@@ -217,10 +217,10 @@ automation_id = data.get("id") or ""
 status = data.get("status") or ""
 kind = data.get("kind") or ""
 
-watch_markers = [
+reduce_markers = [
     "reduce mode",
     "next_action",
-    "fire burst",
+    "fire dispatch",
     "stay under 2 minutes",
     "keep this run brief",
     "scheduled run should stay brief",
@@ -235,19 +235,19 @@ deep_markers = [
     "do not skip straight from evidence to implementation",
 ]
 
-matched_watch = [marker for marker in watch_markers if marker in prompt]
+matched_reduce = [marker for marker in reduce_markers if marker in prompt]
 matched_deep = [marker for marker in deep_markers if marker in prompt]
 issues = []
-if matched_deep and not matched_watch:
-    issues.append("missing_watch_contract")
-if matched_deep and matched_watch:
-    issues.append("mixed_watch_and_burst_scope")
+if matched_deep and not matched_reduce:
+    issues.append("missing_reduce_contract")
+if matched_deep and matched_reduce:
+    issues.append("mixed_reduce_and_dispatch_scope")
 
 payload = {
     "automation_id": automation_id,
     "status": status,
     "kind": kind,
-    "matched_watch_markers": matched_watch,
+    "matched_reduce_markers": matched_reduce,
     "matched_deep_markers": matched_deep,
     "issues": issues,
 }
@@ -681,24 +681,24 @@ _check_orphan_automations() {
 }
 
 # ============================================================================ #
-# CHECK 4b: Watch Harness Scope Drift
+# CHECK 4b: Reduce Harness Scope Drift
 # ============================================================================ #
-_check_watch_harness_scope() {
+_check_reduce_harness_scope() {
   TOTAL=$((TOTAL + 1))
   local count=0 details_json="["
   local first=true
 
   if [[ ! -d "$AUTOMATIONS_DIR" ]]; then
-    _ok "No automations directory available for watch-harness audit"
+    _ok "No automations directory available for reduce-harness audit"
     PASS_COUNT=$((PASS_COUNT + 1))
-    _add_check "{\"id\":\"watch_harness_scope\",\"category\":\"automations\",\"status\":\"pass\",\"count\":0}"
+    _add_check "{\"id\":\"reduce_harness_scope\",\"category\":\"automations\",\"status\":\"pass\",\"count\":0}"
     return
   fi
 
   for toml in "$AUTOMATIONS_DIR"/*/automation.toml; do
     [[ -f "$toml" ]] || continue
     local scan_json status kind issue_count
-    scan_json="$(_watch_harness_prompt_scan "$toml" 2>/dev/null || echo '{}')"
+    scan_json="$(_reduce_harness_prompt_scan "$toml" 2>/dev/null || echo '{}')"
     status="$(python3 -c 'import json,sys; print(json.load(sys.stdin).get("status",""))' <<< "$scan_json" 2>/dev/null || true)"
     kind="$(python3 -c 'import json,sys; print(json.load(sys.stdin).get("kind",""))' <<< "$scan_json" 2>/dev/null || true)"
     [[ "$status" != "ACTIVE" ]] && continue
@@ -728,12 +728,12 @@ for item in details:
 print("; ".join(bits))
 PY
 )"
-    _warn "Watch harness scope drift: $summary"
-    _add_check "{\"id\":\"watch_harness_scope\",\"category\":\"automations\",\"status\":\"warn\",\"count\":$count,\"details\":$details_json}"
+    _warn "Reduce harness scope drift: $summary"
+    _add_check "{\"id\":\"reduce_harness_scope\",\"category\":\"automations\",\"status\":\"warn\",\"count\":$count,\"details\":$details_json}"
   else
-    _ok "No watch harness prompts mixing scheduled checks with burst work"
+    _ok "No reduce harness prompts mixing scheduled checks with dispatch work"
     PASS_COUNT=$((PASS_COUNT + 1))
-    _add_check "{\"id\":\"watch_harness_scope\",\"category\":\"automations\",\"status\":\"pass\",\"count\":0}"
+    _add_check "{\"id\":\"reduce_harness_scope\",\"category\":\"automations\",\"status\":\"pass\",\"count\":0}"
   fi
 }
 
@@ -1122,7 +1122,7 @@ fi
 
 _check_dual_active_automations
 _check_orphan_automations
-_check_watch_harness_scope
+_check_reduce_harness_scope
 _check_stalled_active_automation_rows
 _check_browser_process_pressure
 
