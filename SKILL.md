@@ -265,7 +265,7 @@ Agents have a learned closure bias: they hit the first natural milestone (a comm
 sub-task, a build pass) and invent reasons to quit — "context is getting tight," "this is
 a good stopping point." Claude Code issue #34238 documents the pattern; the bimodal
 distribution model in `scripts/lib/ledger-query.sh` measures it. Gastown's dispatch/reduce
-research found the same shape: short watches that find nothing or long bursts that finish
+research found the same shape: short reduce cycles that find nothing or long dispatch runs that finish
 real work, with very little in between.
 
 **How to apply:** Every harness must say "if you checkpoint in under 5 minutes and
@@ -772,7 +772,7 @@ Vidux does NOT activate for:
 ## Prompt Amplification (built-in)
 
 When `/vidux` is invoked interactively with arguments, amplify the request before executing.
-This is the default entry behavior — no separate `/vidux-amp` needed.
+This is built-in to `/vidux` — prompt amplification is a native part of the entry flow.
 
 **Skip amplification when:**
 - A cron automation is running (stateless cycle, reads PLAN.md directly)
