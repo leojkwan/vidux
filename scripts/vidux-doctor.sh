@@ -42,14 +42,29 @@ AUTOMATIONS_DIR="$VIDUX_ROOT/automations"
 
 # Read config overrides
 if [ -f "$CONFIG" ]; then
-  MAX_WT=$(python3 -c "import json;c=json.load(open('$CONFIG'));print(c.get('defaults',{}).get('max_worktrees',5))" 2>/dev/null || echo 5)
-  STALE_DAYS_CFG=$(python3 -c "import json;c=json.load(open('$CONFIG'));print(c.get('defaults',{}).get('stale_in_progress_days',3))" 2>/dev/null || echo 3)
-  MAX_BROWSER_PROCS=$(python3 -c "import json;c=json.load(open('$CONFIG'));print(c.get('defaults',{}).get('max_browser_processes',7))" 2>/dev/null || echo 7)
-  MAX_BROWSER_SESSION_MINUTES=$(python3 -c "import json;c=json.load(open('$CONFIG'));print(c.get('defaults',{}).get('max_browser_session_minutes',15))" 2>/dev/null || echo 15)
-  MAX_CODEX_ACTIVE_THREADS=$(python3 -c "import json;c=json.load(open('$CONFIG'));print(c.get('defaults',{}).get('max_codex_active_threads',400))" 2>/dev/null || echo 400)
-  MAX_CODEX_ACTIVE_AUTOMATION_THREADS=$(python3 -c "import json;c=json.load(open('$CONFIG'));print(c.get('defaults',{}).get('max_codex_active_automation_threads',250))" 2>/dev/null || echo 250)
-  MAX_CODEX_AVG_TITLE_CHARS=$(python3 -c "import json;c=json.load(open('$CONFIG'));print(c.get('defaults',{}).get('max_codex_avg_title_chars',2000))" 2>/dev/null || echo 2000)
-  MIN_SYSTEM_MEMORY_FREE_PCT=$(python3 -c "import json;c=json.load(open('$CONFIG'));print(c.get('defaults',{}).get('min_system_memory_free_pct',15))" 2>/dev/null || echo 15)
+  # Single python3 call for all config values (was 8 separate calls — ~400-800ms savings)
+  _cfg_vals=$(python3 -c "
+import json,sys
+c=json.load(open(sys.argv[1])).get('defaults',{})
+print(c.get('max_worktrees',5))
+print(c.get('stale_in_progress_days',3))
+print(c.get('max_browser_processes',7))
+print(c.get('max_browser_session_minutes',15))
+print(c.get('max_codex_active_threads',400))
+print(c.get('max_codex_active_automation_threads',250))
+print(c.get('max_codex_avg_title_chars',2000))
+print(c.get('min_system_memory_free_pct',15))
+" "$CONFIG" 2>/dev/null) || true
+  if [ -n "$_cfg_vals" ]; then
+    MAX_WT=$(echo "$_cfg_vals" | sed -n '1p')
+    STALE_DAYS_CFG=$(echo "$_cfg_vals" | sed -n '2p')
+    MAX_BROWSER_PROCS=$(echo "$_cfg_vals" | sed -n '3p')
+    MAX_BROWSER_SESSION_MINUTES=$(echo "$_cfg_vals" | sed -n '4p')
+    MAX_CODEX_ACTIVE_THREADS=$(echo "$_cfg_vals" | sed -n '5p')
+    MAX_CODEX_ACTIVE_AUTOMATION_THREADS=$(echo "$_cfg_vals" | sed -n '6p')
+    MAX_CODEX_AVG_TITLE_CHARS=$(echo "$_cfg_vals" | sed -n '7p')
+    MIN_SYSTEM_MEMORY_FREE_PCT=$(echo "$_cfg_vals" | sed -n '8p')
+  fi
   # CLI arg overrides config
   [[ "$STALE_DAYS" -eq 3 ]] && STALE_DAYS="$STALE_DAYS_CFG"
 fi

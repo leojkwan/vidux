@@ -95,7 +95,7 @@ if [[ "${2:-}" == "--archive" ]]; then
   CONFIG="$SCRIPT_DIR/../vidux.config.json"
   KEEP=30  # fallback default
   if [ -f "$CONFIG" ]; then
-    KEEP=$(python3 -c "import json;print(json.load(open('$CONFIG')).get('defaults',{}).get('archive_threshold',30))" 2>/dev/null || echo 30)
+    KEEP=$(python3 -c "import json,sys;print(json.load(open(sys.argv[1])).get('defaults',{}).get('archive_threshold',30))" "$CONFIG" 2>/dev/null || echo 30)
   fi
 
   # Collect all completed task lines: v1 [x] and v2 [completed] (preserving file order = oldest first)

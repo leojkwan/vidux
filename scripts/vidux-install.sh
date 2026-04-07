@@ -270,7 +270,7 @@ cmd_install() {
   # 4. Verify config
   echo -e "${BOLD}== 4. Config ==${RESET}"
   if [[ -f "$CONFIG_FILE" ]]; then
-    if python3 -c "import json; json.load(open('$CONFIG_FILE'))" 2>/dev/null; then
+    if python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$CONFIG_FILE" 2>/dev/null; then
       ok "vidux.config.json valid"
     else
       fail "vidux.config.json is not valid JSON"
@@ -551,7 +551,7 @@ cmd_doctor() {
   echo -e "${BOLD}== Config ==${RESET}"
   ((total++)) || true
   if [[ -f "$CONFIG_FILE" ]]; then
-    if python3 -c "import json; json.load(open('$CONFIG_FILE'))" 2>/dev/null; then
+    if python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$CONFIG_FILE" 2>/dev/null; then
       ok "vidux.config.json valid JSON"
       ((pass++)) || true
     else

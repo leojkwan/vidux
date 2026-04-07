@@ -35,7 +35,8 @@ PROJECT_NAME="$(basename "$PLAN_DIR")"
 
 # JSON helpers
 json_escape() {
-  local s="$1"; s="${s//\\/\\\\}"; s="${s//\"/\\\"}"; s="${s//$'\t'/\\t}"; s="${s//$'\n'/\\n}"
+  local s="$1"
+  s="${s//\\/\\\\}"; s="${s//\"/\\\"}"; s="${s//$'\t'/\\t}"; s="${s//$'\n'/\\n}"; s="${s//$'\r'/\\r}"
   printf '%s' "$s"
 }
 

@@ -16,9 +16,9 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 CONFIG="$SCRIPT_DIR/../vidux.config.json"
 ARCHIVE_THRESHOLD=30; CONTEXT_WARNING_LINES=200
 if [ -f "$CONFIG" ]; then
-  ARCHIVE_THRESHOLD=$(python3 -c "import json;print(json.load(open('$CONFIG')).get('defaults',{}).get('archive_threshold',30))" 2>/dev/null) || true
+  ARCHIVE_THRESHOLD=$(python3 -c "import json,sys;print(json.load(open(sys.argv[1])).get('defaults',{}).get('archive_threshold',30))" "$CONFIG" 2>/dev/null) || true
   if [ -z "$ARCHIVE_THRESHOLD" ]; then echo "WARNING: Could not parse vidux.config.json. Using defaults." >&2; ARCHIVE_THRESHOLD=30; fi
-  CONTEXT_WARNING_LINES=$(python3 -c "import json;print(json.load(open('$CONFIG')).get('defaults',{}).get('context_warning_lines',200))" 2>/dev/null || echo 200)
+  CONTEXT_WARNING_LINES=$(python3 -c "import json,sys;print(json.load(open(sys.argv[1])).get('defaults',{}).get('context_warning_lines',200))" "$CONFIG" 2>/dev/null || echo 200)
 fi
 
 # --- ledger integration (optional) ----------------------------------------- #
@@ -31,7 +31,14 @@ fi
 die()  { echo "{\"error\": \"$1\"}" >&2; exit 1; }
 json() { printf '%s\n' "$1"; }
 json_escape() {
-  local s="$1"; s="${s//\\/\\\\}"; s="${s//\"/\\\"}"; s="${s//$'\t'/\\t}"; s="${s//$'\n'/\\n}"
+  # Bash-native JSON escape — handles all common chars including backticks and $.
+  # No subprocess spawn (python3 per-call adds ~80ms x N calls = seconds of overhead).
+  local s="$1"
+  s="${s//\\/\\\\}"    # backslash (must be first)
+  s="${s//\"/\\\"}"    # double quote
+  s="${s//$'\t'/\\t}"  # tab
+  s="${s//$'\n'/\\n}"  # newline
+  s="${s//$'\r'/\\r}"  # carriage return
   printf '%s' "$s"
 }
 # Platform-aware sed -i
@@ -408,7 +415,7 @@ fi
 BIMODAL_SCORE=-1; BIMODAL_GATE="pass"
 BIMODAL_CRITICAL=70
 if [ -f "$CONFIG" ]; then
-  BIMODAL_CRITICAL=$(python3 -c "import json;print(json.load(open('$CONFIG')).get('backpressure',{}).get('bimodal_critical_threshold',70))" 2>/dev/null || echo 70)
+  BIMODAL_CRITICAL=$(python3 -c "import json,sys;print(json.load(open(sys.argv[1])).get('backpressure',{}).get('bimodal_critical_threshold',70))" "$CONFIG" 2>/dev/null || echo 70)
 fi
 if type ledger_bimodal_distribution &>/dev/null 2>&1; then
   _REPO_NAME="${_REPO_NAME:-$(basename "$(git -C "$PLAN_DIR" rev-parse --show-toplevel 2>/dev/null || echo "$PLAN_DIR")")}"

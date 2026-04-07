@@ -28,7 +28,7 @@ LEDGER_MAX_ENTRIES=1000; LEDGER_MAX_AGE_DAYS=7
 
 # Read config overrides
 if [ -f "$CONFIG" ]; then
-  ARCHIVE_THRESHOLD=$(python3 -c "import json;print(json.load(open('$CONFIG')).get('defaults',{}).get('archive_threshold',50))" 2>/dev/null || echo 50)
+  ARCHIVE_THRESHOLD=$(python3 -c "import json,sys;print(json.load(open(sys.argv[1])).get('defaults',{}).get('archive_threshold',50))" "$CONFIG" 2>/dev/null || echo 50)
 fi
 
 # --- parse args ------------------------------------------------------------- #
@@ -46,7 +46,8 @@ done
 
 # --- helpers ---------------------------------------------------------------- #
 json_escape() {
-  local s="$1"; s="${s//\\/\\\\}"; s="${s//\"/\\\"}"; s="${s//$'\t'/\\t}"; s="${s//$'\n'/\\n}"
+  local s="$1"
+  s="${s//\\/\\\\}"; s="${s//\"/\\\"}"; s="${s//$'\t'/\\t}"; s="${s//$'\n'/\\n}"; s="${s//$'\r'/\\r}"
   printf '%s' "$s"
 }
 sedi() { if [[ "$(uname)" == "Darwin" ]]; then sed -i '' "$@"; else sed -i "$@"; fi; }
