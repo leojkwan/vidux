@@ -2345,12 +2345,12 @@ class ViduxContractTests(unittest.TestCase):
         for section in ["Reporter Says", "Root Cause", "Impact Map", "Fix Spec", "Gate"]:
             self.assertIn(section, text, f"Investigation template missing: {section}")
 
-    def test_doctrine_principle5_mentions_compaction(self):
-        """DOCTRINE.md Principle 5 must mention compaction survival."""
-        text = _read(ROOT / "DOCTRINE.md")
+    def test_skill_principle5_mentions_compaction(self):
+        """SKILL.md Principle 5 must mention compaction survival."""
+        text = _read(ROOT / "SKILL.md")
         self.assertTrue(
             "compaction" in text.lower(),
-            "DOCTRINE.md missing compaction guidance in Principle 5",
+            "SKILL.md missing compaction guidance in Principle 5",
         )
 
     def test_doctrine_principle7_mentions_investigation(self):
