@@ -133,6 +133,99 @@ if type vidux_emit_loop_start &>/dev/null 2>&1; then
   vidux_emit_loop_start "$PROJECT_NAME" "$PLAN" "dispatch" 2>/dev/null || true
 fi
 
+# --- Merge-gate mode ------------------------------------------------------- #
+# After dispatch completes in a worktree, merge work to the default branch.
+# Tier 1 (fast-forward): auto-merge + push.
+# Tier 2 (conflicts): create PR for human review.
+if [[ "$MODE" == "--merge-gate" ]]; then
+  # Detect worktree vs main repo
+  GIT_TOPLEVEL="$(git -C "$PLAN_DIR" rev-parse --show-toplevel 2>/dev/null || echo "")"
+  GIT_COMMONDIR="$(git -C "$PLAN_DIR" rev-parse --git-common-dir 2>/dev/null || echo "")"
+  IS_WORKTREE="false"
+  WORKTREE_BRANCH=""
+  if [[ -n "$GIT_TOPLEVEL" && -n "$GIT_COMMONDIR" ]]; then
+    REAL_COMMONDIR="$(cd "$PLAN_DIR" && cd "$GIT_COMMONDIR" && pwd 2>/dev/null || echo "")"
+    RAW_GITDIR="$(git -C "$PLAN_DIR" rev-parse --git-dir 2>/dev/null || echo "")"
+    # Resolve to absolute path for comparison
+    if [[ -d "$RAW_GITDIR" ]]; then
+      REAL_GITDIR="$(cd "$RAW_GITDIR" && pwd 2>/dev/null || echo "")"
+    else
+      REAL_GITDIR="$RAW_GITDIR"
+    fi
+    if [[ "$REAL_GITDIR" != "$REAL_COMMONDIR" ]]; then
+      IS_WORKTREE="true"
+      WORKTREE_BRANCH="$(git -C "$PLAN_DIR" branch --show-current 2>/dev/null || echo "detached")"
+    fi
+  fi
+
+  if [[ "$IS_WORKTREE" == "false" ]]; then
+    cat <<MGEOF
+{"merge_gate": "skip", "reason": "not_in_worktree", "plan": "$PLAN"}
+MGEOF
+    exit 0
+  fi
+
+  # Find the default branch from the main repo
+  MAIN_REPO_DIR="$(cd "$PLAN_DIR" && cd "$(git rev-parse --git-common-dir)/.." && pwd)"
+  DEFAULT_BRANCH="$(git -C "$MAIN_REPO_DIR" symbolic-ref --short HEAD 2>/dev/null || echo "main")"
+
+  # Check for uncommitted changes in worktree
+  if ! git -C "$PLAN_DIR" diff --quiet 2>/dev/null || ! git -C "$PLAN_DIR" diff --cached --quiet 2>/dev/null; then
+    cat <<MGEOF
+{"merge_gate": "blocked", "reason": "uncommitted_changes", "worktree_branch": "$WORKTREE_BRANCH", "plan": "$PLAN"}
+MGEOF
+    exit 1
+  fi
+
+  # Count commits ahead of default branch
+  COMMITS_AHEAD="$(git -C "$PLAN_DIR" rev-list --count "${DEFAULT_BRANCH}..HEAD" 2>/dev/null || echo "0")"
+  if [[ "$COMMITS_AHEAD" -eq 0 ]]; then
+    cat <<MGEOF
+{"merge_gate": "skip", "reason": "nothing_to_merge", "worktree_branch": "$WORKTREE_BRANCH", "default_branch": "$DEFAULT_BRANCH"}
+MGEOF
+    exit 0
+  fi
+
+  # Tier 1: Try fast-forward merge in the main repo
+  cd "$MAIN_REPO_DIR"
+  if git merge --ff-only "$WORKTREE_BRANCH" 2>/dev/null; then
+    # Push if remote exists
+    PUSHED="false"
+    if git remote | grep -q origin; then
+      git push origin "$DEFAULT_BRANCH" 2>/dev/null && PUSHED="true" || PUSHED="failed"
+    fi
+    cat <<MGEOF
+{"merge_gate": "merged", "tier": 1, "method": "fast_forward", "worktree_branch": "$WORKTREE_BRANCH", "default_branch": "$DEFAULT_BRANCH", "commits": $COMMITS_AHEAD, "pushed": "$PUSHED"}
+MGEOF
+    exit 0
+  fi
+
+  # Tier 2: Try regular merge
+  if git merge --no-edit "$WORKTREE_BRANCH" 2>/dev/null; then
+    PUSHED="false"
+    if git remote | grep -q origin; then
+      git push origin "$DEFAULT_BRANCH" 2>/dev/null && PUSHED="true" || PUSHED="failed"
+    fi
+    cat <<MGEOF
+{"merge_gate": "merged", "tier": 2, "method": "merge_commit", "worktree_branch": "$WORKTREE_BRANCH", "default_branch": "$DEFAULT_BRANCH", "commits": $COMMITS_AHEAD, "pushed": "$PUSHED"}
+MGEOF
+    exit 0
+  fi
+
+  # Tier 3: Merge failed — abort and create PR if gh available
+  git merge --abort 2>/dev/null || true
+  PR_URL=""
+  if command -v gh &>/dev/null; then
+    cd "$PLAN_DIR"
+    git push -u origin "$WORKTREE_BRANCH" 2>/dev/null || true
+    PR_URL="$(gh pr create --base "$DEFAULT_BRANCH" --head "$WORKTREE_BRANCH" --title "Dispatch: merge $WORKTREE_BRANCH" --body "Auto-created by vidux merge-gate. Manual conflict resolution needed." 2>/dev/null || echo "pr_creation_failed")"
+  fi
+  cat <<MGEOF
+{"merge_gate": "conflict", "tier": 3, "worktree_branch": "$WORKTREE_BRANCH", "default_branch": "$DEFAULT_BRANCH", "commits": $COMMITS_AHEAD, "pr_url": "$(json_escape "$PR_URL")"}
+MGEOF
+  exit 1
+fi
+
 # --- Dry-run mode ---------------------------------------------------------- #
 if [[ "$MODE" == "--dry-run" ]]; then
   TASK=$(current_task)
