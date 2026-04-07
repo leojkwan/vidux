@@ -115,19 +115,19 @@ Bimodal target: N/A (no automations to score)
 Failure mode:   Project goes cold and forgotten. Calendar a manual review weekly.
 ```
 
-#### Recipe 6: Burst Mode
+#### Recipe 6: Dispatch Mode
 
 ```
-Burst Mode  (single long persistent session, no cron)
-──────────
+Dispatch Mode  (single long persistent session, no cron)
+─────────────
 When to use:    Active development sprint — Leo is heads-down for hours, doesn't want
                 cron interruptions. Vidux runs as a single long-lived agent in one
                 session, picking tasks continuously until human stops it.
 Agent count:    1 persistent (no cron)
 Cron cadence:   None — manual /vidux invocation kicks it off
 Conflict risk:  None — single owner of the plan
-Bimodal target: Always deep (this is one giant deep run)
-Failure mode:   Agent drifts off-mission without coordinator. Use for ≤4hr bursts.
+Bimodal target: Always dispatch (this is one giant deep run)
+Failure mode:   Agent drifts off-mission without coordinator. Use for ≤4hr dispatch runs.
 ```
 
 ### Recipe Selection Heuristics (mirrors `prescribe`)
@@ -139,7 +139,7 @@ Failure mode:   Agent drifts off-mission without coordinator. Use for ≤4hr bur
 | 4+ surfaces or handoff problems | Writer + 2 Radars + Coordinator |
 | Multi-repo project | Multi-Repo Fleet |
 | Quiet/maintenance | Maintenance Mode |
-| Active dev sprint | Burst Mode |
+| Active dev sprint | Dispatch Mode |
 
 ---
 
@@ -186,7 +186,7 @@ Analyze a project's PLAN.md and prescribe the optimal fleet topology. READ-ONLY.
    Decision tree:
    ```
    IF stage == cold OR maintenance:                          → Recipe 5 (Maintenance Mode)
-   ELIF Leo says "burst" or active sprint signal:            → Recipe 6 (Burst Mode)
+   ELIF Leo says "dispatch" or active sprint signal:         → Recipe 6 (Dispatch Mode)
    ELIF repos > 1:                                            → Recipe 4 (Multi-Repo Fleet)
    ELIF surfaces ≥ 4 OR handoff == true OR compound ≥ 2:     → Recipe 3 (Writer + 2 Radars + Coord)
    ELIF surfaces ≥ 2 OR active ≥ 3:                          → Recipe 2 (Writer + Radar)
