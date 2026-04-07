@@ -2,7 +2,7 @@
 # compat.sh — OS-portable wrappers for stat/date differences
 # macOS uses BSD stat/date, Linux uses GNU coreutils.
 # Source this once; call the wrapper functions instead of raw stat/date.
-[[ -n "$_VIDUX_COMPAT_LOADED" ]] && return 0
+[[ -n "${_VIDUX_COMPAT_LOADED:-}" ]] && return 0
 _VIDUX_COMPAT_LOADED=1
 
 # Detect OS once

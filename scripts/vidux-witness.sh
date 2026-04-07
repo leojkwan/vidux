@@ -301,7 +301,17 @@ if [[ -n "${AUTO_DIR:-}" && -d "${AUTO_DIR:-}" ]]; then
       MID-ZONE) A_MID_ZONE=$((A_MID_ZONE + 1)) ;;
     esac
 
-    entry="{\"type\":\"automation\",\"id\":\"$(json_escape "$name")\",\"status\":\"$a_status\",\"last_run\":\"$last_run\",\"summary\":\"$summary\"}"
+    # Idle-churn detection: what % of entries have no shipping signals?
+    idle_churn_pct=0; total_entries=0
+    if [[ -f "$mem_file" ]]; then
+      total_entries=$(grep -c '^- ' "$mem_file" 2>/dev/null) || total_entries=0
+      shipping_entries=$(grep -ciE 'shipped|commit|fixed|merged|created|built|added|pushed|wrote' "$mem_file" 2>/dev/null) || shipping_entries=0
+      if [[ "$total_entries" -gt 0 ]]; then
+        idle_churn_pct=$(( (total_entries - shipping_entries) * 100 / total_entries ))
+      fi
+    fi
+
+    entry="{\"type\":\"automation\",\"id\":\"$(json_escape "$name")\",\"status\":\"$a_status\",\"last_run\":\"$last_run\",\"summary\":\"$summary\",\"idle_churn_pct\":$idle_churn_pct,\"total_entries\":${total_entries:-0}}"
     [[ "$AUTO_FIRST" = true ]] && { AUTO_ENTRIES="$entry"; AUTO_FIRST=false; } || AUTO_ENTRIES="$AUTO_ENTRIES,$entry"
   done
 fi
