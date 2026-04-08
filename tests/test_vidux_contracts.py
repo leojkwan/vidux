@@ -1518,14 +1518,14 @@ class ViduxContractTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             repo = Path(tmpdir)
             (repo / "projects").mkdir()
-            auto_dir = repo / "automations" / "resplit-web"
+            auto_dir = repo / "automations" / "acme-web"
             auto_dir.mkdir(parents=True)
             (auto_dir / "automation.toml").write_text(textwrap.dedent("""
                 version = 1
-                id = "resplit-web"
+                id = "acme-web"
                 kind = "cron"
                 status = "ACTIVE"
-                prompt = "Use [$vidux](/tmp/vidux/SKILL.md), [$pilot](/tmp/pilot/SKILL.md), and [$figma-implement-design](/tmp/figma/SKILL.md) for the Resplit web identity overhaul.\n\nREDUCE gate (run FIRST, before any other work):\n1. Run: bash /tmp/vidux-loop.sh /tmp/projects/resplit-web/PLAN.md\n2. Read the JSON output. If next_action is \\\"none\\\", exit immediately.\n4. If next_action is \\\"dispatch\\\": proceed to full execution below.\nBudget: steps 1-3 must complete in under 60 seconds.\n\nAuthority\n- /tmp/projects/resplit-web/PLAN.md\n\nExecution\n- Implement the next queued landing-page improvement after dispatch.\n- Use $figma-implement-design when a node is available.\n\nCheckpoint\n- Keep 3 notes max."
+                prompt = "Use [$vidux](/tmp/vidux/SKILL.md), [$pilot](/tmp/pilot/SKILL.md), and [$figma-implement-design](/tmp/figma/SKILL.md) for the Acme web identity overhaul.\n\nREDUCE gate (run FIRST, before any other work):\n1. Run: bash /tmp/vidux-loop.sh /tmp/projects/acme-web/PLAN.md\n2. Read the JSON output. If next_action is \\\"none\\\", exit immediately.\n4. If next_action is \\\"dispatch\\\": proceed to full execution below.\nBudget: steps 1-3 must complete in under 60 seconds.\n\nAuthority\n- /tmp/projects/acme-web/PLAN.md\n\nExecution\n- Implement the next queued landing-page improvement after dispatch.\n- Use $figma-implement-design when a node is available.\n\nCheckpoint\n- Keep 3 notes max."
             """).lstrip(), encoding="utf-8")
 
             result = subprocess.run(

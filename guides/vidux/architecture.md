@@ -5,7 +5,7 @@
 
 Vidux is a plan-first orchestration system for AI-assisted coding on multi-day projects. It enforces unidirectional data flow -- evidence feeds the plan, the plan drives the code -- so that agent sessions can crash, restart, and resume without losing progress.
 
-Battle-tested across 28+ cycles building itself, a 10-automation fleet across 2 products (Resplit iOS/web and StrongYes web), and overnight cron loops that run unsupervised.
+Battle-tested across 28+ cycles building itself, a 10-automation fleet across 2 products (Acme iOS/web and Beacon web), and overnight cron loops that run unsupervised.
 
 ---
 
@@ -118,9 +118,9 @@ Scan PLAN.md for unchecked tasks
 
 The queue is truth. The feeling is not.
 
-### Real Example: Resplit Fleet
+### Real Example: Acme Fleet
 
-Before the quick check / deep work model, the Resplit iOS automation averaged 4.2 minutes per run. After: bimodal -- either 1.1 minutes (quick check, nothing to do) or 22 minutes (deep work, real tasks). Mid-zone runs dropped from 40% to under 5%. Net tasks completed per day increased because context window bootstrapping (the expensive part) happened less often.
+Before the quick check / deep work model, the Acme iOS automation averaged 4.2 minutes per run. After: bimodal -- either 1.1 minutes (quick check, nothing to do) or 22 minutes (deep work, real tasks). Mid-zone runs dropped from 40% to under 5%. Net tasks completed per day increased because context window bootstrapping (the expensive part) happened less often.
 
 ---
 
@@ -359,7 +359,7 @@ Each hook catches what the previous one missed. If the agent follows SessionStar
 
 ## 10. Fleet Topology
 
-The Resplit/StrongYes fleet runs 10 automations across 2 products. All automations share the same shape:
+The Acme/Beacon fleet runs 10 automations across 2 products. All automations share the same shape:
 
 - **Deep work mode**: every automation does real work, not just monitoring
 - **Self-extending plans**: every automation adds tasks it discovers (Doctrine 11)

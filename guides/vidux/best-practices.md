@@ -1,6 +1,6 @@
 # Vidux Best Practices
 
-Lessons from 28+ cycles where Vidux built itself, managed a 10-automation fleet across Resplit and StrongYes, and ran overnight cron loops unsupervised. This is not theory. Everything here was learned the hard way.
+Lessons from 28+ cycles where Vidux built itself, managed a 10-automation fleet across Acme and Beacon, and ran overnight cron loops unsupervised. This is not theory. Everything here was learned the hard way.
 
 ---
 
@@ -91,7 +91,7 @@ Open PLAN.md, scan for unchecked tasks
 
 The "I am done" feeling is unreliable. The queue is truth.
 
-**Real failure:** A Resplit automation completed a payment flow fix, checkpointed, and exited at 4.7 minutes. Six more tasks were pending. The next cron fire spent 2 minutes bootstrapping context just to pick up where the last one could have continued. Multiply this by every run in a 10-automation fleet running overnight and the waste is substantial.
+**Real failure:** An Acme automation completed a payment flow fix, checkpointed, and exited at 4.7 minutes. Six more tasks were pending. The next cron fire spent 2 minutes bootstrapping context just to pick up where the last one could have continued. Multiply this by every run in a 10-automation fleet running overnight and the waste is substantial.
 
 **How the quick check / deep work model fixes this structurally:** Quick check exits in under 2 minutes (nothing to do). Deep work has no exit until queue drain or hard blocker. There is no middle ground. The agent never decides "should I keep going?" because the mode already decided. See the architecture guide, Section 2.
 
@@ -105,7 +105,7 @@ When you fix a bug, log the related bugs you saw on the same surface. When you a
 
 **The brake: three-strike rule.** If a surface already has 3+ queued polish tasks, ship the most impactful one and move on. Self-extension without a brake becomes recursive optimization forever. A good automation knows when a surface is honestly good and stops adding work to its own queue.
 
-**Real failure:** A Resplit automation discovered 14 polish tasks on a single view controller. Without the three-strike brake it would still be polishing. With the brake it shipped the top 3 and moved to the next gap in the mission.
+**Real failure:** An Acme automation discovered 14 polish tasks on a single view controller. Without the three-strike brake it would still be polishing. With the brake it shipped the top 3 and moved to the next gap in the mission.
 
 **Mission honesty rule:** Separate "current slice status" from "release boundary" from "overall mission completion." If the overall mission has gaps elsewhere, polish on a done surface is procrastination. Only re-extend plans when investigation reveals new surfaces, not when you find one more pixel to align on a surface you already touched.
 
@@ -121,9 +121,9 @@ Functional code is table stakes. The build passes, the tests are green -- that i
 
 **Before/after screenshots as proof.** When a UI task is complete, capture before and after. This is not documentation -- it is evidence that the change is an improvement. An agent that says "I fixed the layout" without visual proof is asking the human to trust. An agent that shows the screenshots is showing.
 
-**Real example from Resplit:** An automation fixed the currency conversion display -- build passed, tests green. But the formatted amount was clipped by the container on small screens. A `$picasso` visual check caught it in the same cycle. Without taste-level checking, it would have shipped broken to 320px devices and required a second cycle to diagnose and fix.
+**Real example from Acme:** An automation fixed the currency conversion display -- build passed, tests green. But the formatted amount was clipped by the container on small screens. A `$picasso` visual check caught it in the same cycle. Without taste-level checking, it would have shipped broken to 320px devices and required a second cycle to diagnose and fix.
 
-**Real example from StrongYes:** An automation built the interview prep timer. Functionally correct -- it counted down, it beeped. But the font was 12px on a component that needed to be glanceable from arm's length. Product taste means catching this in the same cycle, not three cycles later when the human notices.
+**Real example from Beacon:** An automation built the interview prep timer. Functionally correct -- it counted down, it beeped. But the font was 12px on a component that needed to be glanceable from arm's length. Product taste means catching this in the same cycle, not three cycles later when the human notices.
 
 ---
 
@@ -169,7 +169,7 @@ Why subagents, not Teams? Teams persist across sessions (violates stateless doct
 
 Each cycle is stateless: quick check reads the store, optionally fires deep work, checkpoint, exit. The next cycle is a fresh agent that knows nothing except what is in the files.
 
-**30-minute cadence for fleet automations.** The Resplit/StrongYes fleet uses 30-minute cron intervals. Quick check fires every 30 min. If work is pending, deep work runs until the queue is drained. If nothing is pending, quick check exits in under 2 minutes.
+**30-minute cadence for fleet automations.** The Acme/Beacon fleet uses 30-minute cron intervals. Quick check fires every 30 min. If work is pending, deep work runs until the queue is drained. If nothing is pending, quick check exits in under 2 minutes.
 
 **Expect auth expiry.** Tokens expire, MCP servers disconnect. A crashed session loses at most one cycle. The next cycle commits recovered work first.
 
@@ -302,11 +302,11 @@ There are two gate patterns. Which one you use depends on the automation's job:
 
 ### With-Vidux variant (~850 chars)
 
-Use this when the automation loads `$vidux` and has access to `vidux-loop.sh`. This is the standard variant for all Resplit and StrongYes automations.
+Use this when the automation loads `$vidux` and has access to `vidux-loop.sh`. This is the standard variant for all Acme and Beacon automations.
 
 ```
 REDUCE gate (run FIRST, before any other work):
-1. Run: bash /Users/leokwan/Development/vidux/scripts/vidux-loop.sh <plan-path>
+1. Run: bash scripts/vidux-loop.sh <plan-path>
 2. Read the JSON output. If ANY of these are true, checkpoint and exit immediately:
    - action is "blocked" or "auto_blocked" or "stuck" or "all_blocked"
    - action is "complete" or type is "done" or "empty"
@@ -396,7 +396,7 @@ After the gate passes and before execution begins, every automation MUST read si
 
 **Where this goes in the harness prompt:** Immediately after the Authority/read-order block and before the Execution block. The agent reads the gate, then reads authority, then reads siblings, then acts. This ordering ensures the agent never starts work without knowing the fleet state.
 
-**Real failure:** Five StrongYes radars polled the same empty queue without knowing each other existed. `resplit-web` did not know `resplit-asc` just fixed the same surface. Both shipped competing branches. The merge cost more than the original fix.
+**Real failure:** Five Beacon radars polled the same empty queue without knowing each other existed. `acme-web` did not know `acme-backend` just fixed the same surface. Both shipped competing branches. The merge cost more than the original fix.
 
 ### Insertion point guidance
 

@@ -25,7 +25,7 @@ Generate an automation config and lean prompt for a project.
 
 ### Arguments
 
-- `<project>` — project name (e.g., `resplit`, `strongyes`, `vidux`)
+- `<project>` — project name (e.g., `acme`, `beacon`, `vidux`)
 - `<role>` — one of: `writer`, `radar`, `coordinator`
 - Optional: `<focus>` — narrow the radar or writer scope (e.g., `ux`, `revenue`, `flow`, `release-train`)
 
@@ -156,23 +156,23 @@ Show the current automation fleet as a slot map.
 2. Build and display the slot map:
 
 ```
-Fleet: resplit (5 automations)
-  :00  resplit-writer (writer, every 30m)
-  :05  resplit-ux-radar (radar, every 30m)
-  :10  resplit-flow-radar (radar, every 30m)
-  :15  resplit-android-writer (writer, every 30m)
-  :20  resplit-coordinator (coordinator, every 2h)
+Fleet: acme (5 automations)
+  :00  acme-writer (writer, every 30m)
+  :05  acme-ux-radar (radar, every 30m)
+  :10  acme-flow-radar (radar, every 30m)
+  :15  acme-android-writer (writer, every 30m)
+  :20  acme-coordinator (coordinator, every 2h)
 
-Load: max 2 concurrent at :30 (resplit-writer + resplit-ux-radar)
+Load: max 2 concurrent at :30 (acme-writer + acme-ux-radar)
 Gaps: :25, :35, :40, :45, :50, :55 — available for new automations
 ```
 
 3. For each automation, show last memory entry date and bimodal quality:
 ```
 Quality:
-  resplit-writer         last=2h ago  runs: 3 deep (22m avg), 1 quick (45s) ✓ bimodal
-  resplit-ux-radar       last=1h ago  runs: 4 quick (30s avg)               ✓ bimodal
-  resplit-flow-radar     last=30m ago runs: 2 mid (4m avg)                  ⚠ stuck-in-middle
+  acme-writer         last=2h ago  runs: 3 deep (22m avg), 1 quick (45s) ✓ bimodal
+  acme-ux-radar       last=1h ago  runs: 4 quick (30s avg)               ✓ bimodal
+  acme-flow-radar     last=30m ago runs: 2 mid (4m avg)                  ⚠ stuck-in-middle
 ```
 
 ---
@@ -194,12 +194,12 @@ Check fleet health and prompt discipline.
 ### Output
 
 ```
-Validation: resplit fleet
+Validation: acme fleet
   ✓ No schedule collisions
   ✓ All prompts under 15 lines
-  ⚠ resplit-flow-radar: prompt restates checkpoint protocol (remove lines 8-12)
+  ⚠ acme-flow-radar: prompt restates checkpoint protocol (remove lines 8-12)
   ✓ No stale automations
-  ⚠ resplit-flow-radar: 3 runs in 3-8 min range — investigate
+  ⚠ acme-flow-radar: 3 runs in 3-8 min range — investigate
   ✓ All radars have paired writers
   ✓ Coordinator present
 ```

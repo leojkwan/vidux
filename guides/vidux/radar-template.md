@@ -8,7 +8,7 @@
 Use this template when creating automations that:
 - Probe live surfaces (UI, API routes, metrics dashboards, logs)
 - Report findings without writing code
-- Feed a writer automation (e.g., `strongyes-release-train`) via PLAN.md
+- Feed a writer automation (e.g., `beacon-release-train`) via PLAN.md
 
 ## Template
 
@@ -79,9 +79,9 @@ that belongs in the skill or template.
 
 | Radar | Domain | Skill | Unique content |
 |-------|--------|-------|----------------|
-| strongyes-ux-radar | UI quality | $playwright | Playwright screenshots on desktop + mobile |
-| strongyes-flow-radar | Buyer path | $playwright | Auth flow, onboarding, checkout entry probes |
-| strongyes-revenue-radar | Stripe/payments | $posthog-analytics | Stripe contract paths, env contracts, revenue metrics |
+| beacon-ux-radar | UI quality | $playwright | Playwright screenshots on desktop + mobile |
+| beacon-flow-radar | Buyer path | $playwright | Auth flow, onboarding, checkout entry probes |
+| beacon-revenue-radar | Stripe/payments | $posthog-analytics | Stripe contract paths, env contracts, revenue metrics |
 
 ## SCAN gate vs REDUCE gate
 

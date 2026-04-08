@@ -319,7 +319,7 @@ work on a surface it has already finished.
 **How to apply:** Every harness needs a "good enough" gate. When a fix has shipped and
 the user-visible UX is honestly good, stop adding polish tasks for that surface and move
 to the next mission gap. Don't optimize already-good surfaces. The mission honesty rule
-from `projects/resplit` applies fleet-wide: separate "current slice status," "release
+from `projects/acme` applies fleet-wide: separate "current slice status," "release
 boundary," and "overall mission completion." If overall mission has gaps elsewhere,
 polish on a done surface is procrastination. Only re-extend plans when investigation
 reveals new *surfaces*, not when you find one more pixel to align on a surface you
@@ -340,9 +340,9 @@ Not "when convenient." Not "if ledger is available." Structural. Before acting:
    shipped, skip it. Don't fix what's already fixed. Don't scan what was just scanned.
 
 **Why this matters:** The Codex orchestrator created a localization automation without
-checking the fleet. Five StrongYes radars polled the same empty queue without knowing
-each other existed. resplit-web didn't know resplit-asc just fixed the same surface.
-Cross-project awareness matters too: resplit-web, resplit-ios, and resplit-currency all
+checking the fleet. Five Beacon radars polled the same empty queue without knowing
+each other existed. acme-web didn't know acme-backend just fixed the same surface.
+Cross-project awareness matters too: acme-web, acme-ios, and acme-currency all
 touch the same product.
 
 **How to apply:** Every harness prompt's READ step must include sibling context. The
@@ -385,7 +385,7 @@ Every vidux automation is either a **writer** or a **scanner**. The distinction 
 | | **Writer** | **Scanner** |
 |---|---|---|
 | **Purpose** | Execute tasks from a PLAN.md queue | Inspect codebase/product for issues |
-| **Examples** | resplit-asc, release-train, strongyes-builder | localization radar, UX radar, flow radar, content radar, quality audit |
+| **Examples** | acme-backend, release-train, beacon-builder | localization radar, UX radar, flow radar, content radar, quality audit |
 | **State source** | PLAN.md task queue (pending/in_progress/completed) | The codebase itself (files, git history, runtime output) |
 | **"Nothing to do" means** | All tasks completed/blocked, no pending work | No files changed since last scan AND last N scans found no issues |
 | **Gate** | REDUCE gate: runs `vidux-loop.sh`, checks plan state | SCAN gate: checks git changes + last scan results |

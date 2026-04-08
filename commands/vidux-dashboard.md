@@ -95,16 +95,16 @@ Read-only, cross-project status tree. Discovers plans and automations from local
        🔍 self-investigation — COMPLETE — 6h ago
        🔍 context-ops — active — 1h ago
 
-   📦 resplit
+   📦 acme
      📐 PLAN.md — camera routing — 3h ago
 
-   📦 strongyes
+   📦 beacon
      📐 PLAN.md — idle — 2d ago
 
    🤖 Codex Fleet (3 automations)
-     ✅ resplit-writer — last run 30m ago
-     ✅ resplit-ux-radar — last run 1h ago — idle
-     ⚠️ strongyes-ux-radar — stuck-in-middle — 20m ago
+     ✅ acme-writer — last run 30m ago
+     ✅ acme-ux-radar — last run 1h ago — idle
+     ⚠️ beacon-ux-radar — stuck-in-middle — 20m ago
    ```
 
    **Stage emojis:**
@@ -153,8 +153,8 @@ Read-only, cross-project status tree. Discovers plans and automations from local
          "automation_count": 3,
          "automations": [
            {
-             "name": "resplit-writer",
-             "project": "resplit",
+             "name": "acme-writer",
+             "project": "acme",
              "role": "writer",
              "status": "active",
              "bimodal": "ok",

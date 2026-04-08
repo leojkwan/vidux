@@ -71,10 +71,10 @@ Bimodal target: Writer ≥85% deep, Radar ≥95% quick
 Failure mode:   Handoff gap — radar finds issues, writer ignores. Add coordinator.
 ```
 
-#### Recipe 3: Writer + 2 Radars + Coordinator (Resplit Peak)
+#### Recipe 3: Writer + 2 Radars + Coordinator (Acme Peak)
 
 ```
-Writer + 2 Radars + Coordinator  (resplit's peak topology)
+Writer + 2 Radars + Coordinator  (acme's peak topology)
 ─────────────────────────────────
 When to use:    4+ active surfaces, known handoff problems, multi-domain monitoring
                 (UX nuance + flow/perf/release health). Mature project entering polish.
@@ -88,7 +88,7 @@ Failure mode:   Coordinator blindness — fails to flag stuck-in-middle. Audit w
 #### Recipe 4: Multi-Repo Fleet
 
 ```
-Multi-Repo Fleet  (e.g., resplit-web + resplit-ios + resplit-currency-api)
+Multi-Repo Fleet  (e.g., acme-web + acme-ios + acme-currency-api)
 ────────────────
 When to use:    Project spans multiple repos with distinct stacks (web/ios/api).
                 Each repo gets its own specialized writer; one shared coordinator.
@@ -106,7 +106,7 @@ Failure mode:   Writers diverge from shared mission. Coordinator must read all r
 Maintenance Mode  (no automations)
 ────────────────
 When to use:    Mature project in stable polish, no active push, low-feedback state.
-                StrongYes/Resplit 2.0-style "1hr/week Wednesday" cycles.
+                Beacon/Acme 2.0-style "1hr/week Wednesday" cycles.
                 Or any project where automated work would generate noise.
 Agent count:    0 — manual cycles only
 Cron cadence:   None
@@ -208,22 +208,22 @@ Analyze a project's PLAN.md and prescribe the optimal fleet topology. READ-ONLY.
      Distinct surfaces: 4 (Live Split, receipt-detail, screenshots, AP539)
      Compound tasks:   2 ([Investigation:] markers)
      Active worktrees: 1
-     Repos:            1 (resplit-ios)
+     Repos:            1 (acme-ios)
      Stage:            polish (release boundary blocked, mission gaps live)
 
    Prescribed recipe: Recipe 3 — Writer + 2 Radars + Coordinator
      Why: 4 surfaces + 2 compound tasks + handoff debt in Progress entries.
 
-   Existing fleet (resplit):
-     resplit-vidux         writer       :00,:30
-     resplit-ios-ux-lab    radar/ux     :05,:35
-     resplit-launch-loop   radar/flow   :10,:40
-     resplit-oversight     coordinator  :15 (every 2h)
+   Existing fleet (acme):
+     acme-vidux         writer       :00,:30
+     acme-ios-ux-lab    radar/ux     :05,:35
+     acme-launch-loop   radar/flow   :10,:40
+     acme-oversight     coordinator  :15 (every 2h)
 
    Status: ✓ Fleet matches prescription. No changes needed.
 
    Watch for:
-     - resplit-launch-loop has 2 mid-zone runs in last 24h — audit prompt discipline
+     - acme-launch-loop has 2 mid-zone runs in last 24h — audit prompt discipline
      - Coordinator missed 1 handoff gap (cycle 5 → cycle 7) — review oversight rules
    ```
 
@@ -323,12 +323,12 @@ Coordination rules:
 
 #### Specialist Harness Template (≤15 lines)
 
-A specialist is a writer with a narrow surface (e.g., `resplit-currency-api` writer that only touches the FX worker repo).
+A specialist is a writer with a narrow surface (e.g., `acme-currency-api` writer that only touches the FX worker repo).
 
 ```
 Use [$vidux](<path-to-SKILL.md>) as writer for <project>/<focus>.
 
-Mission: <focus-specific mission, e.g., "Ship resplit-currency-api FX pipeline">
+Mission: <focus-specific mission, e.g., "Ship acme-currency-api FX pipeline">
 
 Authority store: <path to project PLAN.md>
 Repo scope: <single repo path — this writer only touches this repo>
@@ -433,9 +433,9 @@ Score existing automations for a project against Doctrine 8 + the new automation
 5. **📌 CHECKPOINT — Generate the audit report.**
 
    ```
-   Audit: resplit (4 automations)
+   Audit: acme (4 automations)
    ────────────────────────────────────
-   resplit-vidux (writer)              8/9 ✓
+   acme-vidux (writer)              8/9 ✓
      ✓ Lines 12/15
      ✓ correct gate (REDUCE — writer)
      ✓ keep-working
@@ -446,7 +446,7 @@ Score existing automations for a project against Doctrine 8 + the new automation
      ✓ no smallest-slice
      ✓ bimodal 4 deep / 1 quick
 
-   resplit-ios-ux-lab (radar/ux)       7/9 ⚠
+   acme-ios-ux-lab (radar/ux)       7/9 ⚠
      ✓ Lines 13/15
      ✓ correct gate (SCAN — radar)
      N/A keep-working (radar)
@@ -457,14 +457,14 @@ Score existing automations for a project against Doctrine 8 + the new automation
      ✓ no smallest-slice
      ⚠ bimodal 2 quick / 2 mid (3-5m) — mid-zone risk
 
-   resplit-launch-loop (radar/flow)    4/9 ✗ NEEDS REWRITE
+   acme-launch-loop (radar/flow)    4/9 ✗ NEEDS REWRITE
      ✗ Lines 22/15 — over by 7
      ✗ correct gate — has REDUCE gate, should be SCAN (radar)
      ✗ bounded-recursion missing
      ✗ doctrine restated lines 12-18 (FSM rules) — REMOVE
      ⚠ bimodal 1 quick / 3 mid — STUCK IN MIDDLE
 
-   resplit-oversight (coordinator)     8/9 ✓
+   acme-oversight (coordinator)     8/9 ✓
      ✓ Lines 14/15
      ✓ correct gate (REDUCE — coordinator)
      ✓ keep-working (coord variant)
@@ -477,8 +477,8 @@ Score existing automations for a project against Doctrine 8 + the new automation
 
    ────────────────────────────────────
    Fleet score: 27/36 (75%)
-   Critical: resplit-launch-loop — wrong gate + rewrite via /vidux-recipes write radar resplit --focus flow
-   Watch:    resplit-ios-ux-lab mid-zone trend
+   Critical: acme-launch-loop — wrong gate + rewrite via /vidux-recipes write radar acme --focus flow
+   Watch:    acme-ios-ux-lab mid-zone trend
    ```
 
 6. **🏁 COMPLETE — Print the report.** Do not auto-rewrite. The user runs `/vidux-recipes write` to fix specific automations.

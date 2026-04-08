@@ -1,12 +1,12 @@
 # Vidux Doctrine
 
-> If an agent reads one file, this is it. 12 principles plus the quick check / deep work execution model and gate patterns, each battle-tested across 40+ cycles building Vidux itself, a 10-automation fleet across Resplit and StrongYes, and overnight cron loops that run unsupervised. SKILL.md extends this with Principle 13 (cross-lane awareness).
+> If an agent reads one file, this is it. 12 principles plus the quick check / deep work execution model and gate patterns, each battle-tested across 40+ cycles building Vidux itself, a 10-automation fleet across Acme and Beacon, and overnight cron loops that run unsupervised. SKILL.md extends this with Principle 13 (cross-lane awareness).
 
 ## 1. Plan is the store
 
 PLAN.md is the single source of truth. Code is a derived view. If the code is wrong, the plan is wrong. Fix the plan first. An agent that edits code without a corresponding plan entry is mutating state outside the reducer.
 
-*Why this matters: The Resplit iOS fleet drifted 400+ lines from spec in 6 cycles before this rule existed. SlopCodeBench confirms it -- agent code degradation is monotonic.*
+*Why this matters: The Acme iOS fleet drifted 400+ lines from spec in 6 cycles before this rule existed. SlopCodeBench confirms it -- agent code degradation is monotonic.*
 
 ## 2. Unidirectional flow
 
@@ -32,13 +32,13 @@ Gather -> Plan -> Execute -> Verify -> Checkpoint -> Gather. Never skip a step. 
 
 Every plan entry cites a source. No source = no entry. Sources: MCP queries, codebase greps with file:line, design doc quotes, PR review history. A guess costs 15-60 minutes of rework. Evidence costs 2-5 minutes.
 
-*Why this matters: A Resplit automation assumed the currency API returned ISO codes. It returned integers. Three downstream tasks built on the wrong assumption.*
+*Why this matters: An Acme automation assumed the currency API returned ISO codes. It returned integers. Three downstream tasks built on the wrong assumption.*
 
 ## 5. Design for completion
 
 Deep work runs end. Context is lost. Auth expires. The store persists. State lives in files, not memory. Every cycle reads fresh. Checkpoints are structured. Any agent can resume from the last checkpoint. Tool state (.claude/, .cursor/) lives outside the working tree.
 
-*Why this matters: A StrongYes overnight loop lost auth at 3am. The next cron fire committed recovered work and continued. Zero human intervention.*
+*Why this matters: A Beacon overnight loop lost auth at 3am. The next cron fire committed recovered work and continued. Zero human intervention.*
 
 ## 6. Process fixes > code fixes
 
@@ -50,13 +50,13 @@ Every failure produces two artifacts: a code fix (table stakes) and a process fi
 
 When 2+ tickets hit the same surface, or 3+ atomic fixes fail on the same surface, bundle them into one `[Investigation: investigations/<slug>.md]`. Atomic fixes to compound problems contradict each other. The investigation file finds the root cause before committing to a fix direction.
 
-*Why this matters: Three separate Resplit agents applied contradictory fixes to the same payment flow. One investigation would have found the shared root cause in 15 minutes.*
+*Why this matters: Three separate Acme agents applied contradictory fixes to the same payment flow. One investigation would have found the shared root cause in 15 minutes.*
 
 ## 8. Cron prompts are harnesses, not snapshots
 
 A cron prompt is a stateless harness — it encodes the end goal and project DNA. PLAN.md holds the state. The harness tells the agent what kind of work to do; the plan tells it which specific work is next. Never put transient state in the harness. Never put project DNA in the plan.
 
-*Why this matters: A StrongYes harness that hard-coded "fix the auth flow" kept trying to fix auth after auth was done. Harness = what kind of work. Plan = which work.*
+*Why this matters: A Beacon harness that hard-coded "fix the auth flow" kept trying to fix auth after auth was done. Harness = what kind of work. Plan = which work.*
 
 ## 9. Subagent coordinator pattern
 
@@ -92,7 +92,7 @@ Agents are good at functional code (Stripe wiring, schema migrations, build conf
 
 Self-extension without a brake becomes recursive optimization forever. A good automation knows when a surface is honestly good and stops adding work to its own queue. Three-strike rule: if a surface already has 3+ queued polish tasks, ship the most impactful one and move on. Don't optimize already-good surfaces. If overall mission has gaps elsewhere, polish on a done surface is procrastination.
 
-*Why this matters: A Resplit automation discovered 14 polish tasks on a single view controller. Without the three-strike brake it would still be polishing. With the brake it shipped the top 3 and moved to the next gap in the mission.*
+*Why this matters: An Acme automation discovered 14 polish tasks on a single view controller. Without the three-strike brake it would still be polishing. With the brake it shipped the top 3 and moved to the next gap in the mission.*
 
 ---
 

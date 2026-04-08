@@ -105,8 +105,8 @@ Full AI-powered diagnostic of a project's vidux health. READ-ONLY — never modi
    Self-ext:   ratio 1.2 (6 added / 5 completed) ✓
    ────────────────────────────────────
    Remediation:
-     1. resplit-flow-radar: 3 mid-zone runs — task granularity issue, review PLAN.md tasks
-     2. resplit-writer: prompt line 14 restates checkpoint protocol — remove
+     1. acme-flow-radar: 3 mid-zone runs — task granularity issue, review PLAN.md tasks
+     2. acme-writer: prompt line 14 restates checkpoint protocol — remove
      3. Handoff gap: ux-radar flagged trust-badge issue cycle 12, writer missed until cycle 15
    ```
 
@@ -312,11 +312,11 @@ Bimodal distribution monitoring and fleet effectiveness report. READ-ONLY.
      Mid (3-8m):    ███            3 runs (12%) ⚠
 
    Per-Automation:
-     resplit-writer         deep=5, quick=2, mid=0    ✓
-     resplit-android-writer deep=3, quick=3, mid=2    ⚠ mid-zone
-     resplit-ux-radar       quick=6, deep=0, mid=0    ✓
-     resplit-flow-radar     quick=4, deep=0, mid=1    ⚠ mid-zone
-     resplit-coordinator    quick=2, deep=1, mid=0    ✓
+     acme-writer         deep=5, quick=2, mid=0    ✓
+     acme-android-writer deep=3, quick=3, mid=2    ⚠ mid-zone
+     acme-ux-radar       quick=6, deep=0, mid=0    ✓
+     acme-flow-radar     quick=4, deep=0, mid=1    ⚠ mid-zone
+     acme-coordinator    quick=2, deep=1, mid=0    ✓
 
    Handoff Gaps: 1
      ux-radar found trust-badge issue (cycle 12) → writer picked up (cycle 15)
