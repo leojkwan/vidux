@@ -474,3 +474,201 @@ See SKILL.md "Fleet health orchestrator pattern" for the full specification.
 **On UI work:** Visual proof required. Before/after screenshots. Load $picasso or equivalent.
 
 **Commit is the checkpoint.** Not push. Every cycle. Always.
+
+---
+
+## 14. Writing Automation Prompts
+
+A harness prompt is not prose. It is a machine-readable contract between the cron scheduler and the agent. Every prompt follows the same eight-block structure, in order. Rearranging blocks or omitting one produces the failure modes documented in Phase 18.
+
+### 14a. Prompt Structure
+
+```
+1. MISSION        — One line. User-visible goal. No implementation details.
+2. SKILLS         — Load skills: $vidux, $pilot, $picasso, etc.
+3. GATE           — REDUCE or SCAN. Runs FIRST. Decides work/exit in <60 sec.
+4. AUTHORITY      — Read order for plan files. Primary state file is #1.
+5. CROSS-LANE     — Read sibling memory notes + hot-files. Dedup, yield, skip.
+6. ROLE BOUNDARY  — What this lane owns. What belongs to siblings.
+7. EXECUTION      — How to do the work. Mid-zone kill rule. Queue drain rule.
+8. CHECKPOINT     — Memory format. Lead line. What to leave explicit.
+```
+
+**Why this order matters:** The gate must run before authority reads. An agent that reads 6 authority files before discovering it has nothing to do just wasted 90 seconds. Cross-lane must come after authority but before execution, so the agent never starts work without knowing fleet state.
+
+### 14b. Before/After Example
+
+This is based on a real fleet failure. The automation was dead overnight — 0 runs shipped code.
+
+**BAD prompt (~4800 chars, gated on wrong file):**
+
+```
+You are a helpful assistant that fixes App Store Connect bugs.
+
+Use $vidux and $pilot for ASC bug fixes in the Acme iOS repo.
+
+Remember to always follow the plan-first methodology. The plan is the
+store, code is the view. Always gather evidence before coding. Use the
+50/30/20 split. Never code without a plan entry.
+
+REDUCE gate:
+1. Run: bash scripts/vidux-loop.sh projects/acme/PLAN.md
+2. If action is "complete" or "done", exit.
+3. Otherwise proceed.
+
+Read these files:
+- DOCTRINE.md
+- SKILL.md
+- projects/acme/PLAN.md
+- The ASC bug tracker in the repo
+
+When fixing bugs, investigate the root cause first. Use dual five-whys.
+Apply the three-strike rule. Check readiness score. Remember the closure
+bias defense. Ship with taste, not just functional correctness.
+
+Commit with: vidux: [what you did]
+```
+
+**What is wrong:**
+
+| Problem | Why it kills the automation |
+|---------|---------------------------|
+| Gates on `projects/acme/PLAN.md` (meta-plan, status: "done") | Gate always exits. Agent never reaches deep work. |
+| Restates doctrine ("plan is the store", "50/30/20", "closure bias") | 800+ chars of noise the agent already knows from $vidux |
+| No cross-lane awareness | Agent does not know if a sibling just fixed the same surface |
+| No role boundary | Agent might try to do release work that belongs to launch-loop |
+| "Read these files" lists DOCTRINE.md | Agent spends 60 sec reading files it loaded via $vidux |
+| No mid-zone kill rule | Agent can sit in 3-8 min limbo reading plans without writing |
+| Vague authority ("The ASC bug tracker in the repo") | Agent must search for the file instead of being told the path |
+
+**GOOD prompt (~2400 chars, gates on actual bug tracker):**
+
+```
+Use [$vidux](/path/to/vidux/SKILL.md) and [$pilot](/path/to/pilot/SKILL.md)
+for ASC bug fixes.
+
+Mission: Fix App Store Connect feedback and bugs in /path/to/acme-ios.
+Every bug fix leaves the UI better than the reporter expected.
+
+Load skills: $vidux, $pilot, $picasso, $bigapple, $xcodebuild
+
+REDUCE gate (run FIRST, before any other work):
+1. Read the last 3 notes from this automation's memory file.
+2. If the most recent note says any of: "blocked", "nothing to do",
+   "unchanged", "no pending", "waiting on human", "same blocker"
+   -- and it was written less than 2 hours ago -- exit immediately:
+   "[REDUCE] <date> Same state as last run (<quote reason>). No deep work."
+   Do NOT read authority files, load skills, or gather evidence. Exit now.
+3. Read /path/to/acme-ios/plans/app-store-feedback.plan.md.
+   Count open/pending bug items. If zero, exit with:
+   "[REDUCE] <date> No pending ASC bugs. No deep work."
+4. If actionable bugs exist: proceed to full execution below.
+Budget: steps 1-3 must complete in under 60 seconds.
+
+Authority:
+1. /path/to/acme-ios/plans/app-store-feedback.plan.md (PRIMARY)
+2. /path/to/acme-ios/.agent-ledger/hot-files.md
+
+Cross-lane awareness (MANDATORY before execution):
+- Read last note from siblings: acme-web, acme-currency, acme-launch-loop
+- Read .agent-ledger/hot-files.md. If another lane owns files, yield.
+- If a sibling just shipped a fix on the same surface, skip it.
+
+Role boundary:
+- This lane owns ASC feedback: investigation, reproduction, fix, proof.
+- Release/upload belongs to acme-launch-loop. Hand off, do not own.
+
+Execution:
+- Pick the top pending ASC bug. Investigate root cause (Doctrine 7).
+  Fix it. Screenshot proof via $xcodebuild + $picasso.
+- Reading and triaging is NOT a valid stop. Fix at least one bug per run.
+- If 2+ bugs hit the same surface, bundle into one investigation.
+- Every failure produces a process fix alongside the code fix (Doctrine 6).
+- If 3+ minutes pass with no file write, checkpoint and exit.
+- Keep working until the queue is empty or a hard blocker stops you.
+
+Checkpoint:
+- Lead with ASC: hot or ASC: cold.
+- Update memory (last 3 notes). Leave bug IDs, proof, blocker, next bug.
+```
+
+**What changed:** Gate targets the actual bug tracker (not the "done" meta-plan). Doctrine is loaded via `$vidux`, not restated. Cross-lane and role boundary are explicit. Mid-zone kill is present. Size dropped from ~4800 to ~2400 chars.
+
+### 14c. Gate Selection Guide
+
+```
+What does the automation DO?
+     |
+     +--> Executes plan tasks, has vidux-loop.sh --> REDUCE (With-Vidux)
+     |         e.g., acme-web, beacon-release-train
+     |
+     +--> Executes tasks, no vidux-loop.sh      --> REDUCE (Standalone)
+     |         e.g., acme-asc (reads repo plan), acme-launch-loop (reads git state)
+     |
+     +--> Inspects codebase or product           --> SCAN
+     |         e.g., acme-localization-pro, ux-radar, security-scanner
+     |
+     +--> Not sure                               --> Default to REDUCE (Standalone)
+              Writer that finds nothing just exits. Scanner on REDUCE is permanently dead.
+```
+
+**The critical asymmetry:** A writer on the wrong plan file exits cleanly (no work found). A scanner on a REDUCE gate is permanently dead — it checks plan state instead of codebase state, finds "nothing to do," and exits every cycle forever. This is why the default is writer, not scanner. A miscategorized writer wastes one cycle. A miscategorized scanner never runs.
+
+### 14d. Common Mistakes
+
+**1. Gating on the wrong plan file.** The number one prompt authorship error. Three of six automations gated on a meta-plan that was already marked "done." The agent hit the gate, saw "complete," and exited before loading a single skill. The fix: the gate reads the file where actionable work items actually live.
+
+**2. Scanner using a REDUCE gate.** A localization radar was given a writer gate. Writers check "is there work in my queue?" Scanners check "has the codebase changed?" The radar checked the plan, found no tasks assigned to it, and exited. It never scanned a single file. Fix: SCAN gate with `git log --since` on watched paths.
+
+**3. Circuit breaker and auto_pause deadlocks.** Safety mechanisms can become traps. Circuit breaker opens after N idle cycles and blocks dispatch. But if dispatch is blocked, the automation stays idle, so CB stays open. Same loop with auto_pause. Fix: ensure the Progress section has shipping signal keywords when work is actually shipped (shipped, commit, fixed, merged, created, built, added, wrote, pushed). If the plan's Progress section has stale entries, the safety mechanisms fire on ghosts.
+
+**4. Restating doctrine in the prompt.** The agent loads doctrine via `$vidux`. Restating "plan is the store," "50/30/20 split," or "closure bias defense" in the prompt adds 500-1000 chars of noise that the agent already internalized from the skill file. This pushes the prompt past 4000 chars and crowds out the actually-unique instructions (gate, authority, role boundary).
+
+**5. Vague authority references.** "Read the bug tracker" forces the agent to search. "Read `/path/to/app-store-feedback.plan.md`" does not. Every authority file gets an absolute path and a role label (PRIMARY, collision avoidance, etc.).
+
+**6. Missing mid-zone kill.** Without the explicit rule ("if 3+ minutes pass with no file write, checkpoint and exit"), agents drift into plan-reading loops during deep work. The kill rule is one line. Omitting it costs entire cycles.
+
+**7. Missing role boundary.** Without an explicit "this lane owns X, sibling owns Y," a writer automation will drift into adjacent work and create merge conflicts with sibling lanes.
+
+### 14e. Skill Token Format
+
+Skill tokens use the `$name` convention. They are shorthand for "load this skill file."
+
+```
+$vidux      — Plan-first orchestration (SKILL.md)
+$pilot      — Stack-aware routing and small tasks
+$picasso    — Visual evaluation and screenshot proof
+$bigapple   — iOS/Apple platform conventions
+$xcodebuild — Xcode build, test, simulator, screenshot
+$ledger     — Cross-agent activity ledger
+$hooks      — PreToolUse/PostToolUse hooks
+$brand-*    — Brand-specific design tokens (e.g., $brand-acme)
+$*-engineering — Project-specific engineering conventions
+```
+
+The first line of the prompt declares skill dependencies with markdown links:
+
+```
+Use [$vidux](/path/to/SKILL.md) and [$pilot](/path/to/pilot/SKILL.md) for <work>.
+```
+
+This gives the agent both the token name and the file path. The `Load skills:` line later lists all tokens the agent should activate. Only list skills the automation actually uses — loading unused skills wastes context budget.
+
+### 14f. Size Guidance
+
+**Target: 2000-3000 characters.** The six rewritten fleet prompts range from 1800 to 2600 chars. The original broken prompts were 3500-5200 chars.
+
+| Range | Signal |
+|-------|--------|
+| < 1500 chars | Missing a block. Check: gate? cross-lane? role boundary? |
+| 1500-3000 chars | Healthy. Each block is present and concise. |
+| 3000-4000 chars | Audit for doctrine restatement or verbose gate logic. |
+| 4000+ chars | Almost certainly restating things the skill files already provide. |
+
+**Where the bloat hides:**
+- Doctrine restatement (500-1000 chars of "plan is the store" prose)
+- Multiple paragraphs of execution philosophy instead of bullet rules
+- Authority chain that lists DOCTRINE.md, SKILL.md, and other files the agent loads via skill tokens
+- Inline explanations of why each gate step matters (the agent does not need justification, just rules)
+
+**The test:** Can you delete a sentence without changing the agent's behavior? If yes, delete it.
