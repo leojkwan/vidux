@@ -249,13 +249,39 @@ deep_markers = [
     "run the vidux contract suite",
     "do not skip straight from evidence to implementation",
 ]
+section_markers = [
+    "\nauthority and read order",
+    "\nauthority chain",
+    "\nauthority",
+    "\nrole boundary",
+    "\nrole",
+    "\nper-run method",
+    "\nexecution focus",
+    "\nexecution rules",
+    "\nexecution",
+    "\nverification",
+    "\ncheckpoint",
+    "\noutput",
+]
 
-matched_reduce = [marker for marker in reduce_markers if marker in prompt]
-matched_deep = [marker for marker in deep_markers if marker in prompt]
+reduce_section = prompt
+reduce_start = prompt.find("reduce gate")
+if reduce_start != -1:
+    end_candidates = []
+    for marker in section_markers:
+        idx = prompt.find(marker, reduce_start + len("reduce gate"))
+        if idx != -1:
+            end_candidates.append(idx)
+    reduce_end = min(end_candidates) if end_candidates else len(prompt)
+    reduce_section = prompt[reduce_start:reduce_end]
+
+matched_reduce = [marker for marker in reduce_markers if marker in reduce_section]
+matched_deep_reduce = [marker for marker in deep_markers if marker in reduce_section]
+matched_deep_any = [marker for marker in deep_markers if marker in prompt]
 issues = []
-if matched_deep and not matched_reduce:
+if matched_deep_any and not matched_reduce:
     issues.append("missing_reduce_contract")
-if matched_deep and matched_reduce:
+if matched_deep_reduce and matched_reduce:
     issues.append("mixed_reduce_and_dispatch_scope")
 
 payload = {
@@ -263,7 +289,7 @@ payload = {
     "status": status,
     "kind": kind,
     "matched_reduce_markers": matched_reduce,
-    "matched_deep_markers": matched_deep,
+    "matched_deep_markers": matched_deep_reduce or matched_deep_any,
     "issues": issues,
 }
 print(json.dumps(payload))

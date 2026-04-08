@@ -25,10 +25,10 @@ SCAN gate (run FIRST, before any other work):
 1. Read last 3 memory notes from ~/.codex/automations/{{automation-id}}/memory.md.
    If the same "no issues found" verdict appears 3 consecutive times with no
    codebase changes between them, exit with:
-   "[SCAN] <date> unchanged, no new issues. No dispatch."
+   "[SCAN] <date> unchanged, no new issues. No deep work."
 2. Check for changes: git log --since="<timestamp of last scan>" -- {{watched_paths}}
 3. If no changes since last scan AND last scan found no issues → exit with:
-   "[SCAN] <date> no changes to {{watched_paths}} since last scan. No dispatch."
+   "[SCAN] <date> no changes to {{watched_paths}} since last scan. No deep work."
 4. Otherwise → proceed to full scan below.
 Budget: steps 1-3 must complete in under 60 seconds.
 
@@ -61,6 +61,11 @@ Checkpoint
 - Update {{automation-id}} memory, keep 3 notes max.
 - If nothing changed from last note, [SCAN] exit.
 - Lead with {{Domain}}: hot or {{Domain}}: cold, then surface/proof/risk/next move.
+
+Inbox
+- If findings are actionable, append to INBOX.md next to the plan store.
+- Format: `- [YYYY-MM-DD] [{{automation-id}}] Finding: <description> [Evidence: <path>]`
+- Do not edit existing entries or promote to PLAN.md — that is the writer's job.
 ```
 
 ## Sizing

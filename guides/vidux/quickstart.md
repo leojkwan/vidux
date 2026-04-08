@@ -79,23 +79,25 @@ READ --> ASSESS --> ACT --> VERIFY --> CHECKPOINT --> done
 
 The next `/vidux` reads fresh from files and picks up from the checkpoint. No memory, no databases, no running processes. PLAN.md is the entire state of the world.
 
-## The Dispatch/Reduce Cycle
+## The Quick Check / Deep Work Cycle
 
 This is how Vidux runs unattended (cron loops, overnight work). Two modes:
 
-**REDUCE** (under 2 minutes, read-only): The cron fires this. It reads the store (PLAN.md), checks for pending work, and either exits (nothing to do) or fires DISPATCH. REDUCE never writes code. It is a pure function of the current store.
+**Quick check** (under 2 minutes, read-only): The cron fires this. It reads the store (PLAN.md), checks for pending work, and either exits (nothing to do) or fires deep work. Never writes code.
 
-**DISPATCH** (15+ minutes, deep work): Drains the queue. Executes tasks, runs builds, ships code. No upper time bound -- it yields only on queue drain, hard blocker, or context budget.
+**Deep work** (15+ minutes, real work): Drains the queue. Executes tasks, runs builds, ships code. No upper time bound -- it yields only on queue drain, hard blocker, or context budget.
 
 ```
-Cron fires REDUCE
+Cron fires quick check (REDUCE gate)
     |
     +--> nothing pending? --> exit
     |
-    +--> work pending? --> fire DISPATCH --> drain queue --> exit
+    +--> work pending? --> fire deep work --> drain queue --> exit
 ```
 
-This is the Redux cycle made literal. `dispatch(action)` fires a long execution. `reducer(state, action)` reads the result and produces new state. The mid-zone (3-8 minutes) where agents quit at the first natural milestone is structurally eliminated -- the mode decides the duration, not the agent's judgment.
+The mid-zone (3-8 minutes) where agents quit at the first natural milestone is structurally eliminated -- the mode decides the duration, not the agent's judgment.
+
+> **Technical names in scripts:** `vidux-loop.sh` outputs `mode: "reduce"` and fires DISPATCH. These are the script-level identifiers for quick check and deep work.
 
 ## Commands
 

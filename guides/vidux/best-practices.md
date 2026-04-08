@@ -93,7 +93,7 @@ The "I am done" feeling is unreliable. The queue is truth.
 
 **Real failure:** A Resplit automation completed a payment flow fix, checkpointed, and exited at 4.7 minutes. Six more tasks were pending. The next cron fire spent 2 minutes bootstrapping context just to pick up where the last one could have continued. Multiply this by every run in a 10-automation fleet running overnight and the waste is substantial.
 
-**How dispatch/reduce fixes this structurally:** REDUCE mode exits in under 2 minutes (nothing to do). DISPATCH mode has no exit until queue drain or hard blocker. There is no middle ground. The agent never decides "should I keep going?" because the mode already decided. See the architecture guide, Section 2.
+**How the quick check / deep work model fixes this structurally:** Quick check exits in under 2 minutes (nothing to do). Deep work has no exit until queue drain or hard blocker. There is no middle ground. The agent never decides "should I keep going?" because the mode already decided. See the architecture guide, Section 2.
 
 ---
 
@@ -167,9 +167,9 @@ Why subagents, not Teams? Teams persist across sessions (violates stateless doct
 
 ## 7. Running Overnight Cron Loops
 
-Each cycle is stateless: REDUCE reads the store, optionally fires DISPATCH, checkpoint, exit. The next cycle is a fresh agent that knows nothing except what is in the files.
+Each cycle is stateless: quick check reads the store, optionally fires deep work, checkpoint, exit. The next cycle is a fresh agent that knows nothing except what is in the files.
 
-**30-minute cadence for fleet automations.** The Resplit/StrongYes fleet uses 30-minute cron intervals. REDUCE fires every 30 min. If work is pending, DISPATCH runs until the queue is drained. If nothing is pending, REDUCE exits in under 2 minutes.
+**30-minute cadence for fleet automations.** The Resplit/StrongYes fleet uses 30-minute cron intervals. Quick check fires every 30 min. If work is pending, deep work runs until the queue is drained. If nothing is pending, quick check exits in under 2 minutes.
 
 **Expect auth expiry.** Tokens expire, MCP servers disconnect. A crashed session loses at most one cycle. The next cycle commits recovered work first.
 
@@ -183,7 +183,7 @@ Each cycle is stateless: REDUCE reads the store, optionally fires DISPATCH, chec
 
 **Coding without a plan entry.** Number one mistake. Every code change traces to a PLAN.md task. The PreToolUse hook reminds you, but it is a safety net, not a substitute. During the Vidux build, agents kept making "quick cleanups" to unplanned files. Each cleanup was small. The cumulative drift was not.
 
-**Checkpointing after one task when more are pending.** Number two mistake. This is closure bias in action. Scan the queue. If there is more work, keep going. DISPATCH mode exists to enforce this structurally.
+**Checkpointing after one task when more are pending.** Number two mistake. This is closure bias in action. Scan the queue. If there is more work, keep going. Deep work mode exists to enforce this structurally.
 
 **Carrying context between sessions.** The next agent remembers nothing. Write it to PLAN.md or it does not exist.
 
@@ -314,12 +314,12 @@ REDUCE gate (run FIRST, before any other work):
    - blocker_dedup is true (same blocker reported 3+ times -- stop wasting cycles)
    - bimodal_gate is "blocked"
    - next_action is "none"
-   Write a 1-line memory note: "[REDUCE] <date> <reason>. No dispatch."
+   Write a 1-line memory note: "[REDUCE] <date> <reason>. No deep work."
    Do NOT read authority files, load skills, or do any other work. Exit now.
 3. Read the last 3 memory notes. If the top note is a [REDUCE] exit with the
-   same reason as this run's JSON, exit with: "[REDUCE] <date> unchanged. No dispatch."
+   same reason as this run's JSON, exit with: "[REDUCE] <date> unchanged. No deep work."
 4. If next_action is "dispatch": proceed to full execution below.
-Budget: steps 1-3 must complete in under 60 seconds. If you are still in REDUCE
+Budget: steps 1-3 must complete in under 60 seconds. If you are still in the quick check
 after 60 seconds, you are in the mid-zone. Checkpoint what you know and exit.
 ```
 
@@ -333,11 +333,11 @@ REDUCE gate (run FIRST, before any other work):
 2. If the most recent note says any of: "blocked", "nothing to do", "unchanged",
    "no pending", "waiting on human", "same blocker" -- and it was written less
    than 2 hours ago -- exit immediately with a 1-line note:
-   "[REDUCE] <date> Same state as last run (<quote reason>). No dispatch."
+   "[REDUCE] <date> Same state as last run (<quote reason>). No deep work."
    Do NOT read authority files, load skills, or gather evidence. Exit now.
 3. Read the single primary state file (plan, queue, or tracker). Count actionable
    items. If zero actionable items and no new items since the last note, exit with:
-   "[REDUCE] <date> No new work. No dispatch."
+   "[REDUCE] <date> No new work. No deep work."
 4. If actionable work exists: proceed to full execution below.
 Budget: steps 1-3 must complete in under 60 seconds.
 ```
@@ -351,11 +351,11 @@ SCAN gate (run FIRST, before any other work):
 1. Read last 3 memory notes from this automation's memory file.
    If the same "no issues found" verdict appears 3 consecutive times with no
    codebase changes between them, exit with:
-   "[SCAN] <date> unchanged, no new issues. No dispatch."
+   "[SCAN] <date> unchanged, no new issues. No deep work."
    Do NOT read authority files, load skills, or do any other work. Exit now.
 2. Check for changes: git log --since="<timestamp of last scan>" -- <watched_paths>
 3. If no changes since last scan AND last scan found no issues → exit with:
-   "[SCAN] <date> no changes to <watched_paths> since last scan. No dispatch."
+   "[SCAN] <date> no changes to <watched_paths> since last scan. No deep work."
 4. Otherwise → proceed to full scan below.
 Budget: steps 1-3 must complete in under 60 seconds.
 ```
@@ -370,16 +370,16 @@ Budget: steps 1-3 must complete in under 60 seconds.
 
 **When the SCAN gate proceeds:** Either the codebase changed since the last scan (new commits in watched paths) or the last scan found issues that need re-verification. The radar does a full scan and writes its findings.
 
-### Dispatch-side mid-zone kill
+### Deep-work mid-zone kill
 
-The REDUCE gate prevents mid-zone on the way *in*. This rule prevents it during dispatch:
+The REDUCE gate prevents mid-zone on the way *in*. This rule prevents it during deep work:
 
-> **If 3+ minutes pass in dispatch mode with no file write and no active research query,
+> **If 3+ minutes pass in deep work mode with no file write and no active research query,
 > checkpoint what you have and exit.**
 
-Do not re-read the plan, re-assess state, or "think about what to do next" — that is
-reduce-mode work happening inside a dispatch. Either write a file or exit. The circuit
-breaker in `vidux-loop.sh` enforces this from the outside (blocks dispatch after N idle
+Do not re-read the plan, re-assess state, or "think about what to do next" -- that is
+quick check work happening inside a deep run. Either write a file or exit. The circuit
+breaker in `vidux-loop.sh` enforces this from the outside (blocks deep work after N idle
 cycles), but the agent should self-enforce from the inside too.
 
 Fleet data (2026-04-07): 32% of Codex sessions land in the 3-8 min mid-zone. Target: <15%.
@@ -413,7 +413,49 @@ Both gate blocks go **inside** the prompt string, immediately after the mission 
 
 ---
 
-## 13. Quick Reference
+## 12c. Radar->Writer Inbox Pattern
+
+Radars observe. Writers execute. The inbox connects them. When a scanner finds an actionable issue, it appends a timestamped entry to `INBOX.md` (which lives next to the project's `PLAN.md`). Writers check the inbox during their READ step, before looking at the task queue.
+
+**When to use:** Any fleet where scanners and writers operate on the same project. Without the inbox, radar findings go to memory notes that writers never read. The feedback loop is broken.
+
+**Entry format:**
+```
+- [YYYY-MM-DD] [scanner-id] Finding: <description> [Evidence: <file:line or proof path>]
+```
+
+**Promotion flow:** If actionable, the writer creates a `[pending]` task in PLAN.md and deletes the inbox entry. If not actionable, the writer annotates it with `[SKIP: reason]` and leaves it. Scanners are append-only -- they never edit or delete inbox entries.
+
+**20-entry cap:** If INBOX.md reaches 20 entries, oldest non-skipped entries are archived to `evidence/` before new ones are appended. A full inbox means the writer is not keeping up. That is a fleet health signal, not a formatting problem.
+
+---
+
+## 13. Fleet Health Orchestrator
+
+When running 5+ automations on the same project, a coordinator automation should manage fleet health instead of letting each automation fend for itself.
+
+**When to use a coordinator:** Any fleet with 5+ automations, or any fleet where 3+ automations share the same plan or target repo. Below that threshold, individual gate logic (REDUCE/SCAN) is sufficient.
+
+**The 5-step fleet scan:**
+
+1. Read all automation memories in one pass (not one at a time)
+2. Classify each: SHIPPING, IDLE, BLOCKED, CRASHED, MID-ZONE
+3. Detect patterns: queue starvation (N idle on same plan), shared blockers (escalate, don't retry), file collisions (coordinate or yield), gate mismatches (scanner on REDUCE = wrong gate)
+4. Act at fleet level: pause idle clusters, escalate repeated blockers, fix gate types, redistribute imbalanced queues
+5. Report scorecard: N shipping / N idle / N blocked / N crashed / N mid-zone
+
+**Anti-patterns:**
+
+- Editing individual prompts while the fleet is dead (mid-zone work at orchestrator level)
+- Retrying the same blocker across 3+ cycles without escalating
+- Spinning up new automations without checking what the existing fleet is doing (Doctrine 13)
+- Treating all idle automations identically — idle-because-queue-empty is different from idle-because-gate-misconfigured
+
+See SKILL.md "Fleet health orchestrator pattern" for the full specification.
+
+---
+
+## 14. Quick Reference
 
 **Before coding:** Readiness score 7+? If not, refine the plan.
 

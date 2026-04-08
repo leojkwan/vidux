@@ -19,8 +19,8 @@ In Redux, a UI store holds application state. Components render views derived fr
 |---------------|-----------------|----------------------|
 | Store | PLAN.md | Single source of truth. All state lives here. |
 | Actions | Plan amendments (require evidence) | The only legal way to mutate the store. Each carries a payload (evidence). |
-| Reducers | REDUCE mode (read store, produce new state) | Pure function. Reads the current store, decides what happens next. |
-| dispatch() | DISPATCH mode (deep work, drain the queue) | Fires a long execution. Yields only on completion. |
+| Reducers | Quick check mode (REDUCE in scripts) | Pure function. Reads the current store, decides what happens next. |
+| dispatch() | Deep work mode (DISPATCH in scripts) | Fires a long execution. Yields only on completion. |
 | View | Code (derived, never independent) | Rendered from the store. If the view is wrong, the store is wrong. |
 | DevTools | Git log + Ledger | Append-only. Replay any session. Time-travel debugging. |
 
@@ -30,7 +30,7 @@ The analogy also explains why Vidux feels heavyweight for small tasks. Redux is 
 
 ---
 
-## 2. The Dispatch/Reduce Cycle
+## 2. The Quick Check / Deep Work Cycle
 
 This is the core runtime model. Understanding it makes everything else obvious.
 
@@ -44,22 +44,22 @@ Agents have a learned closure bias (Claude Code #34238). After completing any ta
 Cron fires every 30 minutes
      |
      v
-REDUCE (<2 min, read-only)
+QUICK CHECK / REDUCE (<2 min, read-only)
      |
      +--> Read PLAN.md, git log, git diff
      |
      +--> Nothing pending?
      |         |
      |         v
-     |    Checkpoint "reduce: nothing pending", exit
+     |    Checkpoint "quick check: nothing pending", exit
      |
      +--> Work pending?
               |
               v
-         Fire DISPATCH
+         Fire DEEP WORK
               |
               v
-         DISPATCH (15+ min, deep work)
+         DEEP WORK / DISPATCH (15+ min)
               |
               +--> Execute first unchecked task
               +--> SCAN QUEUE (mandatory -- closure bias defense)
@@ -73,32 +73,32 @@ REDUCE (<2 min, read-only)
          Checkpoint with structured commit, exit
 ```
 
-**REDUCE** is the cron entry point. It reads the store, evaluates state, and either exits (nothing to do) or fires DISPATCH (work pending). REDUCE never writes code, never modifies the plan beyond updating timestamps. It is a pure function of the current store -- exactly like a Redux reducer.
+**Quick check** (REDUCE in scripts) is the cron entry point. It reads the store, evaluates state, and either exits (nothing to do) or fires deep work (work pending). A quick check never writes code, never modifies the plan beyond updating timestamps.
 
-**DISPATCH** is deep work mode. It pops tasks from the queue, executes them, verifies with build/test gates, and keeps going until the queue is drained or a hard blocker stops it. No upper time bound. No "one task and exit." The harness says: "keep working until the queue is empty or something external stops you."
+**Deep work** (DISPATCH in scripts) is the real work mode. It pops tasks from the queue, executes them, verifies with build/test gates, and keeps going until the queue is drained or a hard blocker stops it. No upper time bound. No "one task and exit." The harness says: "keep working until the queue is empty or something external stops you."
 
 ### Why Mid-Zone Is Structurally Impossible
 
-In a naive setup, the agent decides when to stop. This is the root of the problem -- an agent's "I am done" feeling is unreliable (closure bias). Dispatch/Reduce eliminates this decision:
+In a naive setup, the agent decides when to stop. This is the root of the problem -- an agent's "I am done" feeling is unreliable (closure bias). The quick check / deep work model eliminates this decision:
 
 ```
 Duration spectrum:
 
-  REDUCE          Mid-zone (eliminated)       DISPATCH
+  QUICK CHECK     Mid-zone (eliminated)       DEEP WORK
   |<-- <2 min -->|                           |<-- 15+ min -------->|
   [read, decide] [agents used to quit here]  [drain queue, real work]
                   ^
                   This zone cannot exist because:
-                  - REDUCE exits in <2 min (read-only, no work)
-                  - DISPATCH has no exit until queue drain/blocker
+                  - Quick check exits in <2 min (read-only, no work)
+                  - Deep work has no exit until queue drain/blocker
                   - There is no third mode
 ```
 
-The agent never has to decide "should I keep going?" because the mode already decided. REDUCE always exits fast. DISPATCH never exits until the work is done. The 3-8 minute mid-zone where stuck agents masquerade as polite ones is structurally gone.
+The agent never has to decide "should I keep going?" because the mode already decided. Quick check always exits fast. Deep work never exits until the work is done. The 3-8 minute mid-zone where stuck agents masquerade as polite ones is structurally gone.
 
 ### The Closure Bias Defense
 
-After completing any task inside DISPATCH, the agent MUST scan the queue before checkpointing. This is not optional. The "I am done" feeling after a successful commit is the exact moment closure bias strikes.
+After completing any task inside a deep work run, the agent MUST scan the queue before checkpointing. This is not optional. The "I am done" feeling after a successful commit is the exact moment closure bias strikes.
 
 ```
 Task completed successfully
@@ -120,7 +120,7 @@ The queue is truth. The feeling is not.
 
 ### Real Example: Resplit Fleet
 
-Before dispatch/reduce, the Resplit iOS automation averaged 4.2 minutes per run. After: bimodal -- either 1.1 minutes (REDUCE, nothing to do) or 22 minutes (DISPATCH, real work). Mid-zone runs dropped from 40% to under 5%. Net tasks completed per day increased because context window bootstrapping (the expensive part) happened less often.
+Before the quick check / deep work model, the Resplit iOS automation averaged 4.2 minutes per run. After: bimodal -- either 1.1 minutes (quick check, nothing to do) or 22 minutes (deep work, real tasks). Mid-zone runs dropped from 40% to under 5%. Net tasks completed per day increased because context window bootstrapping (the expensive part) happened less often.
 
 ---
 
@@ -205,7 +205,7 @@ Non-negotiable doctrine. Each exists because a specific failure was observed. Fu
 Every cron fire runs a fresh, stateless agent through five steps. The agent knows nothing except what is in the files.
 
 ```
-REDUCE entry:
+Quick check (REDUCE):
   Cron fires --> READ (30s) --> ASSESS (30s) --> work pending?
                                                       |
                      +----------No----> checkpoint, exit (<2 min total)
@@ -213,7 +213,7 @@ REDUCE entry:
                     Yes
                      |
                      v
-DISPATCH entry:
+Deep work (DISPATCH):
   ACT (15+ min) --> VERIFY (gate) --> CHECKPOINT (30s) --> exit
   ^                                        |
   +--- more tasks? scan queue, loop -------+
@@ -361,14 +361,14 @@ Each hook catches what the previous one missed. If the agent follows SessionStar
 
 The Resplit/StrongYes fleet runs 10 automations across 2 products. All automations share the same shape:
 
-- **DISPATCH mode**: every automation does real work, not just monitoring
+- **Deep work mode**: every automation does real work, not just monitoring
 - **Self-extending plans**: every automation adds tasks it discovers (Doctrine 11)
-- **30-minute cron cadence**: REDUCE fires every 30 min, DISPATCH when work is pending
+- **30-minute cron cadence**: quick check fires every 30 min, deep work when work is pending
 - **Work-stream scoped**: each automation owns one concern (payments, onboarding, UI polish, etc.)
 
 Fleet-wide quality is measured by `scripts/vidux-fleet-quality.sh`, which scans all active automations for stale plans, stuck loops, mid-zone violations, and un-checkpointed work.
 
-The default topology is flat. Each automation reads its own PLAN.md and makes its own dispatch/reduce decision. Coordination happens through the shared git history -- if Automation A fixes a file that Automation B planned to touch, B sees the change in its next REDUCE and adapts. For fleets of 4+ automations, a coordinator automation is an optional pattern (see SKILL.md Principle 9 and `vidux-recipes.md` coordinator harness template). The coordinator does not override individual dispatch/reduce decisions; it sequences cross-lane dependencies and resolves conflicts that git history alone cannot catch.
+The default topology is flat. Each automation reads its own PLAN.md and makes its own quick check / deep work decision. Coordination happens through the shared git history -- if Automation A fixes a file that Automation B planned to touch, B sees the change in its next quick check and adapts. For fleets of 4+ automations, a coordinator automation is an optional pattern (see SKILL.md Principle 9 and `vidux-recipes.md` coordinator harness template). The coordinator does not override individual mode decisions; it sequences cross-lane dependencies and resolves conflicts that git history alone cannot catch.
 
 ---
 
@@ -378,6 +378,6 @@ The default topology is flat. Each automation reads its own PLAN.md and makes it
 
 **Rigidity vs flexibility.** Unidirectional flow is inflexible by design. Drive-by edits to unrelated files accumulate untracked changes that interact in surprising ways three sessions later.
 
-**Queue drain vs throughput.** Half-finished tasks leave the codebase in an intermediate state the next agent must diagnose. The dispatch model says: keep working through the queue until it drains, each task completed fully before the next, codebase always in a known-good state at each checkpoint.
+**Queue drain vs throughput.** Half-finished tasks leave the codebase in an intermediate state the next agent must diagnose. The deep work model says: keep working through the queue until it drains, each task completed fully before the next, codebase always in a known-good state at each checkpoint.
 
 **Solo computer workflow.** Vidux is designed for one human operating one or more AI agents on a local machine. Tool state lives outside the repo. The repo is the shared surface; tool configuration is per-operator.

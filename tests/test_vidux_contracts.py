@@ -1983,9 +1983,9 @@ class ViduxContractTests(unittest.TestCase):
         self.assertIn("Principles 10-12", text)
 
     def test_doctrine_has_dispatch_reduce_section(self):
-        """DOCTRINE.md must contain the Dispatch / Reduce section."""
+        """DOCTRINE.md must contain the Quick Check / Deep Work section."""
         text = _read(DOCTRINE)
-        self.assertIn("Dispatch / Reduce", text)
+        self.assertIn("Quick Check / Deep Work", text)
         self.assertIn("DISPATCH", text)
         self.assertIn("REDUCE", text)
 

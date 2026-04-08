@@ -236,6 +236,23 @@ TASK_REST="${TASK_LINE#*:}"
 TASK_DESC="$(echo "$TASK_REST" | sed -E 's/^- \[([^]]*)\] //')"
 PROCESS_FIX_DECLARED="$({ echo "$TASK_DESC" | grep -oE '\[ProcessFix: ?[a-z_]+\]' || true; } | head -1 | sed -E 's/\[ProcessFix: ?([a-z_]+)\]/\1/' || true)"
 
+# --- sub-plan traversal ([spawns:] tag) ----------------------------------- #
+# If the current task links to a sub-plan via [spawns: path], count its tasks.
+# Single-level only — does not recurse into nested spawns.
+SUB_PLAN_JSON="null"
+SPAWNS_PATH="$(echo "$TASK_DESC" | grep -oE '\[spawns: [^]]+\]' | sed -E 's/\[spawns: (.+)\]/\1/' || true)"
+if [ -n "$SPAWNS_PATH" ]; then
+  # Resolve relative to PLAN_DIR
+  SUB_PLAN_FILE="$PLAN_DIR/$SPAWNS_PATH"
+  if [ -f "$SUB_PLAN_FILE" ]; then
+    _SP_PENDING="$(grep -cE '^\- (\[ \]|\[pending\]) ' "$SUB_PLAN_FILE" 2>/dev/null || true)"
+    _SP_IN_PROGRESS="$(grep -cE '^\- \[in_progress\] ' "$SUB_PLAN_FILE" 2>/dev/null || true)"
+    _SP_COMPLETED="$(grep -cE '^\- (\[x\]|\[completed\]) ' "$SUB_PLAN_FILE" 2>/dev/null || true)"
+    _SP_BLOCKED="$(grep -cE '^\- \[blocked\] ' "$SUB_PLAN_FILE" 2>/dev/null || true)"
+    SUB_PLAN_JSON="{\"path\": \"$(json_escape "$SPAWNS_PATH")\", \"pending\": $_SP_PENDING, \"in_progress\": $_SP_IN_PROGRESS, \"completed\": $_SP_COMPLETED, \"blocked\": $_SP_BLOCKED}"
+  fi
+fi
+
 # --- contradiction detection (keyword overlap + explicit tag) -------------- #
 # Check for explicit [Contradicts: ...] tag first
 CONTRADICTS_TAG="$(echo "$TASK_DESC" | grep -oE '\[Contradicts: [^]]+\]' || true)"
@@ -537,6 +554,7 @@ cat <<ENDJSON
   "circuit_breaker_streak": $CIRCUIT_BREAKER_STREAK,
   "blocker_dedup": $BLOCKER_DEDUP,
   "queue_starved": $QUEUE_STARVED,
+  "sub_plan": $SUB_PLAN_JSON,
   "reduce_contract": {
     "read_only": true,
     "max_budget_seconds": 120,

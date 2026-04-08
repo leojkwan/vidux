@@ -1,6 +1,6 @@
 # Vidux Doctrine
 
-> If an agent reads one file, this is it. 12 principles plus the dispatch/reduce execution model and gate patterns, each battle-tested across 40+ cycles building Vidux itself, a 10-automation fleet across Resplit and StrongYes, and overnight cron loops that run unsupervised. SKILL.md extends this with Principle 13 (cross-lane awareness).
+> If an agent reads one file, this is it. 12 principles plus the quick check / deep work execution model and gate patterns, each battle-tested across 40+ cycles building Vidux itself, a 10-automation fleet across Resplit and StrongYes, and overnight cron loops that run unsupervised. SKILL.md extends this with Principle 13 (cross-lane awareness).
 
 ## 1. Plan is the store
 
@@ -36,7 +36,7 @@ Every plan entry cites a source. No source = no entry. Sources: MCP queries, cod
 
 ## 5. Design for completion
 
-Dispatches end. Context is lost. Auth expires. The store persists. State lives in files, not memory. Every cycle reads fresh. Checkpoints are structured. Any agent can resume from the last checkpoint. Tool state (.claude/, .cursor/) lives outside the working tree.
+Deep work runs end. Context is lost. Auth expires. The store persists. State lives in files, not memory. Every cycle reads fresh. Checkpoints are structured. Any agent can resume from the last checkpoint. Tool state (.claude/, .cursor/) lives outside the working tree.
 
 *Why this matters: A StrongYes overnight loop lost auth at 3am. The next cron fire committed recovered work and continued. Zero human intervention.*
 
@@ -76,9 +76,9 @@ Healthy runs are bimodal: <2 min (nothing to do, checkpoint and exit) or 15+ min
 
 Every harness must say "if you checkpoint in under 5 minutes and pending work remains, you stopped too early -- pick up the next task." Quick exits are healthy when nothing is pending; mid-zone exits are stuck agents masquerading as polite ones.
 
-**Dispatch-side mid-zone kill:** Once in dispatch mode, if 3+ minutes pass with no file write and no active research query, checkpoint what you have and exit. Do not re-read the plan, re-assess state, or "think about what to do next" -- that is reduce-mode work happening inside a dispatch, which is the mid-zone by definition. Either write a file or exit. The circuit breaker in `vidux-loop.sh` enforces this from the outside (blocks dispatch after N idle cycles), but the agent should self-enforce from the inside too.
+**Deep-work mid-zone kill:** Once in deep work mode, if 3+ minutes pass with no file write and no active research query, checkpoint what you have and exit. Do not re-read the plan, re-assess state, or "think about what to do next" -- that is quick check work happening inside a deep run, which is the mid-zone by definition. Either write a file or exit. The circuit breaker in `vidux-loop.sh` enforces this from the outside (blocks deep work after N idle cycles), but the agent should self-enforce from the inside too.
 
-*Why this matters: Claude Code #34238 documents the closure bias pattern. Gastown's dispatch/reduce research found the same bimodal shape: short reduce cycles that find nothing, or long dispatch runs that finish real work, with very little in between. Fleet data shows 32% of Codex sessions land in the mid-zone (target: <15%).*
+*Why this matters: Claude Code #34238 documents the closure bias pattern. Gastown's research found the same bimodal shape: short quick checks that find nothing, or long deep work runs that finish real work, with very little in between. Fleet data shows 32% of Codex sessions land in the mid-zone (target: <15%).*
 
 ## 11. Self-extending plans with taste
 
@@ -96,28 +96,30 @@ Self-extension without a brake becomes recursive optimization forever. A good au
 
 ---
 
-## Dispatch / Reduce
+## Quick Check / Deep Work
 
-The two execution modes follow the Redux analogy exactly.
+Two execution modes. No middle ground.
 
-**DISPATCH** = deep work mode. Fire actions, drain the queue, ship code. No upper time bound. DISPATCH yields only on queue drain, hard blocker, or context budget. This is `dispatch(action)` -- it fires a long execution.
+**Quick check** (REDUCE gate in scripts) -- read the store, evaluate state, decide in under 2 minutes. Always read-only. The cron fires a quick check. If work is pending, it fires a deep work run. If nothing is pending, it exits.
 
-**REDUCE** = feedback mode. Read results, feed evidence back into the store, improve the plan. Under 2 minutes, always read-only. The cron fires REDUCE. REDUCE decides whether to fire DISPATCH. This is `reducer(state, action)` -- it reads the result and produces new state.
+**Deep work** (DISPATCH in scripts) -- drain the queue, ship code, do real work. No upper time bound. Deep work yields only on queue drain, hard blocker, or context budget.
 
 Mid-zone (3-8 min) is structurally eliminated -- the agent never decides when to stop because the mode already decided.
+
+> **Technical names:** Scripts and JSON output use REDUCE and DISPATCH as gate/mode identifiers. In prose and harness prompts, prefer "quick check" and "deep work."
 
 ```
 Cron
  |
  v
-REDUCE (<2 min, read-only)
+QUICK CHECK / REDUCE (<2 min, read-only)
  |
  +--> nothing pending? --> checkpoint, exit
  |
- +--> work pending? --> fire DISPATCH
+ +--> work pending? --> fire DEEP WORK
                          |
                          v
-                    DISPATCH (15+ min, real work)
+                    DEEP WORK / DISPATCH (15+ min)
                          |
                          +--> drain queue until:
                               - queue empty
@@ -128,7 +130,7 @@ REDUCE (<2 min, read-only)
                     checkpoint, exit
 ```
 
-**Terminology:** DISPATCH and REDUCE only. Never "burst" or "watch" -- those terms are rejected. The Redux metaphor is load-bearing.
+**Terminology:** In prose, say "quick check" and "deep work." In scripts and JSON, REDUCE and DISPATCH are the technical identifiers. Never "burst" or "watch" -- those terms are rejected.
 
 ### Writers vs Scanners
 
@@ -158,7 +160,7 @@ SCAN gate (for scanner/radar automations):
 3. Otherwise --> full scan.
 ```
 
-The SCAN gate replaces the REDUCE gate in scanner harnesses. It checks reality, not plan state. A scanner that passes the SCAN gate enters DISPATCH and runs its full inspection. Findings become evidence files and/or new PLAN.md entries -- the scanner never fixes what it finds (that is a writer's job). If a scanner finds nothing, it writes a `[SCAN: clean]` memory note and exits. Three consecutive clean notes trigger the early exit in step 1.
+The SCAN gate replaces the REDUCE gate in scanner harnesses. It checks reality, not plan state. A scanner that passes the SCAN gate enters deep work and runs its full inspection. Findings become evidence files and/or new PLAN.md entries -- the scanner never fixes what it finds (that is a writer's job). If a scanner finds nothing, it writes a `[SCAN: clean]` memory note and exits. Three consecutive clean notes trigger the early exit in step 1.
 
 See `guides/vidux/best-practices.md` Section 12 for the full copy-paste gate blocks and insertion guidance.
 
@@ -170,8 +172,8 @@ See `guides/vidux/best-practices.md` Section 12 for the full copy-paste gate blo
 |-------|-------|
 | Store | PLAN.md |
 | Actions | Plan amendments (require evidence) |
-| Reducers | REDUCE mode -- read store, produce new state |
-| dispatch() | DISPATCH mode -- deep work, drain the queue |
+| Reducers | Quick check mode (REDUCE) -- read store, produce new state |
+| dispatch() | Deep work mode (DISPATCH) -- drain the queue |
 | View | Code (derived, never independent) |
 | DevTools | Git log + Ledger (reconstruct any mission) |
 

@@ -22,7 +22,7 @@ flowchart LR
     CODE -->|results feed back| DOC
 ```
 
-Every change moves through five steps: **Gather evidence -> Plan -> Execute -> Verify -> Checkpoint.** No step is skippable. If the code is wrong, the plan is wrong — fix the plan first. The store persists across sessions; each dispatch dies. Any fresh agent can rehydrate from files and continue.
+Every change moves through five steps: **Gather evidence -> Plan -> Execute -> Verify -> Checkpoint.** No step is skippable. If the code is wrong, the plan is wrong — fix the plan first. The store persists across sessions; each run dies. Any fresh agent can rehydrate from files and continue.
 
 ## Install
 
@@ -70,10 +70,10 @@ Vidux solves that by making documentation the control plane. State lives in mark
 
 Vidux includes self-healing mechanisms for automation fleets:
 
-- **Circuit breaker** — `vidux-loop.sh` blocks dispatch after N consecutive idle cycles (configurable, default 3). Prevents automations from burning cycles without shipping.
+- **Circuit breaker** — `vidux-loop.sh` blocks deep work after N consecutive idle cycles (configurable, default 3). Prevents automations from burning cycles without shipping.
 - **Idle-churn detection** — `vidux-witness.sh` reports per-automation `idle_churn_pct`. Automations where >50% of runs produce nothing get flagged.
-- **REDUCE gate** — a copy-paste prompt block that forces agents to check for actionable work before loading skills or reading files. Exits in <60s when nothing to do.
-- **Mid-zone kill** — dispatch-side enforcement: 3+ minutes with no file write = checkpoint and exit. Targets the 3-8 minute "stuck agent masquerading as polite" pattern.
+- **Quick check gate** (REDUCE gate in scripts) — a copy-paste prompt block that forces agents to check for actionable work before loading skills or reading files. Exits in <60s when nothing to do.
+- **Mid-zone kill** — deep-work enforcement: 3+ minutes with no file write = checkpoint and exit. Targets the 3-8 minute "stuck agent masquerading as polite" pattern.
 - **Radar template** — shared harness template for read-only observer automations (`guides/vidux/radar-template.md`). ~800-1200 chars per radar prompt.
 - **Cross-platform** — `scripts/lib/compat.sh` abstracts macOS/Linux differences (stat, date).
 

@@ -18,7 +18,7 @@ This is non-negotiable — the user needs to see what phase you're in at all tim
 - `⚡ EXECUTE` — writing code, running tasks from the queue
 - `✅ VERIFY` — build gate, test gate, QA checks
 - `📌 CHECKPOINT` — committing, updating Progress, structured handoff
-- `🏁 COMPLETE` — cycle complete, store persists, next dispatch rehydrates
+- `🏁 COMPLETE` — cycle complete, store persists, next cycle rehydrates
 
 **Meta-stages** (overlay on primary — show both when active):
 - `🔎 INVESTIGATE` — inside a nested bug investigation
@@ -197,7 +197,7 @@ Always leave a durable checkpoint when stopping.
 ### 6. 🏁 COMPLETE
 
 Stop only when you've hit a real boundary — context budget, blocker, or empty queue.
-The store persists. The next dispatch rehydrates from files. Leave enough in Progress for it to pick up immediately.
+The store persists. The next cycle rehydrates from files. Leave enough in Progress for it to pick up immediately.
 
 ## Reminders
 

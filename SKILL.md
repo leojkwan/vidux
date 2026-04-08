@@ -117,8 +117,8 @@ A plan entry without evidence is a guess. Guesses cause rework.
 
 ### 5. Design for completion
 
-Every dispatch will end. Context will be lost. Auth will expire. **Compaction will fire.**
-The store persists. The dispatch doesn't. Therefore:
+Every deep work run will end. Context will be lost. Auth will expire. **Compaction will fire.**
+The store persists. The run doesn't. Therefore:
 - State lives in files (PLAN.md, git branch), not in memory
 - Every cycle reads fresh from files, never carries context forward
 - Checkpoints are structured (not freeform summaries)
@@ -268,12 +268,12 @@ subagents, the coordinator runs slices sequentially in fresh sessions instead.
 > **Healthy runs are bimodal: <2 min (nothing to do, checkpoint and exit) or 15+ min (real work, full e2e cycle). Mid-zone runs (3-8 min) are the disease.**
 
 This is the operational counterpart of Principle 5 (design for completion). Principle 5 says
-the dispatch must be safe to end; this principle says it must not end at the *wrong* moment.
+the deep work run must be safe to end; this principle says it must not end at the *wrong* moment.
 Agents have a learned closure bias: they hit the first natural milestone (a commit, a
-sub-task, a build pass) and invent reasons to quit — "context is getting tight," "this is
+sub-task, a build pass) and invent reasons to quit -- "context is getting tight," "this is
 a good stopping point." Claude Code issue #34238 documents the pattern; the bimodal
-distribution model in `scripts/lib/ledger-query.sh` measures it. Gastown's dispatch/reduce
-research found the same shape: short reduce passes that find nothing or long dispatch runs that finish
+distribution model in `scripts/lib/ledger-query.sh` measures it. Gastown's research
+found the same shape: short quick checks that find nothing or long deep work runs that finish
 real work, with very little in between.
 
 **How to apply:** Every harness must say "if you checkpoint in under 5 minutes and
@@ -380,7 +380,7 @@ Two philosophies inform Vidux. Channel them when making design decisions.
 
 ### Two automation types
 
-Every vidux automation is either a **writer** or a **scanner**. The distinction is structural -- it determines which gate pattern the harness uses, how the agent decides "nothing to do," and what the REDUCE exit looks like.
+Every vidux automation is either a **writer** or a **scanner**. The distinction is structural -- it determines which gate pattern the harness uses, how the agent decides "nothing to do," and what the quick check exit looks like.
 
 | | **Writer** | **Scanner** |
 |---|---|---|
@@ -388,10 +388,29 @@ Every vidux automation is either a **writer** or a **scanner**. The distinction 
 | **Examples** | resplit-asc, release-train, strongyes-builder | localization radar, UX radar, flow radar, content radar, quality audit |
 | **State source** | PLAN.md task queue (pending/in_progress/completed) | The codebase itself (files, git history, runtime output) |
 | **"Nothing to do" means** | All tasks completed/blocked, no pending work | No files changed since last scan AND last N scans found no issues |
-| **Gate** | REDUCE gate: runs `vidux-loop.sh`, checks plan state | Scanner gate: checks git changes + last scan results |
-| **Dispatch** | Pop next task, execute, verify, checkpoint | Full scan of watched paths, report findings, checkpoint |
+| **Gate** | REDUCE gate: runs `vidux-loop.sh`, checks plan state | SCAN gate: checks git changes + last scan results |
+| **Deep work** | Pop next task, execute, verify, checkpoint | Full scan of watched paths, report findings, checkpoint |
 
 **Why this matters:** A scanner that uses a REDUCE gate will check if "all tasks are done" in PLAN.md and exit -- without ever looking at the codebase it is supposed to scan. Scanners do not pop tasks. They look at reality.
+
+### Radar->writer inbox pattern
+
+Scanners find issues. Writers fix issues. The inbox bridges them. Without it, radars observe problems that never reach the writer's queue, and writers check an empty PLAN.md while real issues go unaddressed.
+
+**How it works:**
+
+1. `INBOX.md` lives alongside `PLAN.md` in the project directory.
+2. Scanners append findings as timestamped entries (append-only for scanners):
+   ```
+   - [YYYY-MM-DD] [scanner-id] Finding: <description> [Evidence: <file:line or proof path>]
+   ```
+3. Writers check `INBOX.md` during their READ step, **before** looking at PLAN.md tasks.
+4. If an inbox entry is actionable, the writer promotes it to a `[pending]` task in PLAN.md and deletes the inbox entry.
+5. If not actionable, the writer annotates it with `[SKIP: reason]` and leaves it.
+6. `INBOX.md` is append-only for scanners, read-write for writers. Scanners never edit or delete entries.
+7. Maximum 20 entries. If full, oldest non-skipped entries get archived to `evidence/` before new ones are appended.
+
+**Why not write directly to PLAN.md?** Scanners are read-only observers (Doctrine: role boundary). Letting scanners mutate the task queue breaks the separation between observation and execution. The inbox is a buffer that preserves that boundary while closing the feedback loop.
 
 ### Anti-loop: why the Decision Log exists
 
@@ -423,7 +442,7 @@ PLAN.md each cycle — it never carries state forward in the prompt.
 2. **ASSESS** — Is the plan ready for code? Or does it need more evidence/refinement?
 3. **ACT** — Either refine the plan (gather + synthesize) OR execute one task from the plan.
 4. **CHECKPOINT** — Structured commit with: what changed, what's next, any blockers.
-5. **COMPLETE** — Cycle complete. Store persists. Next dispatch reads fresh.
+5. **COMPLETE** — Cycle complete. Store persists. Next cycle reads fresh.
 
 ### When to plan vs when to code
 
@@ -635,6 +654,22 @@ Living log updated each cycle.
 - [Date] Cycle N: [what happened]. outcome=<scorecard>. Next: [what's next]. Blocker: [if any].
 ```
 
+## INBOX.md Structure
+
+When a project uses the radar->writer inbox pattern, `INBOX.md` lives next to `PLAN.md`:
+
+```markdown
+# Inbox — [Project Name]
+
+Scanner findings awaiting writer promotion.
+
+- [YYYY-MM-DD] [scanner-id] Finding: <description> [Evidence: <path>]
+- [YYYY-MM-DD] [scanner-id] Finding: <description> [Evidence: <file:line>]
+- [YYYY-MM-DD] [scanner-id] Finding: <description> [SKIP: reason]
+```
+
+Writers delete promoted entries and annotate non-actionable ones. Maximum 20 entries; overflow archives oldest non-skipped entries to `evidence/`.
+
 ---
 
 ## Compound Tasks & Investigations
@@ -711,6 +746,21 @@ What is actually broken and why. Not symptoms — the specific code path.
 - [ ] tests pass (including new)
 - [ ] visual check or runtime smoke (for UI)
 ```
+
+### Sub-plan linking with `[spawns:]`
+
+A task can link to its sub-plan explicitly using the `[spawns:]` tag:
+
+```markdown
+- [in_progress] Task 5: Fix payment flow [spawns: investigations/payment-flow.md]
+```
+
+Rules:
+- The sub-plan follows the same PLAN.md structure (tasks with `[pending]`/`[in_progress]`/`[completed]`/`[blocked]` states)
+- vidux-loop.sh reports sub-plan status in its JSON output when the parent task is `in_progress` or `pending`
+- Sub-plan tasks inherit the parent's priority unless overridden
+- Traversal is 1 level deep (sub-plans do not recurse into their own `[spawns:]` tags)
+- `[spawns:]` and `[Investigation:]` serve the same purpose; `[spawns:]` is the machine-readable form that vidux-loop.sh traverses
 
 ### Status propagation
 
@@ -958,3 +1008,29 @@ Vidux orchestrates but doesn't replace these skills. It loads them as needed:
 | **captain** | Installation, multi-tool symlinks, health checks |
 | **vidux-loop** | Fleet creation and management — automation schedules, lean prompts, coordinator pattern, bimodal quality enforcement. **Writer automations only.** `vidux-loop.sh` and its plan-based REDUCE gate are designed for task-queue execution. Scanner automations use the SCAN gate pattern (see best-practices §12) and do not call `vidux-loop.sh` for their gate. |
 | **vidux-doctor.sh** | Runtime health checks — worktree hygiene, automation topology, stale plans, merge conflicts. Run at session start or whenever you need a read-only health pass. |
+
+### Fleet health orchestrator pattern
+
+When a Codex orchestrator manages multiple automations, it must operate at fleet level, not prompt level. An orchestrator that tightens one radar prompt while 6/11 automations are idle is mid-zone work.
+
+**The orchestrator should:**
+
+1. **Read ALL automation memories in one pass** — scan every `~/.codex/automations/*/memory.md` before taking any action. Never inspect one automation at a time.
+2. **Classify each automation**: SHIPPING (actively producing commits), IDLE (gate-exiting with no work), BLOCKED (same blocker 2+ cycles), CRASHED (auth failure, MCP disconnect), MID-ZONE (3-8 min sessions with no output).
+3. **Detect fleet-level patterns:**
+   - N idle automations on the same plan = queue starvation (the plan has no work, not the automations)
+   - Same blocker across N automations = escalation needed (human or infra fix, not retry)
+   - N automations touching the same files = collision (coordinate or yield)
+   - Scanner using a REDUCE gate = wrong gate type (scanners use SCAN; see best-practices §12)
+4. **Take fleet-level action:**
+   - Pause idle clusters instead of retrying them individually
+   - Create escalation tasks instead of re-reporting the same blocker
+   - Fix gate mismatches (scanner -> SCAN, writer -> REDUCE)
+   - Redistribute work when queues are imbalanced across lanes
+5. **Report a fleet scorecard** every cycle: N shipping, N idle, N blocked, N crashed, N mid-zone. The scorecard is the orchestrator's primary output — not prompt edits.
+
+**The orchestrator should NOT:**
+
+- Edit one prompt at a time. That is mid-zone work for a fleet manager.
+- Retry the same blocker 3+ times. Blocker dedup applies to orchestrators too — escalate or pause.
+- Create new automations without checking the existing fleet (Doctrine 13: cross-lane awareness). Five radars polling the same empty queue is worse than one.
