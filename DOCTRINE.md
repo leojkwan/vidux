@@ -1,6 +1,6 @@
 # Vidux Doctrine
 
-> If an agent reads one file, this is it. 12 principles plus the quick check / deep work execution model and gate patterns, each battle-tested across 40+ cycles building Vidux itself, a 10-automation fleet across Acme and Beacon, and overnight cron loops that run unsupervised. SKILL.md extends this with Principle 13 (cross-lane awareness).
+> If an agent reads one file, this is it. 14 principles plus the quick check / deep work execution model and gate patterns, each battle-tested across 40+ cycles building Vidux itself, a 10-automation fleet across Acme and Beacon, and overnight cron loops that run unsupervised. SKILL.md extends this with Principle 13 (cross-lane awareness).
 
 ## 1. Plan is the store
 
@@ -93,6 +93,16 @@ Agents are good at functional code (Stripe wiring, schema migrations, build conf
 Self-extension without a brake becomes recursive optimization forever. A good automation knows when a surface is honestly good and stops adding work to its own queue. Three-strike rule: if a surface already has 3+ queued polish tasks, ship the most impactful one and move on. Don't optimize already-good surfaces. If overall mission has gaps elsewhere, polish on a done surface is procrastination.
 
 *Why this matters: An Acme automation discovered 14 polish tasks on a single view controller. Without the three-strike brake it would still be polishing. With the brake it shipped the top 3 and moved to the next gap in the mission.*
+
+### 14. Hungry by default — find work, don't wait for it
+
+> An agent that exits with "nothing to do" without looking for work is a parked car with the engine running.
+
+*Why this matters: Six Acme automations exited every hour with "all tasks done" for 24 hours straight. The ASC bug tracker had 71 open items. The queue was empty because no one looked.*
+
+When the queue drains, run the five-point idle scan before exiting: INBOX.md, sibling memory, git history, blocked-task recheck, codebase scan. Only exit after all 5 find nothing. A clean exit cites what was scanned.
+
+When the user returns interactively: present what happened, numbered options for next moves, your recommended pick, and "steer me or say go." Never ask "what would you like to do?" without presenting options first.
 
 ---
 

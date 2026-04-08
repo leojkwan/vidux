@@ -309,7 +309,7 @@ REDUCE gate (run FIRST, before any other work):
 1. Run: bash scripts/vidux-loop.sh <plan-path>
 2. Read the JSON output. If ANY of these are true, checkpoint and exit immediately:
    - action is "blocked" or "auto_blocked" or "stuck" or "all_blocked"
-   - action is "complete" or type is "done" or "empty"
+   - action is "complete" or type is "done" or "empty" (BUT if queue_starved is true, proceed to five-point idle scan instead of exiting)
    - auto_pause_recommended is true
    - blocker_dedup is true (same blocker reported 3+ times -- stop wasting cycles)
    - bimodal_gate is "blocked"
@@ -338,6 +338,10 @@ REDUCE gate (run FIRST, before any other work):
 3. Read the single primary state file (plan, queue, or tracker). Count actionable
    items. If zero actionable items and no new items since the last note, exit with:
    "[REDUCE] <date> No new work. No deep work."
+3.5. If zero items in the primary file, run the five-point idle scan (Doctrine 14):
+   INBOX.md → sibling memory → git log on owned paths → blocked task recheck → codebase TODO/FIXME scan.
+   If any scan finds work: add to plan, proceed to execution.
+   If all scans clean: exit with "[REDUCE] <date> Five-point scan clean. No deep work."
 4. If actionable work exists: proceed to full execution below.
 Budget: steps 1-3 must complete in under 60 seconds.
 ```
@@ -629,6 +633,8 @@ What does the automation DO?
 **6. Missing mid-zone kill.** Without the explicit rule ("if 3+ minutes pass with no file write, checkpoint and exit"), agents drift into plan-reading loops during deep work. The kill rule is one line. Omitting it costs entire cycles.
 
 **7. Missing role boundary.** Without an explicit "this lane owns X, sibling owns Y," a writer automation will drift into adjacent work and create merge conflicts with sibling lanes.
+
+**8. Exiting on empty queue without scanning.** The queue being empty does not mean there is no work. The ASC bug tracker had 71 open items while the automation exited "nothing to do" for 24 hours. Doctrine 14 requires a five-point idle scan before any "nothing to do" exit. Every clean exit must cite what was scanned.
 
 ### 14e. Skill Token Format
 

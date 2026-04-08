@@ -350,6 +350,48 @@ orchestrator should detect fleet-level patterns (6 idle automations = dead fleet
 touching same file = collision), not wordsmith individual prompts. Ledger reads and
 hot-files checks are as mandatory as reading PLAN.md.
 
+### 14. Hungry by default — find work, don't wait for it
+
+> **An agent that exits with "nothing to do" without looking for work is a parked car with the engine running.**
+
+Every automation — writer or scanner — shares the same obligation: when the queue drains
+or the scan is clean, look for work before exiting. "Nothing assigned" is not the same as
+"nothing to do." A human with taste would scan the codebase, read recent commits, check
+what siblings found, and generate candidate tasks. An agent should do the same.
+
+**When the queue is empty, run the five-point scan (in order):**
+
+1. **INBOX.md** — Did a radar find issues that haven't been promoted to tasks yet?
+2. **Sibling memory** — Did a sibling lane ship something that creates follow-up work for this lane?
+3. **Git history** — Are there recent commits on surfaces this lane owns that need verification or polish?
+4. **Blocked task check** — Did an external blocker get resolved since last cycle? (Check URLs, auth, deps.)
+5. **Codebase scan** — Are there TODO/FIXME/HACK markers, untested paths, or missing docs on owned surfaces?
+
+If any scan finds actionable work: add it to the plan as `[pending]`, cite the scan as evidence,
+and execute it. This is Doctrine 11 (self-extending) applied to the idle state.
+
+If all 5 scans find nothing: exit with a genuine "nothing to do" and the scan results as proof.
+A clean exit must cite what was scanned, not just assert emptiness.
+
+**When the user returns to an interactive session:**
+
+Present a structured briefing before asking what to do:
+1. One-line summary: what happened since they left
+2. Numbered list of candidate next moves (what you'd do with taste, prioritized)
+3. Your pick: which one you'd start with and why
+4. Steering prompt: "steer me, reprioritize, or say go"
+
+This is not optional polish. An agent that says "what would you like to do?" without
+presenting options is forcing the human to context-switch into planning mode. The agent
+already has the context. Use it.
+
+**Relationship to other principles:** This principle makes Doctrine 11 (self-extending)
+universal — not just during active work, but also during idle states. It makes Doctrine 10
+(bimodal) honest — a quick exit is only healthy when the five-point scan confirms nothing,
+not when the queue happens to be empty. It makes Doctrine 12 (bounded recursion) the
+brake — self-extension during idle scans is still bounded by "good enough" on already-shipped
+surfaces.
+
 ---
 
 ## Advisors
@@ -478,10 +520,14 @@ ELIF plan is empty or doesn't exist:
   -> Checkpoint (plan created, no code)
 
 ELIF all tasks are [completed]:
-  -> Verify final state. Mark mission complete.
+  -> Run five-point idle scan (Doctrine 14): INBOX.md, sibling memory, git history, blocked recheck, codebase scan.
+  -> If scan finds work: add to plan as [pending], execute.
+  -> If scan clean: verify final state. Mark mission complete.
 
 ELIF all tasks are [blocked]:
-  -> Log status. Escalate each blocker to human. Checkpoint.
+  -> Check if any blocker has been resolved (URL check, auth check, dep check).
+  -> If unblocked: set to [pending], execute.
+  -> If still blocked: log status. Escalate each blocker to human. Checkpoint.
 
 ELSE:
   -> Log status. Checkpoint.
@@ -981,7 +1027,7 @@ auto-block write is skipped. No data is lost.
 Vidux core is company-agnostic. Zero references to any employer's internal tools.
 
 **Layer 1: Vidux Core (open-sourceable)**
-- Doctrine (13 principles)
+- Doctrine (14 principles)
 - Two data structures (doc tree + work queue)
 - Loop mechanics (stateless cycle)
 - Failure protocol (dual five-whys, three-strike gate)
