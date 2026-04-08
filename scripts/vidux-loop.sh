@@ -146,6 +146,7 @@ PROCESS_FIX_DECLARED=""
 AUTO_PAUSE_RECOMMENDED=false; UNPRODUCTIVE_STREAK=0
 BIMODAL_SCORE=-1; BIMODAL_GATE="pass"
 CIRCUIT_BREAKER="closed"; CIRCUIT_BREAKER_STREAK=0
+BLOCKER_DEDUP=false; QUEUE_STARVED=false
 
 # Circuit breaker: if last N Progress entries show no shipping signals, block dispatch.
 CB_THRESHOLD=3
@@ -201,7 +202,13 @@ fi
 
 if [ -z "$TASK_LINE" ]; then
   # Shared fleet health suffix for all early-exit JSON paths
-  _FLEET_SUFFIX="\"auto_pause_recommended\": $AUTO_PAUSE_RECOMMENDED, \"unproductive_streak\": $UNPRODUCTIVE_STREAK, \"bimodal_score\": $BIMODAL_SCORE, \"bimodal_gate\": \"$BIMODAL_GATE\", \"circuit_breaker\": \"$CIRCUIT_BREAKER\", \"circuit_breaker_streak\": $CIRCUIT_BREAKER_STREAK"
+  # Queue starvation: all tasks done, but plan has a Purpose section and no MISSION COMPLETE marker
+  if grep -q '^## Purpose' "$PLAN" 2>/dev/null; then
+    if ! grep -qi 'MISSION COMPLETE\|mission.complete' "$PLAN" 2>/dev/null; then
+      QUEUE_STARVED=true
+    fi
+  fi
+  _FLEET_SUFFIX="\"auto_pause_recommended\": $AUTO_PAUSE_RECOMMENDED, \"unproductive_streak\": $UNPRODUCTIVE_STREAK, \"bimodal_score\": $BIMODAL_SCORE, \"bimodal_gate\": \"$BIMODAL_GATE\", \"circuit_breaker\": \"$CIRCUIT_BREAKER\", \"circuit_breaker_streak\": $CIRCUIT_BREAKER_STREAK, \"blocker_dedup\": $BLOCKER_DEDUP, \"queue_starved\": $QUEUE_STARVED"
   # Check if there are blocked tasks left (not "done" — escalate)
   BLOCKED_COUNT="$(grep -nE '^\- \[blocked\] ' "$PLAN" | _exclude_ec_lines | grep -c '.' || true)"
   if [ "$BLOCKED_COUNT" -gt 0 ]; then
@@ -316,6 +323,37 @@ if [ -n "$DEP" ]; then
         fi
       done <<< "$PENDING_IDS"
     done
+  fi
+fi
+
+# --- blocker dedup detection ------------------------------------------------ #
+# If this task is blocked (dep-gated or FSM [blocked]), check whether the same
+# blocker keyword appears in the last 3 Progress entries. If the same blocker
+# has been reported 3 times already, the loop is wasting cycles. Set
+# blocker_dedup=true so the REDUCE gate can recommend auto-pause.
+if grep -q '^## Progress' "$PLAN" 2>/dev/null; then
+  _BD_IS_BLOCKED=false
+  echo "$TASK_REST" | grep -qE '^\- \[blocked\] ' && _BD_IS_BLOCKED=true
+  [ "$BLOCKED" = true ] && _BD_IS_BLOCKED=true
+
+  if [ "$_BD_IS_BLOCKED" = true ]; then
+    _BD_KEY="${BLOCKER_NOTE:-$TASK_DESC}"
+    _BD_KEY="$(printf '%s' "$_BD_KEY" | cut -c1-40)"
+    if [ -n "$_BD_KEY" ]; then
+      _BD_PROG_BLOCK="$(awk '/^## Progress/{found=1; next} found && /^## /{found=0} found{print}' "$PLAN")"
+      _BD_LAST_3="$(printf '%s\n' "$_BD_PROG_BLOCK" | { grep -E '^\- \[' || true; } | head -3)"
+      _BD_HITS=0
+      while IFS= read -r _bd_line; do
+        [ -z "$_bd_line" ] && continue
+        if printf '%s' "$_bd_line" | grep -qF "$_BD_KEY"; then
+          _BD_HITS=$((_BD_HITS + 1))
+        fi
+      done <<< "$_BD_LAST_3"
+      if [ "$_BD_HITS" -ge 3 ]; then
+        BLOCKER_DEDUP=true
+        AUTO_PAUSE_RECOMMENDED=true
+      fi
+    fi
   fi
 fi
 
@@ -497,6 +535,8 @@ cat <<ENDJSON
   "bimodal_gate": "$BIMODAL_GATE",
   "circuit_breaker": "$CIRCUIT_BREAKER",
   "circuit_breaker_streak": $CIRCUIT_BREAKER_STREAK,
+  "blocker_dedup": $BLOCKER_DEDUP,
+  "queue_starved": $QUEUE_STARVED,
   "reduce_contract": {
     "read_only": true,
     "max_budget_seconds": 120,

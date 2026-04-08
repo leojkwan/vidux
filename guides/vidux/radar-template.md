@@ -37,6 +37,16 @@ Authority
 2. Last 3 memory notes: ~/.codex/automations/{{automation-id}}/memory.md
 3. Sibling radar notes ({{writer-automation-id}}) when present, same path
 
+Cross-lane READ (run after gate passes, before execution):
+1. Sibling memory scan — Read the last note from every sibling automation's
+   memory file (~/.codex/automations/*/memory.md). Know what shipped in the
+   last hour and what surfaces are claimed.
+2. Hot-files check — Read .agent-ledger/hot-files.md in the target repo. If
+   another lane is actively touching files you plan to inspect, yield or
+   coordinate.
+3. Fleet duplicate detection — If your planned scan overlaps with what a
+   sibling just scanned, skip it. Don't scan what was just scanned.
+
 Role boundary
 - Read-only radar: observe, report, flag. Never write app code or open fix branches.
 - Hand writer-ready findings to {{writer-automation-id}} via plan store.

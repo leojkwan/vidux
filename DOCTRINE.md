@@ -146,7 +146,9 @@ Writers produce code and consume tasks. Scanners produce evidence and create tas
 
 Every automation harness starts with a gate that forces the agent to evaluate actionable work *before* loading skills or reading authority files. The gate is how Principle 10 (bimodal runs) gets enforced in practice -- agents that have nothing to do never enter the mid-zone because they exit before doing any real work.
 
-Two variants exist for writers: **with-vidux** (runs `vidux-loop.sh`, reads JSON, exits on blocked/complete/stuck) and **standalone** (reads memory + primary state file directly). Both enforce the same contract: steps 1-3 complete in under 60 seconds, and an agent that finds no actionable work writes a one-line `[REDUCE]` memory note and exits immediately.
+Two variants exist for writers: **with-vidux** (runs `vidux-loop.sh`, reads JSON, exits on blocked/complete/stuck/blocker_dedup) and **standalone** (reads memory + primary state file directly). Both enforce the same contract: steps 1-3 complete in under 60 seconds, and an agent that finds no actionable work writes a one-line `[REDUCE]` memory note and exits immediately.
+
+**Blocker dedup:** `vidux-loop.sh` detects when the same blocker keyword (first 40 chars) appears in the last 3 Progress entries. When `blocker_dedup` is true, the gate also sets `auto_pause_recommended: true` -- stop wasting cycles re-reporting a known blocker.
 
 ```
 SCAN gate (for scanner/radar automations):

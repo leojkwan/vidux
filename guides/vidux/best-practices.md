@@ -311,6 +311,7 @@ REDUCE gate (run FIRST, before any other work):
    - action is "blocked" or "auto_blocked" or "stuck" or "all_blocked"
    - action is "complete" or type is "done" or "empty"
    - auto_pause_recommended is true
+   - blocker_dedup is true (same blocker reported 3+ times -- stop wasting cycles)
    - bimodal_gate is "blocked"
    - next_action is "none"
    Write a 1-line memory note: "[REDUCE] <date> <reason>. No dispatch."
@@ -382,6 +383,20 @@ breaker in `vidux-loop.sh` enforces this from the outside (blocks dispatch after
 cycles), but the agent should self-enforce from the inside too.
 
 Fleet data (2026-04-07): 32% of Codex sessions land in the 3-8 min mid-zone. Target: <15%.
+
+### Cross-lane READ step
+
+After the gate passes and before execution begins, every automation MUST read sibling state. This is Doctrine 13 -- cross-lane awareness is not optional. Three mandatory checks:
+
+1. **Sibling memory scan** -- Read the last note from every sibling automation's memory file (`~/.codex/automations/*/memory.md`). Know what shipped in the last hour and what surfaces are claimed. An automation that skips this will duplicate work or collide with an active lane.
+
+2. **Hot-files check** -- Read `.agent-ledger/hot-files.md` in the target repo. If another lane is actively touching files you are about to touch, yield or coordinate. Two lanes editing the same file in the same cycle produces merge conflicts that waste the next cycle to resolve.
+
+3. **Fleet duplicate detection** -- If your planned work overlaps with what a sibling just shipped, skip it. Do not fix what is already fixed. Do not scan what was just scanned. The dedup check is a single pass over sibling memory notes -- it costs seconds and saves entire cycles.
+
+**Where this goes in the harness prompt:** Immediately after the Authority/read-order block and before the Execution block. The agent reads the gate, then reads authority, then reads siblings, then acts. This ordering ensures the agent never starts work without knowing the fleet state.
+
+**Real failure:** Five StrongYes radars polled the same empty queue without knowing each other existed. `resplit-web` did not know `resplit-asc` just fixed the same surface. Both shipped competing branches. The merge cost more than the original fix.
 
 ### Insertion point guidance
 
