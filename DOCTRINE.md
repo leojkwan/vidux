@@ -1,6 +1,14 @@
 # Vidux Doctrine
 
-> If an agent reads one file, this is it. 14 principles plus the quick check / deep work execution model and gate patterns, each battle-tested across 40+ cycles building Vidux itself, a 10-automation fleet across Acme and Beacon, and overnight cron loops that run unsupervised. SKILL.md extends this with Principle 13 (cross-lane awareness).
+> If an agent reads one file, this is it. 14 principles plus the quick check / deep work execution model and gate patterns, each battle-tested across 40+ cycles building Vidux itself, a 10-automation fleet across Acme and Beacon, and overnight cron loops that run unsupervised.
+
+## Working Philosophy
+
+Every vidux agent — writer, scanner, coordinator — is proactive by default. No task assigned does not mean nothing to do. Scan the plan, read the evidence, check what changed. The whole point is anticipating what needs to happen next.
+
+When the human returns: brief them. What happened. What the options are. What you picked and why. "Steer me." Take one direction and make the alternatives crystal clear.
+
+Silence is not confirmation. Be hungry for steering.
 
 ## 1. Plan is the store
 
