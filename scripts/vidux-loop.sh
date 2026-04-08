@@ -149,12 +149,14 @@ CIRCUIT_BREAKER="closed"; CIRCUIT_BREAKER_STREAK=0
 BLOCKER_DEDUP=false; QUEUE_STARVED=false
 
 # Circuit breaker: if last N Progress entries show no shipping signals, block dispatch.
+# Scoped to ## Progress section only — don't match task descriptions elsewhere.
 CB_THRESHOLD=3
 if [ -f "$CONFIG" ]; then
   CB_THRESHOLD=$(python3 -c "import json,sys;print(json.load(open(sys.argv[1])).get('backpressure',{}).get('circuit_breaker_threshold',3))" "$CONFIG" 2>/dev/null || echo 3)
 fi
-if [ -f "$PLAN" ]; then
-  _recent_progress=$({ grep -E '^\s*-\s*\[' "$PLAN" | grep -i 'Cycle' || true; } | head -"$CB_THRESHOLD")
+if grep -q '^## Progress' "$PLAN" 2>/dev/null; then
+  _cb_prog_block="$(awk '/^## Progress/{found=1; next} found && /^## /{found=0} found{print}' "$PLAN")"
+  _recent_progress=$(printf '%s\n' "$_cb_prog_block" | { grep -E '^\- \[' || true; } | head -"$CB_THRESHOLD")
   _shipping_signals=0
   while IFS= read -r line; do
     if echo "$line" | grep -qiE 'shipped|commit|fixed|merged|created|built|added|wrote|pushed'; then
@@ -167,10 +169,11 @@ if [ -f "$PLAN" ]; then
   fi
 fi
 
-# Auto-pause: if last 3 Progress entries are unproductive, recommend pausing.
+# Auto-pause: if most recent 3 Progress entries are unproductive, recommend pausing.
+# Uses head -3 (not tail -3) because Progress entries are newest-first.
 if grep -q '^## Progress' "$PLAN" 2>/dev/null; then
   _AP_PROG_BLOCK="$(awk '/^## Progress/{found=1; next} found && /^## /{found=0} found{print}' "$PLAN")"
-  _AP_LAST_3="$(printf '%s\n' "$_AP_PROG_BLOCK" | { grep -E '^\- \[' || true; } | tail -3)"
+  _AP_LAST_3="$(printf '%s\n' "$_AP_PROG_BLOCK" | { grep -E '^\- \[' || true; } | head -3)"
   if [ -n "$_AP_LAST_3" ]; then
     _AP_UNPRODUCTIVE=0; _AP_TOTAL=0
     while IFS= read -r pline; do

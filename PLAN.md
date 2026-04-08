@@ -127,6 +127,19 @@ Create a net-new plan-first orchestration system that makes quarter-long iOS pro
 - [completed] **17.8 Sub-plan tree traversal** — Add `[spawns: investigations/foo.md]` tag support to vidux-loop.sh. Script traverses sub-plans when parent task is in_progress, reports aggregate status. [Evidence: user question "maybe we're not doing a good enough job with keeping the task queue or sub plan tree"]
 - [completed] **17.9 Orchestrator fleet health mode** — Redesign orchestrator from "edit one prompt at a time" to "detect fleet-level patterns and take fleet-level action." When 6/11 automations REDUCE-exit, the orchestrator should notice and act, not wordsmith one radar prompt. [Evidence: fleet-audit-11-automations.md#why-5]
 
+### Phase 18: Fleet Prompt Rewrite & Best Practices
+
+**Goal:** All 6 active Codex automations were dead overnight (0/6 shipped code). Root causes: wrong gate files, scanner using writer gate, circuit breaker and auto_pause deadlocks. Rewrite every prompt using v2.4.0 patterns and document prompt authoring best practices.
+
+[Evidence: `projects/vidux-self-investigation/evidence/2026-04-08-automation-prompt-rewrites.md`]
+
+- [completed] **18.1 Remove personal project data from repo** — Untracked 5 files in projects/, deleted fleet-rebuild script, genericized 92 resplit/strongyes references to acme/beacon across 10 docs, removed hardcoded paths. [Done: 2026-04-08]
+- [completed] **18.2 Diagnose all 6 active automations** — Audited prompts, ran vidux-loop.sh on each plan, read all memory files. Found: 4 wrong gate files, 1 scanner-as-writer, 2 safety deadlocks (CB + auto_pause). [Done: 2026-04-08] [Evidence: automation-prompt-rewrites.md]
+- [completed] **18.3 Rewrite all 6 automation prompts** — resplit-asc/currency/launch-loop → standalone REDUCE gate on correct plan. resplit-web/strongyes → with-vidux REDUCE with advisory CB/auto_pause. resplit-localization-pro → SCAN gate. All 6: cross-lane awareness, skill tokens, mid-zone kill. Updated Codex DB + reset 12 memory files. [Done: 2026-04-08]
+- [pending] **18.4 Write prompt authoring best practices** — Add Section 14 to best-practices.md: prompt structure, before/after example, gate selection guide, common mistakes, skill token format, size guidance. [Evidence: real fleet failure data]
+- [pending] **18.5 Verify fleet recovery after Codex restart** — After Leo reopens Codex, check next cycle's memory notes for dispatch (not REDUCE exit). At least 2/6 should dispatch work. [Depends: 18.3, Codex restart]
+- [pending] **18.6 Archive StrongYes plan** — 85 completed tasks need archiving to keep hot window lean. Run vidux-checkpoint.sh --archive. [Evidence: vidux-loop.sh context_warning=true]
+
 ### Phase 10 Open Questions
 - [x] Q6: Max plan nesting depth = 3, 4th allowed but flagged. Enforced by dashboard. [Decision Log entry exists.] [Done: 2026-04-07]
 - [x] Q7: Dashboard refresh = on-demand. Config added in 10.2 (`dashboard.refresh_mode: "on-demand"`). [Done: 2026-04-07]
