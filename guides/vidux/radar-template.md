@@ -21,18 +21,15 @@ Mission
 - Watch {{what to observe — be specific: surfaces, endpoints, metrics}}.
 - Surface writer-ready findings to {{writer-automation-id}} via the plan store. Never ship code or open competing fix branches.
 
-REDUCE gate (run FIRST, before any other work):
-1. Run: bash /path/to/vidux/scripts/vidux-loop.sh {{PLAN_PATH}}
-2. Read the JSON output. If ANY of these are true, checkpoint and exit immediately:
-   - next_action is "none"
-   - auto_pause_recommended is true
-   - circuit_breaker is "open"
-   - bimodal_gate is "blocked"
-   Write a 1-line memory note: "[REDUCE] <date> <reason>. No dispatch."
-   Do NOT read authority files, load skills, or do any other work. Exit now.
-3. Read the last 3 memory notes. If the top note is a [REDUCE] exit with the
-   same reason as this run's JSON, exit with: "[REDUCE] <date> unchanged. No dispatch."
-4. If next_action is "dispatch": proceed to full execution below.
+SCAN gate (run FIRST, before any other work):
+1. Read last 3 memory notes from ~/.codex/automations/{{automation-id}}/memory.md.
+   If the same "no issues found" verdict appears 3 consecutive times with no
+   codebase changes between them, exit with:
+   "[SCAN] <date> unchanged, no new issues. No dispatch."
+2. Check for changes: git log --since="<timestamp of last scan>" -- {{watched_paths}}
+3. If no changes since last scan AND last scan found no issues → exit with:
+   "[SCAN] <date> no changes to {{watched_paths}} since last scan. No dispatch."
+4. Otherwise → proceed to full scan below.
 Budget: steps 1-3 must complete in under 60 seconds.
 
 Authority
@@ -52,15 +49,15 @@ Execution
 
 Checkpoint
 - Update {{automation-id}} memory, keep 3 notes max.
-- If nothing changed from last note, [REDUCE] exit.
+- If nothing changed from last note, [SCAN] exit.
 - Lead with {{Domain}}: hot or {{Domain}}: cold, then surface/proof/risk/next move.
 ```
 
 ## Sizing
 
 A well-formed radar prompt using this template should be **800-1200 chars**.
-The REDUCE gate block is ~600 chars (shared). The unique sections (Mission, Execution)
-should be ~200-600 chars. If your radar exceeds 1500 chars, you're embedding process
+The SCAN gate block is ~500 chars (shared). The unique sections (Mission, Execution)
+should be ~300-700 chars. If your radar exceeds 1500 chars, you're embedding process
 that belongs in the skill or template.
 
 ## Examples
@@ -71,7 +68,9 @@ that belongs in the skill or template.
 | strongyes-flow-radar | Buyer path | $playwright | Auth flow, onboarding, checkout entry probes |
 | strongyes-revenue-radar | Stripe/payments | $posthog-analytics | Stripe contract paths, env contracts, revenue metrics |
 
-## REDUCE gate updates
+## SCAN gate vs REDUCE gate
 
-This template includes the `circuit_breaker` field (added in Phase 15.1). Older radar
-prompts that check only `bimodal_gate` should be updated to also check `circuit_breaker`.
+This template uses the **SCAN gate**, not the REDUCE gate. Radars are read-only observers
+that inspect the codebase or live product for issues. They check *reality* (git history,
+file state, live surfaces), not *plan state*. The REDUCE gate belongs in writer automations
+that execute plan tasks. See the best-practices guide, Section 12, for the full comparison.

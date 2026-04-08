@@ -136,7 +136,7 @@ Kick off the loop before bed. Review Progress in the morning. Each commit tells 
 ~/.cursor/skills/vidux  --+--> /path/to/vidux  (one clone, multi-tool symlinks)
 ~/.codex/skills/vidux   --+
                                |
-                               +-- DOCTRINE.md    <-- 11 principles (read this first)
+                               +-- DOCTRINE.md    <-- 12 principles (read this first)
                                +-- SKILL.md       <-- full contract
                                +-- LOOP.md        <-- stateless cycle mechanics
                                +-- commands/      <-- /vidux, /vidux-plan, /vidux-status
@@ -154,6 +154,6 @@ One clone, multi-tool symlinks. Plans live in `projects/<mission>/`, never in th
 
 ## Next Steps
 
-- Read `DOCTRINE.md` for the 11 principles (5 minutes, covers 80% of what you need)
+- Read `DOCTRINE.md` for the 12 principles (5 minutes, covers 80% of what you need)
 - Read `guides/vidux/architecture.md` for the Redux parallel and system design
 - Read `guides/vidux/best-practices.md` for lessons learned from 28+ cycles

@@ -225,6 +225,14 @@ file lists, implementation tasks, current blockers, or any snapshot of state.
 
 **One loop per project/mission.** If a loop already exists, refine it instead of creating a sibling.
 
+**Writer vs scanner harnesses.** When vidux creates a harness for a writer automation (task
+queue execution), the harness includes the plan-based REDUCE gate (runs `vidux-loop.sh`,
+checks plan state). When vidux creates a harness for a scanner automation (codebase inspection,
+quality audit, radar), the harness MUST NOT include the plan-based REDUCE gate. Instead it
+includes the SCAN gate -- checks file changes since last scan, checks last N scan results.
+A scanner that gates on plan state will never scan. See "REDUCE Gate Pattern" in best-practices
+for both gate templates.
+
 > For the full harness template and authoring guidance, see `guides/vidux/best-practices.md`.
 
 ### 9. Subagent coordinator pattern
@@ -317,6 +325,31 @@ polish on a done surface is procrastination. Only re-extend plans when investiga
 reveals new *surfaces*, not when you find one more pixel to align on a surface you
 already touched.
 
+### 13. Cross-lane awareness — know your siblings
+
+> **An automation that doesn't know what its siblings are doing is a solo agent pretending to be part of a fleet.**
+
+Every automation MUST read sibling state during its READ step. This is not optional.
+Not "when convenient." Not "if ledger is available." Structural. Before acting:
+
+1. **Sibling memory scan** — Read the last note from every sibling automation's memory file.
+   Know what shipped in the last hour and what surfaces are claimed.
+2. **Hot-files check** — Read `.agent-ledger/hot-files.md` in the target repo. If another
+   lane is actively touching files you're about to touch, yield or coordinate.
+3. **Fleet duplicate detection** — If your planned work overlaps with what a sibling just
+   shipped, skip it. Don't fix what's already fixed. Don't scan what was just scanned.
+
+**Why this matters:** The Codex orchestrator created a localization automation without
+checking the fleet. Five StrongYes radars polled the same empty queue without knowing
+each other existed. resplit-web didn't know resplit-asc just fixed the same surface.
+Cross-project awareness matters too: resplit-web, resplit-ios, and resplit-currency all
+touch the same product.
+
+**How to apply:** Every harness prompt's READ step must include sibling context. The
+orchestrator should detect fleet-level patterns (6 idle automations = dead fleet, 3 lanes
+touching same file = collision), not wordsmith individual prompts. Ledger reads and
+hot-files checks are as mandatory as reading PLAN.md.
+
 ---
 
 ## Advisors
@@ -345,6 +378,21 @@ Two philosophies inform Vidux. Channel them when making design decisions.
 
 ## Loop Mechanics (the 30%)
 
+### Two automation types
+
+Every vidux automation is either a **writer** or a **scanner**. The distinction is structural -- it determines which gate pattern the harness uses, how the agent decides "nothing to do," and what the REDUCE exit looks like.
+
+| | **Writer** | **Scanner** |
+|---|---|---|
+| **Purpose** | Execute tasks from a PLAN.md queue | Inspect codebase/product for issues |
+| **Examples** | resplit-asc, release-train, strongyes-builder | localization radar, UX radar, flow radar, content radar, quality audit |
+| **State source** | PLAN.md task queue (pending/in_progress/completed) | The codebase itself (files, git history, runtime output) |
+| **"Nothing to do" means** | All tasks completed/blocked, no pending work | No files changed since last scan AND last N scans found no issues |
+| **Gate** | REDUCE gate: runs `vidux-loop.sh`, checks plan state | Scanner gate: checks git changes + last scan results |
+| **Dispatch** | Pop next task, execute, verify, checkpoint | Full scan of watched paths, report findings, checkpoint |
+
+**Why this matters:** A scanner that uses a REDUCE gate will check if "all tasks are done" in PLAN.md and exit -- without ever looking at the codebase it is supposed to scan. Scanners do not pop tasks. They look at reality.
+
 ### Anti-loop: why the Decision Log exists
 
 Stateless cron agents have no memory of WHY a previous agent made a choice.
@@ -368,7 +416,7 @@ evidence of potential contradictions so the agent cannot claim ignorance.
 ### How the cron works
 
 Every cycle (20 min or hourly) is stateless-but-iterative.
-The cron PROMPT is an evergreen harness (see Doctrine 7). The cron READS state from
+The cron PROMPT is an evergreen harness (see Doctrine 8). The cron READS state from
 PLAN.md each cycle — it never carries state forward in the prompt.
 
 1. **READ** — `PLAN.md` from the branch. Last ledger entry. Git log since last checkpoint.
@@ -808,9 +856,23 @@ RAW INPUT → GATHER → AMPLIFY → PRESENT → [STEER...] → FIRE → EXECUTE
 
 | Signal | Mode |
 |--------|------|
-| "cron", "automation", "schedule", "loop", "recurring" | **HARNESS** — produce evergreen cron prompt per Doctrine 8 |
+| "cron", "automation", "schedule", "loop", "recurring" | **HARNESS** — produce evergreen cron prompt per Doctrine 8 (then detect writer vs scanner below) |
 | "plan", "project", "investigate", "research" | **PLAN** — produce mission description, no code |
 | Everything else | **EXECUTE** — produce specific, evidence-cited, actionable prompt |
+
+**HARNESS sub-detection -- writer vs scanner:** When HARNESS mode is selected, classify
+the automation type from the input before generating the prompt. This determines which
+gate pattern the harness gets.
+
+| Signal in request | Type | Gate |
+|-------------------|------|------|
+| "scan", "watch", "monitor", "audit", "check quality", "find issues", "radar", "lint", "detect", "sweep", "inspect" | **Scanner** | Scanner gate (file changes + last scan results) |
+| "build", "ship", "release", "deploy", "execute tasks", "pop queue", "run plan", "train" | **Writer** | REDUCE gate (vidux-loop.sh + plan state) |
+| Ambiguous | Ask the user: "Is this a scanner (inspects code for issues) or a writer (executes tasks from a plan)?" |
+
+**This is not optional.** If vidux detects scanner signals and generates a writer harness
+with a plan-based gate, the automation will check "all tasks done" and exit without scanning.
+The gate type must match the automation type.
 
 **3. PRESENT** — show the amplified prompt in a box. End with `→ steer me or say fire`.
 
@@ -869,7 +931,7 @@ auto-block write is skipped. No data is lost.
 Vidux core is company-agnostic. Zero references to any employer's internal tools.
 
 **Layer 1: Vidux Core (open-sourceable)**
-- Doctrine (12 principles)
+- Doctrine (13 principles)
 - Two data structures (doc tree + work queue)
 - Loop mechanics (stateless cycle)
 - Failure protocol (dual five-whys, three-strike gate)
@@ -894,5 +956,5 @@ Vidux orchestrates but doesn't replace these skills. It loads them as needed:
 | **pilot** | Entry router and compatibility layer. Pilot activates Vidux for expedition-scale, plan-first work, then steps out of the way instead of running a second loop. |
 | **ledger** | Lifecycle events, cross-session state, worktree GC (`ledger --gc --report` during READ step) |
 | **captain** | Installation, multi-tool symlinks, health checks |
-| **vidux-loop** | Fleet creation and management — automation schedules, lean prompts, coordinator pattern, bimodal quality enforcement |
+| **vidux-loop** | Fleet creation and management — automation schedules, lean prompts, coordinator pattern, bimodal quality enforcement. **Writer automations only.** `vidux-loop.sh` and its plan-based REDUCE gate are designed for task-queue execution. Scanner automations use the SCAN gate pattern (see best-practices §12) and do not call `vidux-loop.sh` for their gate. |
 | **vidux-doctor.sh** | Runtime health checks — worktree hygiene, automation topology, stale plans, merge conflicts. Run at session start or whenever you need a read-only health pass. |

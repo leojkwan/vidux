@@ -61,9 +61,49 @@ This is non-negotiable — the user needs to see what phase you're in at all tim
 4. Read the authority `PLAN.md`, `## Decision Log`, latest `## Progress`, and `git diff --stat`.
 5. Treat v1 checkboxes as compatible input: `- [ ]` = `[pending]`, `- [x]` = `[completed]`.
 
+## Intent Detection: Scanner vs Writer
+
+Before creating a plan or generating a harness, classify the user's request.
+
+**Scanner signals** — any of these words in the request means the user wants a scanner/radar automation, not a plan-driven writer:
+
+`scan`, `watch`, `monitor`, `audit`, `check quality`, `find issues`, `radar`, `inspect`, `lint`, `review`, `detect`, `coverage`, `gaps`, `drift`, `standards`, `enforce`
+
+**Writer signals** — these indicate plan-driven work (the default):
+
+`fix`, `build`, `ship`, `implement`, `create`, `add`, `update`, `deploy`, `release`
+
+**Resolution:** Scanner signals win over writer signals. If the request contains both "scan for issues and fix them," treat it as a scanner — the scanner finds work, then a writer harness (separate automation) fixes it. One automation, one role.
+
+When scanner intent is detected, the generated harness uses the **SCAN gate** (below) instead of the REDUCE gate. The plan structure also changes — see "If Scanner Intent Detected" section.
+
+### SCAN gate (for scanner/radar automations)
+
+```
+SCAN gate (run FIRST, before any other work):
+1. Read last 3 memory notes. If same verdict 3× with no code changes → exit.
+   Write: "[SCAN] <date> Same verdict 3×, no changes. Skipping."
+2. git log --since="<last scan timestamp>" -- <watched paths>.
+   No new commits + last scan was clean → exit.
+   Write: "[SCAN] <date> No changes since last clean scan. Skipping."
+3. Otherwise → full scan. Run the scan, write findings, checkpoint.
+Budget: steps 1-3 must complete in under 60 seconds.
+```
+
+The SCAN gate checks the **codebase** for changes, not PLAN.md for task state. A scanner with an empty plan should still scan. A scanner whose last 3 runs found the same thing with no intervening code changes should exit fast.
+
 ## If The Authority PLAN Does Not Exist
 
 🔍 **GATHER** — The user wants to begin a new project.
+
+**If scanner intent detected** (see Intent Detection above):
+
+- Create a lightweight scanner plan with: Purpose, Watched Paths, Scan Rules, Constraints, Memory, Progress.
+- The scanner plan does NOT have a Tasks section with a queue to drain. It has Watched Paths (directories/patterns to scan) and Scan Rules (what to look for, severity thresholds, how to report).
+- The generated harness uses the SCAN gate, not the REDUCE gate.
+- 📌 **CHECKPOINT** the scanner plan. No code scanned yet — the first scan happens on the next cycle.
+
+**If writer intent detected** (default):
 
 - Use the arguments passed to `/vidux` as the project description.
 - Search code, docs, prior plans, and team conventions.
@@ -166,3 +206,4 @@ The store persists. The next dispatch rehydrates from files. Leave enough in Pro
 - Never reopen a logged direction without new evidence.
 - The process fix is more valuable than the code fix.
 - **Always show your stage.** If output lacks a stage prefix, you're doing it wrong.
+- **Scanner vs writer is decided once, at intent detection.** If the user said "scan", "watch", "radar", or any scanner signal, generate a SCAN gate. Do not generate a REDUCE gate that checks PLAN.md task state for a scanner automation — the scanner checks the codebase, not the plan queue.

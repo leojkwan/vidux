@@ -1,6 +1,6 @@
 # Vidux Doctrine
 
-> If an agent reads one file, this is it. 12 principles, each battle-tested across 28+ cycles building Vidux itself, a 10-automation fleet across Resplit and StrongYes, and overnight cron loops that run unsupervised.
+> If an agent reads one file, this is it. 12 principles plus the dispatch/reduce execution model and gate patterns, each battle-tested across 40+ cycles building Vidux itself, a 10-automation fleet across Resplit and StrongYes, and overnight cron loops that run unsupervised. SKILL.md extends this with Principle 13 (cross-lane awareness).
 
 ## 1. Plan is the store
 
@@ -54,7 +54,7 @@ When 2+ tickets hit the same surface, or 3+ atomic fixes fail on the same surfac
 
 ## 8. Cron prompts are harnesses, not snapshots
 
-A harness encodes the end goal and project DNA. PLAN.md holds the state. The harness tells the agent what kind of work to do; the plan tells it which specific work is next. Never put transient state in the harness. Never put project DNA in the plan.
+A cron prompt is a stateless harness — it encodes the end goal and project DNA. PLAN.md holds the state. The harness tells the agent what kind of work to do; the plan tells it which specific work is next. Never put transient state in the harness. Never put project DNA in the plan.
 
 *Why this matters: A StrongYes harness that hard-coded "fix the auth flow" kept trying to fix auth after auth was done. Harness = what kind of work. Plan = which work.*
 
@@ -130,11 +130,33 @@ REDUCE (<2 min, read-only)
 
 **Terminology:** DISPATCH and REDUCE only. Never "burst" or "watch" -- those terms are rejected. The Redux metaphor is load-bearing.
 
-### REDUCE Gate
+### Writers vs Scanners
 
-The REDUCE gate is a literal text block inserted at the top of every automation harness prompt. It forces the agent to evaluate actionable work *before* loading skills or reading authority files. The gate is how Principle 10 (bimodal runs) gets enforced in practice -- agents that have nothing to do never enter the mid-zone because they exit before doing any real work.
+Not all automations consume a queue. There are two kinds:
 
-Two variants exist: **with-vidux** (runs `vidux-loop.sh`, reads JSON, exits on blocked/complete/stuck) and **standalone** (reads memory + primary state file directly). Both enforce the same contract: steps 1-3 complete in under 60 seconds, and an agent that finds no actionable work writes a one-line `[REDUCE]` memory note and exits immediately.
+**Writers** pop tasks from PLAN.md, execute them, verify, checkpoint. Their REDUCE checks plan state: "is there work in the queue?" If no, exit. This is the default and everything above describes it.
+
+**Scanners** (also called radars) inspect reality -- the codebase, a live API, a build log, a set of assets -- for problems the plan doesn't know about yet. Their REDUCE checks reality state: "has anything changed since my last scan?" If no, exit. A scanner that checks PLAN.md for work will always find nothing and exit without scanning. This is the failure mode that kills scanner automations.
+
+The distinction matters because vidux generates harness prompts. When vidux creates an automation, it must detect the intent -- is this automation consuming queued work or discovering new work? -- and generate the correct gate. Signals: if the prompt says "find," "scan," "audit," "detect," "check for," or "inspect," it is a scanner. If it says "implement," "build," "fix," "ship," or "wire up," it is a writer. Ambiguous prompts default to writer (safer -- a writer that finds no work just exits cleanly).
+
+Writers produce code and consume tasks. Scanners produce evidence and create tasks. Both feed the same store. The unidirectional flow holds: scanners are the Gather step that feeds Plan.
+
+### Entry Gates: REDUCE and SCAN
+
+Every automation harness starts with a gate that forces the agent to evaluate actionable work *before* loading skills or reading authority files. The gate is how Principle 10 (bimodal runs) gets enforced in practice -- agents that have nothing to do never enter the mid-zone because they exit before doing any real work.
+
+Two variants exist for writers: **with-vidux** (runs `vidux-loop.sh`, reads JSON, exits on blocked/complete/stuck) and **standalone** (reads memory + primary state file directly). Both enforce the same contract: steps 1-3 complete in under 60 seconds, and an agent that finds no actionable work writes a one-line `[REDUCE]` memory note and exits immediately.
+
+```
+SCAN gate (for scanner/radar automations):
+1. Read last 3 memory notes. If same "no issues" verdict 3x --> exit.
+2. git log --since="<last scan timestamp>" -- <watched paths>.
+   If no changes AND last scan was clean --> exit.
+3. Otherwise --> full scan.
+```
+
+The SCAN gate replaces the REDUCE gate in scanner harnesses. It checks reality, not plan state. A scanner that passes the SCAN gate enters DISPATCH and runs its full inspection. Findings become evidence files and/or new PLAN.md entries -- the scanner never fixes what it finds (that is a writer's job). If a scanner finds nothing, it writes a `[SCAN: clean]` memory note and exits. Three consecutive clean notes trigger the early exit in step 1.
 
 See `guides/vidux/best-practices.md` Section 12 for the full copy-paste gate blocks and insertion guidance.
 

@@ -251,12 +251,14 @@ Generate a lean harness file for a specific role on a project. WRITES one new au
    - Read sibling automations to build the siblings list
    - Find the lowest-density 5-minute slot on the cron grid
 
-2. **📐 PLAN — Pick the template based on role.**
+2. **📐 PLAN — Pick the template and gate based on role.**
 
    The harness MUST obey Doctrine 8 (≤15 lines) AND embody the new doctrine:
    - **No mid-zone:** explicit "keep working through the queue" directive
    - **Taste/self-extend:** "add tasks you discover; UI proof gates required"
    - **Bounded recursion:** "stop polishing surfaces that are honestly good enough"
+
+   **Gate selection:** Writers and coordinators get the REDUCE gate (checks PLAN.md task state). Radars and specialists with scanner focus get the SCAN gate (checks codebase for changes since last scan). See `guides/vidux/best-practices.md` Section 12 for both gate blocks.
 
 3. **⚡ EXECUTE — Generate the harness.**
 
@@ -279,23 +281,26 @@ Design DNA:
 - Bounded recursion: stop polishing surfaces that are honestly good enough. Move to the next mission gap, not the next pixel.
 ```
 
-#### Radar Harness Template (≤15 lines)
+#### Radar Harness Template (≤15 lines, uses SCAN gate)
 
 ```
 Use [$vidux](<path-to-SKILL.md>) as radar for <project>.
 
+SCAN gate (run FIRST, before any other work):
+1. Read last 3 memory notes. If same verdict 3× with no code changes → exit with "[SCAN] unchanged".
+2. git log --since="<last scan>" -- <watched paths>. No changes + clean → exit.
+3. Otherwise → full scan below.
+
 Mission: Monitor <focus> for <project> — find work, never fix it.
 
 Authority store: <path to project PLAN.md>
-
-Role: radar — read-only monitoring, evidence-only. Never edits code.
-Siblings: <comma-separated sibling automations>
+Role: radar — read-only. Never edits code.
 Focus: <specific surface — UX, perf, flow, release-train, etc.>
+Watched paths: <glob patterns for directories this radar monitors>
 
 Design DNA:
-- Bimodal: < 2 min if nothing changed, OR 10-15 min thorough write-up when something is found. Never the middle.
-- When found, write evidence with screenshots/repro/affected files. Hand off through PLAN.md ## Tasks, not Slack.
-- Self-extend: surface BUNDLES — if you spot 3 tickets on the same area, file one investigation, not three tasks.
+- When found, write evidence with screenshots/repro/affected files. Hand off through PLAN.md ## Tasks.
+- Surface BUNDLES — 3 tickets on the same area = one investigation, not three tasks.
 - Stop adding polish to surfaces the writer already shipped this week. Hunt new surfaces, not pixels.
 ```
 
@@ -410,6 +415,7 @@ Score existing automations for a project against Doctrine 8 + the new automation
    | Check | Pass criteria | Severity if fail |
    |-------|--------------|------------------|
    | Line count | ≤ 15 lines (hard) / ≤ 20 lines (critical) | high / blocker |
+   | Correct gate | Writers have REDUCE gate; radars have SCAN gate (not REDUCE) | high |
    | "Keep working" directive (writers only) | Contains "keep working" or "until a real boundary" | high |
    | UI proof gate (writers + UX radars) | Mentions screenshot/visual/$picasso/$bigapple/$playwright | medium |
    | Self-extend directive | Mentions "add tasks", "file related", "extend the plan" | medium |
@@ -420,7 +426,7 @@ Score existing automations for a project against Doctrine 8 + the new automation
 
 4. **📐 PLAN — Compute the audit score.**
    - Each pass = +1, each fail = 0
-   - Out of 8 total checks
+   - Out of 9 total checks
    - Flag any automation scoring ≤ 5 as needing rewrite
    - Flag any automation scoring 0 on a `high` severity check as critical
 
@@ -429,8 +435,9 @@ Score existing automations for a project against Doctrine 8 + the new automation
    ```
    Audit: resplit (4 automations)
    ────────────────────────────────────
-   resplit-vidux (writer)              7/8 ✓
+   resplit-vidux (writer)              8/9 ✓
      ✓ Lines 12/15
+     ✓ correct gate (REDUCE — writer)
      ✓ keep-working
      ✓ UI proof gate ($picasso, $bigapple)
      ✓ self-extend
@@ -439,8 +446,9 @@ Score existing automations for a project against Doctrine 8 + the new automation
      ✓ no smallest-slice
      ✓ bimodal 4 deep / 1 quick
 
-   resplit-ios-ux-lab (radar/ux)       6/8 ⚠
+   resplit-ios-ux-lab (radar/ux)       7/9 ⚠
      ✓ Lines 13/15
+     ✓ correct gate (SCAN — radar)
      N/A keep-working (radar)
      ✓ UI proof gate
      ✓ self-extend (bundles)
@@ -449,14 +457,16 @@ Score existing automations for a project against Doctrine 8 + the new automation
      ✓ no smallest-slice
      ⚠ bimodal 2 quick / 2 mid (3-5m) — mid-zone risk
 
-   resplit-launch-loop (radar/flow)    4/8 ✗ NEEDS REWRITE
+   resplit-launch-loop (radar/flow)    4/9 ✗ NEEDS REWRITE
      ✗ Lines 22/15 — over by 7
+     ✗ correct gate — has REDUCE gate, should be SCAN (radar)
      ✗ bounded-recursion missing
      ✗ doctrine restated lines 12-18 (FSM rules) — REMOVE
      ⚠ bimodal 1 quick / 3 mid — STUCK IN MIDDLE
 
-   resplit-oversight (coordinator)     7/8 ✓
+   resplit-oversight (coordinator)     8/9 ✓
      ✓ Lines 14/15
+     ✓ correct gate (REDUCE — coordinator)
      ✓ keep-working (coord variant)
      N/A UI proof gate (coordinator)
      ✓ bounded-recursion
@@ -466,8 +476,8 @@ Score existing automations for a project against Doctrine 8 + the new automation
      ✓ bimodal 5 quick (healthy)
 
    ────────────────────────────────────
-   Fleet score: 24/32 (75%)
-   Critical: resplit-launch-loop — rewrite via /vidux-recipes write radar resplit --focus flow
+   Fleet score: 27/36 (75%)
+   Critical: resplit-launch-loop — wrong gate + rewrite via /vidux-recipes write radar resplit --focus flow
    Watch:    resplit-ios-ux-lab mid-zone trend
    ```
 

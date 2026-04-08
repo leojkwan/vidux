@@ -285,11 +285,20 @@ The code fix is table stakes. The process fix is the valuable output. Over the V
 
 ---
 
-## 12. REDUCE Gate Pattern
+## 12. Entry Gates: REDUCE and SCAN
 
-The REDUCE gate is a copy-paste block inserted at the top of every automation harness prompt. It forces the agent to evaluate whether there is actionable work *before* loading skills, reading authority files, or doing any other work. The gate is the enforcement mechanism for Doctrine 10 (bimodal runs) -- it structurally eliminates mid-zone exits by making the "nothing to do" path fast and cheap.
+Every automation harness prompt starts with a gate -- a copy-paste block that forces the agent to evaluate whether there is actionable work *before* loading skills, reading authority files, or doing any other work. The gate structurally eliminates mid-zone exits by making the "nothing to do" path fast and cheap.
 
-**Expected impact:** REDUCE exits drop from ~2 minutes to under 30 seconds. Agents that have nothing to do never load skills or read the authority chain. Over a 10-automation fleet running 30-minute cron intervals, this saves hundreds of wasted agent-minutes per day.
+There are two gate patterns. Which one you use depends on the automation's job:
+
+- **REDUCE gate** -- for writer automations that execute plan tasks. Checks *plan state* via `vidux-loop.sh` or the primary state file.
+- **SCAN gate** -- for scanner/radar automations that inspect the codebase or live product. Checks *reality* via git history, file state, and its own memory.
+
+**When to use which:** If the automation's job is to **find** issues (radars, scanners, linters, audit bots), use the SCAN gate. If its job is to **fix** known issues (writers, builders, release trains), use the REDUCE gate.
+
+**Expected impact:** Gate exits drop from ~2 minutes to under 30 seconds. Agents that have nothing to do never load skills or read the authority chain. Over a 10-automation fleet running 30-minute cron intervals, this saves hundreds of wasted agent-minutes per day.
+
+### 12a. REDUCE Gate Pattern
 
 ### With-Vidux variant (~850 chars)
 
@@ -332,6 +341,34 @@ REDUCE gate (run FIRST, before any other work):
 Budget: steps 1-3 must complete in under 60 seconds.
 ```
 
+### 12b. SCAN Gate Pattern
+
+Use this for scanner and radar automations -- agents whose job is to observe, detect, and report, not to execute plan tasks. The SCAN gate checks reality (git history, file state, live surfaces) instead of plan state. A localization radar checks for hardcoded strings in the codebase; a UX radar checks rendered surfaces. Neither consults PLAN.md to decide whether to run.
+
+```
+SCAN gate (run FIRST, before any other work):
+1. Read last 3 memory notes from this automation's memory file.
+   If the same "no issues found" verdict appears 3 consecutive times with no
+   codebase changes between them, exit with:
+   "[SCAN] <date> unchanged, no new issues. No dispatch."
+   Do NOT read authority files, load skills, or do any other work. Exit now.
+2. Check for changes: git log --since="<timestamp of last scan>" -- <watched_paths>
+3. If no changes since last scan AND last scan found no issues → exit with:
+   "[SCAN] <date> no changes to <watched_paths> since last scan. No dispatch."
+4. Otherwise → proceed to full scan below.
+Budget: steps 1-3 must complete in under 60 seconds.
+```
+
+**Key differences from REDUCE:**
+- No `vidux-loop.sh` call. Scanners do not read plan state.
+- The staleness check is git-based (`git log --since`), not plan-based (`next_action`).
+- The "3 consecutive identical verdicts" rule prevents a radar from endlessly re-scanning unchanged code.
+- `<watched_paths>` scopes the change detection to the paths the radar actually cares about (e.g., `src/` for a code scanner, `assets/locales/` for a localization radar).
+
+**When the SCAN gate exits:** The radar found nothing new to report, and the codebase has not changed in the paths it watches. This is the correct "nothing to do" signal for an observer.
+
+**When the SCAN gate proceeds:** Either the codebase changed since the last scan (new commits in watched paths) or the last scan found issues that need re-verification. The radar does a full scan and writes its findings.
+
 ### Dispatch-side mid-zone kill
 
 The REDUCE gate prevents mid-zone on the way *in*. This rule prevents it during dispatch:
@@ -348,15 +385,16 @@ Fleet data (2026-04-07): 32% of Codex sessions land in the 3-8 min mid-zone. Tar
 
 ### Insertion point guidance
 
-The REDUCE gate block goes **inside** the prompt string, immediately after the mission and skill-loading lines, and **before** the authority chain or read order. The agent must hit the gate before it starts reading authority files. The gate text is literal -- copy it verbatim, replacing only `<plan-path>` with the automation's actual plan path.
+Both gate blocks go **inside** the prompt string, immediately after the mission and skill-loading lines, and **before** the authority chain or read order. The agent must hit the gate before it starts reading authority files. The gate text is literal -- copy it verbatim, replacing only `<plan-path>` (REDUCE) or `<watched_paths>` (SCAN) with the automation's actual values.
 
-### When to use which variant
+### When to use which gate
 
-| Automation type | Variant |
-|-----------------|---------|
-| Loads `$vidux`, has a PLAN.md | With-Vidux |
-| No vidux, has its own queue/tracker file | Standalone |
-| Pure reader/radar with no plan file | Standalone (use memory file as primary state) |
+| Automation type | Gate |
+|-----------------|------|
+| Writer that loads `$vidux`, has a PLAN.md | REDUCE (With-Vidux) |
+| Writer without vidux, has its own queue/tracker | REDUCE (Standalone) |
+| Scanner/radar that inspects codebase or product | SCAN |
+| Radar that feeds findings to a writer via PLAN.md | SCAN (radar scans, writer acts) |
 
 ---
 

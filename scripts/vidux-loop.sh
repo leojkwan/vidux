@@ -84,7 +84,7 @@ fi
 EXIT_CRITERIA_MET=true; EXIT_CRITERIA_PENDING=0; EXIT_CRITERIA_TOTAL=0
 EC_LINE_START=0; EC_LINE_END=0
 if grep -q '^## Exit Criteria' "$PLAN" 2>/dev/null; then
-  EC_LINE_START="$(grep -n '^## Exit Criteria' "$PLAN" | head -1 | cut -d: -f1)"
+  EC_LINE_START="$(grep -n '^## Exit Criteria' "$PLAN" | head -1 | cut -d: -f1 || true)"
   # End = next ## heading after EC, or EOF+1
   EC_LINE_END="$(awk -v start="$EC_LINE_START" 'NR>start && /^## /{print NR; exit}' "$PLAN")"
   [ -z "$EC_LINE_END" ] && EC_LINE_END="$(( $(wc -l < "$PLAN" | tr -d ' ') + 1 ))"
@@ -141,6 +141,51 @@ fi
 CONTRADICTION_WARNING=false; CONTRADICTION_MATCHES=""; CONTRADICTS_TAG=""
 PROCESS_FIX_DECLARED=""
 
+# --- fleet health (early — needed by all exit paths) ---------------------- #
+# Initialize fleet health fields so early-exit JSON always has consistent schema.
+AUTO_PAUSE_RECOMMENDED=false; UNPRODUCTIVE_STREAK=0
+BIMODAL_SCORE=-1; BIMODAL_GATE="pass"
+CIRCUIT_BREAKER="closed"; CIRCUIT_BREAKER_STREAK=0
+
+# Circuit breaker: if last N Progress entries show no shipping signals, block dispatch.
+CB_THRESHOLD=3
+if [ -f "$CONFIG" ]; then
+  CB_THRESHOLD=$(python3 -c "import json,sys;print(json.load(open(sys.argv[1])).get('backpressure',{}).get('circuit_breaker_threshold',3))" "$CONFIG" 2>/dev/null || echo 3)
+fi
+if [ -f "$PLAN" ]; then
+  _recent_progress=$({ grep -E '^\s*-\s*\[' "$PLAN" | grep -i 'Cycle' || true; } | head -"$CB_THRESHOLD")
+  _shipping_signals=0
+  while IFS= read -r line; do
+    if echo "$line" | grep -qiE 'shipped|commit|fixed|merged|created|built|added|wrote|pushed'; then
+      _shipping_signals=$((_shipping_signals + 1))
+    fi
+  done <<< "$_recent_progress"
+  if [ -n "$_recent_progress" ] && [ "$_shipping_signals" -eq 0 ]; then
+    CIRCUIT_BREAKER="open"
+    CIRCUIT_BREAKER_STREAK=$CB_THRESHOLD
+  fi
+fi
+
+# Auto-pause: if last 3 Progress entries are unproductive, recommend pausing.
+if grep -q '^## Progress' "$PLAN" 2>/dev/null; then
+  _AP_PROG_BLOCK="$(awk '/^## Progress/{found=1; next} found && /^## /{found=0} found{print}' "$PLAN")"
+  _AP_LAST_3="$(printf '%s\n' "$_AP_PROG_BLOCK" | { grep -E '^\- \[' || true; } | tail -3)"
+  if [ -n "$_AP_LAST_3" ]; then
+    _AP_UNPRODUCTIVE=0; _AP_TOTAL=0
+    while IFS= read -r pline; do
+      [ -z "$pline" ] && continue
+      _AP_TOTAL=$((_AP_TOTAL + 1))
+      if printf '%s' "$pline" | grep -qiE 'blocked|proof-refresh only|nothing to do|no pending|all blocked|checkpoint_only|escalate|no actionable'; then
+        _AP_UNPRODUCTIVE=$((_AP_UNPRODUCTIVE + 1))
+      fi
+    done <<< "$_AP_LAST_3"
+    UNPRODUCTIVE_STREAK=$_AP_UNPRODUCTIVE
+    if [ "$_AP_UNPRODUCTIVE" -ge 3 ] && [ "$_AP_TOTAL" -ge 3 ]; then
+      AUTO_PAUSE_RECOMMENDED=true
+    fi
+  fi
+fi
+
 # --- read: find first actionable task ------------------------------------- #
 # Priority 1: resume an in_progress task (session may have died mid-task)
 TASK_LINE="$(grep -nE '^\- \[in_progress\] ' "$PLAN" | _exclude_ec_lines | head -1 || true)"
@@ -155,10 +200,12 @@ if [ -z "$TASK_LINE" ]; then
 fi
 
 if [ -z "$TASK_LINE" ]; then
+  # Shared fleet health suffix for all early-exit JSON paths
+  _FLEET_SUFFIX="\"auto_pause_recommended\": $AUTO_PAUSE_RECOMMENDED, \"unproductive_streak\": $UNPRODUCTIVE_STREAK, \"bimodal_score\": $BIMODAL_SCORE, \"bimodal_gate\": \"$BIMODAL_GATE\", \"circuit_breaker\": \"$CIRCUIT_BREAKER\", \"circuit_breaker_streak\": $CIRCUIT_BREAKER_STREAK"
   # Check if there are blocked tasks left (not "done" — escalate)
   BLOCKED_COUNT="$(grep -nE '^\- \[blocked\] ' "$PLAN" | _exclude_ec_lines | grep -c '.' || true)"
   if [ "$BLOCKED_COUNT" -gt 0 ]; then
-    json "{\"mode\":\"reduce\", \"cycle\": 0, \"task\": \"none\", \"type\": \"all_blocked\", \"action\": \"escalate\", \"next_action\": \"none\", \"context\": \"$BLOCKED_COUNT task(s) blocked — escalate blockers to human\", \"hot_tasks\": $HOT_TASKS, \"cold_tasks\": $COLD_TASKS, \"context_warning\": $CONTEXT_WARNING, \"context_note\": \"$(json_escape "$CONTEXT_NOTE")\", \"decision_log_count\": $DL_COUNT, \"decision_log_warning\": $DL_WARNING, \"decision_log_entries\": \"$(json_escape "$DL_ENTRIES")\", \"contradiction_warning\": $CONTRADICTION_WARNING, \"contradiction_matches\": \"$(json_escape "$CONTRADICTION_MATCHES")\", \"contradicts_tag\": \"$(json_escape "$CONTRADICTS_TAG")\", \"process_fix_declared\": \"$(json_escape "$PROCESS_FIX_DECLARED")\"}"
+    json "{\"mode\":\"reduce\", \"cycle\": 0, \"task\": \"none\", \"type\": \"all_blocked\", \"action\": \"escalate\", \"next_action\": \"none\", \"context\": \"$BLOCKED_COUNT task(s) blocked — escalate blockers to human\", \"hot_tasks\": $HOT_TASKS, \"cold_tasks\": $COLD_TASKS, \"context_warning\": $CONTEXT_WARNING, \"context_note\": \"$(json_escape "$CONTEXT_NOTE")\", \"decision_log_count\": $DL_COUNT, \"decision_log_warning\": $DL_WARNING, \"decision_log_entries\": \"$(json_escape "$DL_ENTRIES")\", \"contradiction_warning\": $CONTRADICTION_WARNING, \"contradiction_matches\": \"$(json_escape "$CONTRADICTION_MATCHES")\", \"contradicts_tag\": \"$(json_escape "$CONTRADICTS_TAG")\", \"process_fix_declared\": \"$(json_escape "$PROCESS_FIX_DECLARED")\", $_FLEET_SUFFIX}"
     exit 0
   fi
   # Check if there are ANY tasks at all (any FSM state) — excludes Exit Criteria lines
@@ -166,12 +213,12 @@ if [ -z "$TASK_LINE" ]; then
   if [ "$HAS_TASKS" -gt 0 ]; then
     # Gate on exit criteria: if criteria exist and aren't all checked, keep working
     if [ "$EXIT_CRITERIA_MET" = false ]; then
-      json "{\"mode\":\"reduce\", \"cycle\": 0, \"task\": \"none\", \"type\": \"exit_criteria_pending\", \"action\": \"execute\", \"next_action\": \"dispatch\", \"context\": \"All tasks done but $EXIT_CRITERIA_PENDING exit criteria unmet\", \"hot_tasks\": $HOT_TASKS, \"cold_tasks\": $COLD_TASKS, \"context_warning\": $CONTEXT_WARNING, \"context_note\": \"$(json_escape "$CONTEXT_NOTE")\", \"decision_log_count\": $DL_COUNT, \"decision_log_warning\": $DL_WARNING, \"decision_log_entries\": \"$(json_escape "$DL_ENTRIES")\", \"contradiction_warning\": $CONTRADICTION_WARNING, \"contradiction_matches\": \"$(json_escape "$CONTRADICTION_MATCHES")\", \"contradicts_tag\": \"$(json_escape "$CONTRADICTS_TAG")\", \"process_fix_declared\": \"$(json_escape "$PROCESS_FIX_DECLARED")\", \"exit_criteria_met\": $EXIT_CRITERIA_MET, \"exit_criteria_pending\": $EXIT_CRITERIA_PENDING}"
+      json "{\"mode\":\"reduce\", \"cycle\": 0, \"task\": \"none\", \"type\": \"exit_criteria_pending\", \"action\": \"execute\", \"next_action\": \"dispatch\", \"context\": \"All tasks done but $EXIT_CRITERIA_PENDING exit criteria unmet\", \"hot_tasks\": $HOT_TASKS, \"cold_tasks\": $COLD_TASKS, \"context_warning\": $CONTEXT_WARNING, \"context_note\": \"$(json_escape "$CONTEXT_NOTE")\", \"decision_log_count\": $DL_COUNT, \"decision_log_warning\": $DL_WARNING, \"decision_log_entries\": \"$(json_escape "$DL_ENTRIES")\", \"contradiction_warning\": $CONTRADICTION_WARNING, \"contradiction_matches\": \"$(json_escape "$CONTRADICTION_MATCHES")\", \"contradicts_tag\": \"$(json_escape "$CONTRADICTS_TAG")\", \"process_fix_declared\": \"$(json_escape "$PROCESS_FIX_DECLARED")\", \"exit_criteria_met\": $EXIT_CRITERIA_MET, \"exit_criteria_pending\": $EXIT_CRITERIA_PENDING, $_FLEET_SUFFIX}"
     else
-      json "{\"mode\":\"reduce\", \"cycle\": 0, \"task\": \"none\", \"type\": \"done\", \"action\": \"complete\", \"next_action\": \"none\", \"context\": \"All tasks done\", \"hot_tasks\": $HOT_TASKS, \"cold_tasks\": $COLD_TASKS, \"context_warning\": $CONTEXT_WARNING, \"context_note\": \"$(json_escape "$CONTEXT_NOTE")\", \"decision_log_count\": $DL_COUNT, \"decision_log_warning\": $DL_WARNING, \"decision_log_entries\": \"$(json_escape "$DL_ENTRIES")\", \"contradiction_warning\": $CONTRADICTION_WARNING, \"contradiction_matches\": \"$(json_escape "$CONTRADICTION_MATCHES")\", \"contradicts_tag\": \"$(json_escape "$CONTRADICTS_TAG")\", \"process_fix_declared\": \"$(json_escape "$PROCESS_FIX_DECLARED")\", \"exit_criteria_met\": $EXIT_CRITERIA_MET, \"exit_criteria_pending\": $EXIT_CRITERIA_PENDING}"
+      json "{\"mode\":\"reduce\", \"cycle\": 0, \"task\": \"none\", \"type\": \"done\", \"action\": \"complete\", \"next_action\": \"none\", \"context\": \"All tasks done\", \"hot_tasks\": $HOT_TASKS, \"cold_tasks\": $COLD_TASKS, \"context_warning\": $CONTEXT_WARNING, \"context_note\": \"$(json_escape "$CONTEXT_NOTE")\", \"decision_log_count\": $DL_COUNT, \"decision_log_warning\": $DL_WARNING, \"decision_log_entries\": \"$(json_escape "$DL_ENTRIES")\", \"contradiction_warning\": $CONTRADICTION_WARNING, \"contradiction_matches\": \"$(json_escape "$CONTRADICTION_MATCHES")\", \"contradicts_tag\": \"$(json_escape "$CONTRADICTS_TAG")\", \"process_fix_declared\": \"$(json_escape "$PROCESS_FIX_DECLARED")\", \"exit_criteria_met\": $EXIT_CRITERIA_MET, \"exit_criteria_pending\": $EXIT_CRITERIA_PENDING, $_FLEET_SUFFIX}"
     fi
   else
-    json "{\"mode\":\"reduce\", \"cycle\": 0, \"task\": \"none\", \"type\": \"empty\", \"action\": \"create_tasks\", \"next_action\": \"none\", \"context\": \"Plan has no tasks\", \"hot_tasks\": $HOT_TASKS, \"cold_tasks\": $COLD_TASKS, \"context_warning\": $CONTEXT_WARNING, \"context_note\": \"$(json_escape "$CONTEXT_NOTE")\", \"decision_log_count\": $DL_COUNT, \"decision_log_warning\": $DL_WARNING, \"decision_log_entries\": \"$(json_escape "$DL_ENTRIES")\", \"contradiction_warning\": $CONTRADICTION_WARNING, \"contradiction_matches\": \"$(json_escape "$CONTRADICTION_MATCHES")\", \"contradicts_tag\": \"$(json_escape "$CONTRADICTS_TAG")\", \"process_fix_declared\": \"$(json_escape "$PROCESS_FIX_DECLARED")\"}"
+    json "{\"mode\":\"reduce\", \"cycle\": 0, \"task\": \"none\", \"type\": \"empty\", \"action\": \"create_tasks\", \"next_action\": \"none\", \"context\": \"Plan has no tasks\", \"hot_tasks\": $HOT_TASKS, \"cold_tasks\": $COLD_TASKS, \"context_warning\": $CONTEXT_WARNING, \"context_note\": \"$(json_escape "$CONTEXT_NOTE")\", \"decision_log_count\": $DL_COUNT, \"decision_log_warning\": $DL_WARNING, \"decision_log_entries\": \"$(json_escape "$DL_ENTRIES")\", \"contradiction_warning\": $CONTRADICTION_WARNING, \"contradiction_matches\": \"$(json_escape "$CONTRADICTION_MATCHES")\", \"contradicts_tag\": \"$(json_escape "$CONTRADICTS_TAG")\", \"process_fix_declared\": \"$(json_escape "$PROCESS_FIX_DECLARED")\", $_FLEET_SUFFIX}"
   fi
   exit 0
 fi
@@ -180,7 +227,7 @@ LINE_NUM="${TASK_LINE%%:*}"
 TASK_REST="${TASK_LINE#*:}"
 # Strip the FSM/checkbox prefix: - [ ] , - [pending] , - [in_progress] , etc.
 TASK_DESC="$(echo "$TASK_REST" | sed -E 's/^- \[([^]]*)\] //')"
-PROCESS_FIX_DECLARED="$(echo "$TASK_DESC" | grep -oE '\[ProcessFix: ?[a-z_]+\]' | head -1 | sed -E 's/\[ProcessFix: ?([a-z_]+)\]/\1/' || true)"
+PROCESS_FIX_DECLARED="$({ echo "$TASK_DESC" | grep -oE '\[ProcessFix: ?[a-z_]+\]' || true; } | head -1 | sed -E 's/\[ProcessFix: ?([a-z_]+)\]/\1/' || true)"
 
 # --- contradiction detection (keyword overlap + explicit tag) -------------- #
 # Check for explicit [Contradicts: ...] tag first
@@ -346,31 +393,6 @@ $DL_ENTRY\\
   fi
 fi
 
-# --- auto-pause detection (fleet-level unproductive streak) ----------------- #
-# If the last 3 Progress entries indicate no real work, recommend pausing.
-# Patterns: "blocked", "proof-refresh only", "nothing to do", "no pending",
-# "all blocked", "checkpoint_only", "escalate". Threshold: 3 consecutive.
-AUTO_PAUSE_RECOMMENDED=false; UNPRODUCTIVE_STREAK=0
-if grep -q '^## Progress' "$PLAN" 2>/dev/null; then
-  # Get last 3 progress entries (most recent first)
-  LAST_3="$(printf '%s\n' "$PROG_BLOCK" | { grep -E '^\- \[' || true; } | tail -3)"
-  if [ -n "$LAST_3" ]; then
-    UNPRODUCTIVE_COUNT=0
-    TOTAL_CHECKED=0
-    while IFS= read -r pline; do
-      [ -z "$pline" ] && continue
-      TOTAL_CHECKED=$((TOTAL_CHECKED + 1))
-      if printf '%s' "$pline" | grep -qiE 'blocked|proof-refresh only|nothing to do|no pending|all blocked|checkpoint_only|escalate|no actionable'; then
-        UNPRODUCTIVE_COUNT=$((UNPRODUCTIVE_COUNT + 1))
-      fi
-    done <<< "$LAST_3"
-    UNPRODUCTIVE_STREAK=$UNPRODUCTIVE_COUNT
-    if [ "$UNPRODUCTIVE_COUNT" -ge 3 ] && [ "$TOTAL_CHECKED" -ge 3 ]; then
-      AUTO_PAUSE_RECOMMENDED=true
-    fi
-  fi
-fi
-
 # --- recompute hot_tasks after mutations (stuck-loop may have auto-blocked) - #
 HOT_TASKS="$(grep -nE '^\- (\[ \]|\[(pending|in_progress)\]) ' "$PLAN" | _exclude_ec_lines | grep -c '.' || true)"
 
@@ -410,9 +432,6 @@ if type ledger_conflict_check &>/dev/null 2>&1; then
 fi
 
 # --- bimodal enforcement --------------------------------------------------- #
-# If fleet bimodal score is below critical threshold, refuse to fire dispatch.
-# Threshold from vidux.config.json backpressure.bimodal_critical_threshold (default 70).
-BIMODAL_SCORE=-1; BIMODAL_GATE="pass"
 BIMODAL_CRITICAL=70
 if [ -f "$CONFIG" ]; then
   BIMODAL_CRITICAL=$(python3 -c "import json,sys;print(json.load(open(sys.argv[1])).get('backpressure',{}).get('bimodal_critical_threshold',70))" "$CONFIG" 2>/dev/null || echo 70)
@@ -423,30 +442,6 @@ if type ledger_bimodal_distribution &>/dev/null 2>&1; then
   BIMODAL_SCORE=$(printf '%s' "$_BIMODAL_JSON" | jq '.bimodal_score // -1' 2>/dev/null || echo -1)
   if [ "$BIMODAL_SCORE" != "-1" ] && [ "$BIMODAL_SCORE" -lt "$BIMODAL_CRITICAL" ] 2>/dev/null; then
     BIMODAL_GATE="blocked"
-  fi
-fi
-
-# --- circuit breaker ------------------------------------------------------- #
-# If the last N consecutive Progress entries show no code changes (no commit hash,
-# no "shipped", no "fixed", no file changes), recommend circuit break.
-# Configurable via vidux.config.json backpressure.circuit_breaker_threshold (default 3).
-CIRCUIT_BREAKER="closed"; CIRCUIT_BREAKER_STREAK=0
-CB_THRESHOLD=3
-if [ -f "$CONFIG" ]; then
-  CB_THRESHOLD=$(python3 -c "import json,sys;print(json.load(open(sys.argv[1])).get('backpressure',{}).get('circuit_breaker_threshold',3))" "$CONFIG" 2>/dev/null || echo 3)
-fi
-if [ -f "$PLAN" ]; then
-  # Extract last N progress entries and check for shipping signals
-  _recent_progress=$(grep -E '^\s*-\s*\[' "$PLAN" | grep -i 'Cycle' | head -"$CB_THRESHOLD")
-  _shipping_signals=0
-  while IFS= read -r line; do
-    if echo "$line" | grep -qiE 'shipped|commit|fixed|merged|created|built|added|wrote|pushed'; then
-      _shipping_signals=$((_shipping_signals + 1))
-    fi
-  done <<< "$_recent_progress"
-  if [ -n "$_recent_progress" ] && [ "$_shipping_signals" -eq 0 ]; then
-    CIRCUIT_BREAKER="open"
-    CIRCUIT_BREAKER_STREAK=$CB_THRESHOLD
   fi
 fi
 

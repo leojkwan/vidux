@@ -2464,13 +2464,13 @@ class ViduxContractTests(unittest.TestCase):
 
     def test_reduce_gate_in_doctrine(self):
         """DOCTRINE.md must document the REDUCE gate pattern."""
-        content = (self.ROOT / "DOCTRINE.md").read_text()
+        content = (ROOT / "DOCTRINE.md").read_text()
         self.assertIn("REDUCE", content)
         self.assertIn("gate", content.lower())
 
     def test_reduce_gate_in_best_practices(self):
         """best-practices.md must have the REDUCE gate pattern section."""
-        bp = self.ROOT / "guides" / "vidux" / "best-practices.md"
+        bp = ROOT / "guides" / "vidux" / "best-practices.md"
         if bp.exists():
             content = bp.read_text()
             self.assertIn("REDUCE Gate", content)
@@ -2548,8 +2548,7 @@ class ViduxContractTests(unittest.TestCase):
         template = ROOT / "guides" / "vidux" / "radar-template.md"
         self.assertTrue(template.exists(), "radar-template.md missing")
         text = _read(template)
-        self.assertIn("REDUCE gate", text)
-        self.assertIn("circuit_breaker", text)
+        self.assertIn("SCAN gate", text)
         self.assertIn("{{PLAN_PATH}}", text)
         self.assertIn("Role boundary", text)
         self.assertIn("800-1200 chars", text)

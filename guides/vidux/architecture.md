@@ -184,7 +184,7 @@ Agents never "just code." They either update docs (which creates queue items) or
 
 ## 4. The Six Core Principles
 
-Non-negotiable doctrine. Each exists because a specific failure was observed. Full text with examples in `DOCTRINE.md` (11 doctrines); extended set with implementation details in `SKILL.md` (12 principles).
+Non-negotiable doctrine. Each exists because a specific failure was observed. Full text with examples in `DOCTRINE.md` (12 doctrines); extended set with implementation details in `SKILL.md` (13 principles).
 
 **1. Plan is the store.** PLAN.md is truth. Code is derived. Fix the plan first.
 
@@ -330,7 +330,7 @@ Vidux core is company-agnostic. Zero references to any internal tooling, build s
             v
 +-------------------------------------------+
 | Layer 1: Vidux Core (open-sourceable)     |
-|  Doctrine (11-12 principles), data        |
+|  Doctrine (12-13 principles), data        |
 |  structures, loop mechanics, failure      |
 |  protocol, PLAN.md template               |
 +-------------------------------------------+
@@ -368,7 +368,7 @@ The Resplit/StrongYes fleet runs 10 automations across 2 products. All automatio
 
 Fleet-wide quality is measured by `scripts/vidux-fleet-quality.sh`, which scans all active automations for stale plans, stuck loops, mid-zone violations, and un-checkpointed work.
 
-The topology is flat by design. No coordinator automation manages the others. Each automation reads its own PLAN.md and makes its own dispatch/reduce decision. Coordination happens through the shared git history -- if Automation A fixes a file that Automation B planned to touch, B sees the change in its next REDUCE and adapts.
+The default topology is flat. Each automation reads its own PLAN.md and makes its own dispatch/reduce decision. Coordination happens through the shared git history -- if Automation A fixes a file that Automation B planned to touch, B sees the change in its next REDUCE and adapts. For fleets of 4+ automations, a coordinator automation is an optional pattern (see SKILL.md Principle 9 and `vidux-recipes.md` coordinator harness template). The coordinator does not override individual dispatch/reduce decisions; it sequences cross-lane dependencies and resolves conflicts that git history alone cannot catch.
 
 ---
 
@@ -378,6 +378,6 @@ The topology is flat by design. No coordinator automation manages the others. Ea
 
 **Rigidity vs flexibility.** Unidirectional flow is inflexible by design. Drive-by edits to unrelated files accumulate untracked changes that interact in surprising ways three sessions later.
 
-**One task per cycle vs throughput.** Half-finished tasks leave the codebase in an intermediate state the next agent must diagnose. One complete task per cycle (then scan for more) means the codebase is always in a known-good state at each checkpoint.
+**Queue drain vs throughput.** Half-finished tasks leave the codebase in an intermediate state the next agent must diagnose. The dispatch model says: keep working through the queue until it drains, each task completed fully before the next, codebase always in a known-good state at each checkpoint.
 
 **Solo computer workflow.** Vidux is designed for one human operating one or more AI agents on a local machine. Tool state lives outside the repo. The repo is the shared surface; tool configuration is per-operator.
