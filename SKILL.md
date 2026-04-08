@@ -916,7 +916,7 @@ gate pattern the harness gets.
 
 | Signal in request | Type | Gate |
 |-------------------|------|------|
-| "scan", "watch", "monitor", "audit", "check quality", "find issues", "radar", "lint", "detect", "sweep", "inspect" | **Scanner** | Scanner gate (file changes + last scan results) |
+| "scan", "watch", "monitor", "audit", "check quality", "find issues", "radar", "lint", "detect", "sweep", "inspect" | **Scanner** | SCAN gate (file changes + last scan results) |
 | "build", "ship", "release", "deploy", "execute tasks", "pop queue", "run plan", "train" | **Writer** | REDUCE gate (vidux-loop.sh + plan state) |
 | Ambiguous | Ask the user: "Is this a scanner (inspects code for issues) or a writer (executes tasks from a plan)?" |
 

@@ -413,7 +413,7 @@ Both gate blocks go **inside** the prompt string, immediately after the mission 
 
 ---
 
-## 12c. Radar->Writer Inbox Pattern
+### 12c. Radar->Writer Inbox Pattern
 
 Radars observe. Writers execute. The inbox connects them. When a scanner finds an actionable issue, it appends a timestamped entry to `INBOX.md` (which lives next to the project's `PLAN.md`). Writers check the inbox during their READ step, before looking at the task queue.
 
