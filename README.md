@@ -11,18 +11,43 @@ If you know Redux, you already know Vidux. The plan is the store. Code is the vi
 
 ```mermaid
 flowchart LR
-    DOC[Doc Tree<br/>PLAN.md + evidence/]
-    QUEUE[Work Queue<br/>FIFO sliding window]
-    AGENT[Fresh Agent<br/>stateless cycle]
-    CODE[Code Change<br/>verified + checkpointed]
+    DOC["<b>Doc Tree</b><br/>PLAN.md + evidence/"]
+    QUEUE["<b>Work Queue</b><br/>FIFO sliding window"]
+    AGENT["<b>Fresh Agent</b><br/>stateless cycle"]
+    CODE["<b>Code Change</b><br/>verified + checkpointed"]
 
-    DOC -->|doc edit creates| QUEUE
-    QUEUE -->|agent pops item| AGENT
-    AGENT -->|executes one task| CODE
-    CODE -->|results feed back| DOC
+    DOC -->|"doc edit creates"| QUEUE
+    QUEUE -->|"agent pops item"| AGENT
+    AGENT -->|"executes one task"| CODE
+    CODE -->|"results feed back"| DOC
+
+    style DOC fill:#2d333b,stroke:#539bf5,stroke-width:2px,color:#adbac7
+    style QUEUE fill:#2d333b,stroke:#c69026,stroke-width:2px,color:#adbac7
+    style AGENT fill:#2d333b,stroke:#57ab5a,stroke-width:2px,color:#adbac7
+    style CODE fill:#2d333b,stroke:#986ee2,stroke-width:2px,color:#adbac7
 ```
 
-Every change moves through five steps: **Gather evidence -> Plan -> Execute -> Verify -> Checkpoint.** No step is skippable. If the code is wrong, the plan is wrong — fix the plan first. The store persists across sessions; each run dies. Any fresh agent can rehydrate from files and continue.
+Every cycle follows five steps — the unidirectional loop that prevents state drift:
+
+```mermaid
+flowchart LR
+    R["READ<br/><i>PLAN.md, git log,<br/>git diff</i>"]
+    A["ASSESS<br/><i>evidence exists?<br/>code or refine?</i>"]
+    E["ACT<br/><i>execute tasks<br/>until queue empty</i>"]
+    V["VERIFY<br/><i>build, test,<br/>gate</i>"]
+    C["CHECKPOINT<br/><i>structured commit,<br/>progress entry</i>"]
+
+    R --> A --> E --> V --> C
+    C -.->|"next cycle"| R
+
+    style R fill:#2d333b,stroke:#539bf5,stroke-width:2px,color:#adbac7
+    style A fill:#2d333b,stroke:#c69026,stroke-width:2px,color:#adbac7
+    style E fill:#2d333b,stroke:#57ab5a,stroke-width:2px,color:#adbac7
+    style V fill:#2d333b,stroke:#986ee2,stroke-width:2px,color:#adbac7
+    style C fill:#2d333b,stroke:#e5534b,stroke-width:2px,color:#adbac7
+```
+
+No step is skippable. If the code is wrong, the plan is wrong — fix the plan first. The store persists across sessions; each run dies. Any fresh agent can rehydrate from files and continue.
 
 ## Install
 
