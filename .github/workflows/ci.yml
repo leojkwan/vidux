@@ -1,0 +1,83 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  contract-tests:
+    name: Contract tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install test dependencies
+        run: pip install pytest-timeout
+
+      - name: Run contract tests
+        run: python -m pytest tests/test_vidux_contracts.py -v --tb=short --timeout=30
+        timeout-minutes: 8
+
+  shellcheck:
+    name: ShellCheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run ShellCheck on scripts/
+        uses: ludeeus/action-shellcheck@2.0.0
+        with:
+          scandir: scripts
+          severity: warning
+
+      - name: Run ShellCheck on hooks/
+        uses: ludeeus/action-shellcheck@2.0.0
+        with:
+          scandir: hooks
+          severity: warning
+
+  docs-lint:
+    name: Doc structure
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Core docs exist
+        run: |
+          for f in SKILL.md DOCTRINE.md LOOP.md ENFORCEMENT.md INGREDIENTS.md \
+                   README.md CONTRIBUTING.md LICENSE; do
+            test -f "$f" || { echo "MISSING: $f"; exit 1; }
+          done
+          echo "All core docs present."
+
+      - name: Issue templates are valid YAML
+        run: |
+          pip install --quiet pyyaml
+          python -c "
+          import yaml, pathlib, sys
+          errors = []
+          for p in pathlib.Path('.github/ISSUE_TEMPLATE').glob('*.yml'):
+              try:
+                  yaml.safe_load(p.read_text())
+                  print(f'  OK: {p}')
+              except yaml.YAMLError as e:
+                  errors.append(f'{p}: {e}')
+                  print(f'  FAIL: {p}')
+          if errors:
+              print('\n'.join(errors))
+              sys.exit(1)
+          print('All templates valid.')
+          "
