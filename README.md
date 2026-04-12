@@ -9,6 +9,10 @@ Vidux is a lightweight orchestration system for AI coding work that spans multip
 
 If you know Redux, you already know Vidux. The plan is the store. Code is the view. You never "just code" — you either update the plan (which creates work) or pop a work item (which was created by a plan update). That unidirectional flow is the whole trick.
 
+<p align="center">
+  <img src="assets/vidux-terminal-demo.svg" alt="vidux terminal session — READ, ASSESS, ACT, VERIFY, CHECKPOINT" width="780">
+</p>
+
 ```mermaid
 flowchart LR
     DOC[Doc Tree<br/>PLAN.md + evidence/]
