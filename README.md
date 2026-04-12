@@ -35,11 +35,14 @@ ln -sfn /path/to/vidux ~/.codex/skills/vidux
 
 Then run `/vidux "your project description"` in Claude Code, Cursor, or Codex. The first cycle gathers evidence and writes a `PLAN.md`. No code is written until the plan is ready.
 
-Optional enforcement hooks for a target repo:
+Optional enforcement hooks for a target repo (copy or symlink the hooks into your project's `.git/hooks/`):
 
 ```bash
-bash scripts/install-hooks.sh /path/to/your/project
+cp hooks/pre-commit-plan-check.sh /path/to/your/project/.git/hooks/pre-commit
+cp hooks/post-commit-checkpoint.sh /path/to/your/project/.git/hooks/post-commit
 ```
+
+See `hooks/` for the full set: `pre-commit-plan-check.sh`, `post-commit-checkpoint.sh`, `three-strike-gate.sh`, and `hooks.json` (Claude Code hook configuration).
 
 ## Why It Exists
 
@@ -85,11 +88,11 @@ If the same task appears in 3+ consecutive `PROGRESS.md` entries while still `[i
 - `LOOP.md` — the stateless cycle mechanics
 - `ENFORCEMENT.md` — Claude Code hook configuration
 - `INGREDIENTS.md` — design lineage (10 patterns from 26 surveyed tools)
-- `commands/` — `/vidux`, `/vidux-plan`, `/vidux-loop`, `/vidux-status`, `/vidux-dashboard`, `/vidux-recipes`, `/vidux-manager`, `/vidux-version`
-- `scripts/` — loop driver, checkpoint, gather, doctor, witness, dispatch, prune, install
-- `scripts/lib/` — compat.sh (macOS/Linux portability), codex-db.sh, ledger integration, queue-jsonl
+- `commands/` — `/vidux`, `/vidux-plan`, `/vidux-fleet`, `/vidux-manager`, `/vidux-dashboard`
+- `scripts/` — `vidux-loop.sh` (loop driver), `vidux-checkpoint.sh`, `vidux-doctor.sh`, `vidux-fleet-quality.sh`, `vidux-fleet-rebuild.sh`, `vidux-test-all.sh`
+- `scripts/lib/` — `compat.sh` (macOS/Linux portability), `codex-db.sh`, `ledger-emit.sh`, `ledger-query.sh`, `ledger-config.sh`, `queue-jsonl.sh`, `resolve-plan-store.sh`
 - `hooks/` — prompt-hook nudges for plan discipline
-- `guides/vidux/` — quickstart, architecture, best practices, radar template
+- `guides/` — `harness.md`, `fleet-ops.md`, `investigation.md`, `evidence-format.md`, `draft-pr-flow.md`
 - `tests/` — 160+ contract tests (scripts, commands, doctrine, SKILL.md structure)
 
 ### Companion skill: `/vidux-codex`
@@ -103,10 +106,10 @@ Measured savings under Framing B (Claude metered, Codex unlimited): **10x at 33 
 Vidux includes self-healing mechanisms for automation fleets:
 
 - **Circuit breaker** — `vidux-loop.sh` blocks deep work after N consecutive idle cycles (configurable, default 3). Prevents automations from burning cycles without shipping.
-- **Idle-churn detection** — `vidux-witness.sh` reports per-automation `idle_churn_pct`. Automations where >50% of runs produce nothing get flagged.
+- **Idle-churn detection** — `vidux-fleet-quality.sh` reports per-automation `idle_churn_pct`. Automations where >50% of runs produce nothing get flagged.
 - **Quick check gate** (quick check in scripts) — a copy-paste prompt block that forces agents to check for actionable work before loading skills or reading files. Exits in <60s when nothing to do.
 - **Mid-zone kill** — deep-work enforcement: 3+ minutes with no file write = checkpoint and exit. Targets the 3-8 minute "stuck agent masquerading as polite" pattern.
-- **Radar template** — shared harness template for read-only observer automations (`guides/vidux/radar-template.md`). ~800-1200 chars per radar prompt.
+- **Radar template** — shared harness template for read-only observer automations (see `examples/fleet-reference/` for sample radar configs). ~800-1200 chars per radar prompt.
 - **Cross-platform** — `scripts/lib/compat.sh` abstracts macOS/Linux differences (stat, date).
 
 ## Public Policy
@@ -119,6 +122,8 @@ This repo is public because the core ideas are meant to be reused and pressure-t
 
 ## Start Here
 
-- [Quickstart](guides/vidux/quickstart.md)
-- [Architecture](guides/vidux/architecture.md)
-- [Best Practices](guides/vidux/best-practices.md)
+- [Harness Setup](guides/harness.md) — configure Claude Code / Cursor hooks and settings
+- [Fleet Operations](guides/fleet-ops.md) — automation fleet patterns, scheduling, observer pairs
+- [Investigation Guide](guides/investigation.md) — compound tasks and L2 investigation lifecycle
+- [Evidence Format](guides/evidence-format.md) — how to structure evidence files
+- [Draft PR Flow](guides/draft-pr-flow.md) — how automation lanes push via draft PRs
