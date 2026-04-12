@@ -38,7 +38,8 @@ Then run `/vidux "your project description"` in Claude Code, Cursor, or Codex. T
 Optional enforcement hooks for a target repo:
 
 ```bash
-bash scripts/install-hooks.sh /path/to/your/project
+cp hooks/pre-commit-plan-check.sh /path/to/your/project/.git/hooks/pre-commit
+cp hooks/post-commit-checkpoint.sh /path/to/your/project/.git/hooks/post-commit
 ```
 
 ## Why It Exists
@@ -85,12 +86,12 @@ If the same task appears in 3+ consecutive `PROGRESS.md` entries while still `[i
 - `LOOP.md` — the stateless cycle mechanics
 - `ENFORCEMENT.md` — Claude Code hook configuration
 - `INGREDIENTS.md` — design lineage (10 patterns from 26 surveyed tools)
-- `commands/` — `/vidux`, `/vidux-plan`, `/vidux-loop`, `/vidux-status`, `/vidux-dashboard`, `/vidux-recipes`, `/vidux-manager`, `/vidux-version`
-- `scripts/` — loop driver, checkpoint, gather, doctor, witness, dispatch, prune, install
+- `commands/` — `/vidux`, `/vidux-plan`, `/vidux-fleet`, `/vidux-dashboard`, `/vidux-manager`
+- `scripts/` — vidux-loop.sh, vidux-checkpoint.sh, vidux-doctor.sh, vidux-fleet-quality.sh, vidux-fleet-rebuild.sh, vidux-test-all.sh
 - `scripts/lib/` — compat.sh (macOS/Linux portability), codex-db.sh, ledger integration, queue-jsonl
 - `hooks/` — prompt-hook nudges for plan discipline
-- `guides/vidux/` — quickstart, architecture, best practices, radar template
-- `tests/` — 160+ contract tests (scripts, commands, doctrine, SKILL.md structure)
+- `guides/` — draft-pr-flow.md, evidence-format.md, fleet-ops.md, harness.md, investigation.md
+- `tests/` — 144 contract tests (scripts, commands, doctrine, SKILL.md structure)
 
 ### Companion skill: `/vidux-codex`
 
@@ -103,10 +104,10 @@ Measured savings under Framing B (Claude metered, Codex unlimited): **10x at 33 
 Vidux includes self-healing mechanisms for automation fleets:
 
 - **Circuit breaker** — `vidux-loop.sh` blocks deep work after N consecutive idle cycles (configurable, default 3). Prevents automations from burning cycles without shipping.
-- **Idle-churn detection** — `vidux-witness.sh` reports per-automation `idle_churn_pct`. Automations where >50% of runs produce nothing get flagged.
+- **Idle-churn detection** — `vidux-fleet-quality.sh` reports per-automation `idle_churn_pct`. Automations where >50% of runs produce nothing get flagged.
 - **Quick check gate** (quick check in scripts) — a copy-paste prompt block that forces agents to check for actionable work before loading skills or reading files. Exits in <60s when nothing to do.
 - **Mid-zone kill** — deep-work enforcement: 3+ minutes with no file write = checkpoint and exit. Targets the 3-8 minute "stuck agent masquerading as polite" pattern.
-- **Radar template** — shared harness template for read-only observer automations (`guides/vidux/radar-template.md`). ~800-1200 chars per radar prompt.
+- **Radar template** — shared harness template for read-only observer automations (`guides/harness.md`). ~800-1200 chars per radar prompt.
 - **Cross-platform** — `scripts/lib/compat.sh` abstracts macOS/Linux differences (stat, date).
 
 ## Public Policy
@@ -119,6 +120,8 @@ This repo is public because the core ideas are meant to be reused and pressure-t
 
 ## Start Here
 
-- [Quickstart](guides/vidux/quickstart.md)
-- [Architecture](guides/vidux/architecture.md)
-- [Best Practices](guides/vidux/best-practices.md)
+- [Harness Authoring](guides/harness.md)
+- [Evidence Format](guides/evidence-format.md)
+- [Fleet Operations](guides/fleet-ops.md)
+- [Draft-PR Flow](guides/draft-pr-flow.md)
+- [Investigations](guides/investigation.md)
