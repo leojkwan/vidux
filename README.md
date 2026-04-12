@@ -1,13 +1,20 @@
+<p align="center">
+  <img src="assets/vidux-banner.svg" alt="vidux — plan first, code second" width="100%" />
+</p>
+
+<p align="center">
+  <a href="https://github.com/leojkwan/vidux/stargazers"><img src="https://img.shields.io/github/stars/leojkwan/vidux?style=flat&color=3b82f6" alt="GitHub stars" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/leojkwan/vidux?style=flat" alt="License" /></a>
+  <a href="https://github.com/leojkwan/vidux/commits/main"><img src="https://img.shields.io/github/last-commit/leojkwan/vidux?style=flat" alt="Last commit" /></a>
+</p>
+
 # Vidux
 
-**The Redux of planned vibe coding.**
+**Plan first, code second.** Vidux is a lightweight orchestration system for AI coding work that spans multiple sessions, agents, or days.
 
-Vidux is a lightweight orchestration system for AI coding work that spans multiple sessions, agents, or days. It has exactly two data structures:
-
-- **PLAN.md** — the store. The single source of truth. Every change flows through it.
-- **A FIFO work queue** — the dispatch. Doc edits create work items; agents pop them and execute.
-
-If you know Redux, you already know Vidux. The plan is the store. Code is the view. You never "just code" — you either update the plan (which creates work) or pop a work item (which was created by a plan update). That unidirectional flow is the whole trick.
+- **One source of truth** — every project has a single `PLAN.md`. All decisions, pivots, and progress live there.
+- **Stateless agents** — each run starts fresh, reads the plan, does one task, checkpoints, and exits. No memory tricks.
+- **Works everywhere** — Claude Code, Cursor, Codex. Any agent that can read markdown can pick up where the last one stopped.
 
 ```mermaid
 flowchart LR
@@ -85,7 +92,7 @@ If the same task appears in 3+ consecutive `PROGRESS.md` entries while still `[i
 - `LOOP.md` — the stateless cycle mechanics
 - `ENFORCEMENT.md` — Claude Code hook configuration
 - `INGREDIENTS.md` — design lineage (10 patterns from 26 surveyed tools)
-- `commands/` — `/vidux`, `/vidux-plan`, `/vidux-loop`, `/vidux-status`, `/vidux-dashboard`, `/vidux-recipes`, `/vidux-manager`, `/vidux-version`
+- `commands/` — `/vidux`, `/vidux-plan`, `/vidux-fleet`, `/vidux-dashboard`, `/vidux-manager`, `/vidux-codex`
 - `scripts/` — loop driver, checkpoint, gather, doctor, witness, dispatch, prune, install
 - `scripts/lib/` — compat.sh (macOS/Linux portability), codex-db.sh, ledger integration, queue-jsonl
 - `hooks/` — prompt-hook nudges for plan discipline
