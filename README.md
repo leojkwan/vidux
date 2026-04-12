@@ -85,11 +85,11 @@ If the same task appears in 3+ consecutive `PROGRESS.md` entries while still `[i
 - `LOOP.md` — the stateless cycle mechanics
 - `ENFORCEMENT.md` — Claude Code hook configuration
 - `INGREDIENTS.md` — design lineage (10 patterns from 26 surveyed tools)
-- `commands/` — `/vidux`, `/vidux-plan`, `/vidux-loop`, `/vidux-status`, `/vidux-dashboard`, `/vidux-recipes`, `/vidux-manager`, `/vidux-version`
+- `commands/` — `/vidux`, `/vidux-plan`, `/vidux-fleet`, `/vidux-manager`, `/vidux-dashboard`
 - `scripts/` — loop driver, checkpoint, gather, doctor, witness, dispatch, prune, install
 - `scripts/lib/` — compat.sh (macOS/Linux portability), codex-db.sh, ledger integration, queue-jsonl
 - `hooks/` — prompt-hook nudges for plan discipline
-- `guides/vidux/` — quickstart, architecture, best practices, radar template
+- `guides/` — harness template, fleet ops, investigation protocol, evidence format, draft-PR flow
 - `tests/` — 160+ contract tests (scripts, commands, doctrine, SKILL.md structure)
 
 ### Companion skill: `/vidux-codex`
@@ -97,6 +97,23 @@ If the same task appears in 3+ consecutive `PROGRESS.md` entries while still `[i
 Vidux pairs naturally with `/vidux-codex`, a companion skill that adds **Claude-as-director / Codex-as-executor** delegation on top of the standard vidux cycle. Use it when Claude credits are the bottleneck and a task's read surface exceeds ~3 KB of source material. `/vidux-codex` offloads the read to Codex, returns a compressed 3-section summary (Summary / Evidence / Recommendation), and lets Claude apply taste to the verdict without spending its own budget grinding through files.
 
 Measured savings under Framing B (Claude metered, Codex unlimited): **10x at 33 KB source, 49x at 160 KB, 110x at 357 KB** — linear with source size, no upper bound. The vidux cycle is unchanged; `/vidux-codex` adds exactly one optional delegation step between ASSESS and ACT. `/vidux-codex` ships separately (not in this repo) but is designed to compose with every pattern documented here.
+
+## Ecosystem
+
+Vidux is the core discipline. These companion skills extend it for specific workflows:
+
+| Skill | What it does | Ships in this repo? |
+|---|---|---|
+| `/vidux` | The full plan-first cycle — read, assess, act, verify, checkpoint | Yes |
+| `/vidux-plan` | Plan-only mode — creates or refines a PLAN.md without writing code | Yes |
+| `/vidux-fleet` | Create, manage, and audit automation fleets — schedules, roles, health checks | Yes |
+| `/vidux-manager` | Self-diagnostic agent — runs plan quality tests, validates fleet health | Yes |
+| `/vidux-dashboard` | Cross-project visibility — shows all plans as a tree with status and health | Yes |
+| `/vidux-codex` | Claude-as-director / Codex-as-executor delegation for large read surfaces | No (separate) |
+| `/pilot` | Universal project lead — detects stack and stage, routes into vidux when needed | No (separate) |
+| `/ledger` | Append-only JSONL activity log for multi-agent coordination across tools | No (separate) |
+
+The in-repo skills (`commands/`) work standalone. The external skills are optional and compose with the core cycle without changing it.
 
 ## Fleet Intelligence (v2.3+)
 
@@ -119,6 +136,8 @@ This repo is public because the core ideas are meant to be reused and pressure-t
 
 ## Start Here
 
-- [Quickstart](guides/vidux/quickstart.md)
-- [Architecture](guides/vidux/architecture.md)
-- [Best Practices](guides/vidux/best-practices.md)
+- [Harness Template](guides/harness.md) — how to wire vidux into any project
+- [Fleet Operations](guides/fleet-ops.md) — multi-automation coordination
+- [Investigation Protocol](guides/investigation.md) — compound task lifecycle
+- [Evidence Format](guides/evidence-format.md) — what counts as evidence
+- [Draft PR Flow](guides/draft-pr-flow.md) — how automations push code
