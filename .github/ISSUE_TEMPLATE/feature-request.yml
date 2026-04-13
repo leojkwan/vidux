@@ -1,0 +1,38 @@
+name: Feature Request
+description: Suggest an improvement or new capability for Vidux.
+title: "[Feature] "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or gap
+      description: What limitation or missing capability prompted this request?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the change you'd like to see. Include examples if possible.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What workarounds or alternative approaches have you tried?
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Core contract (SKILL.md / DOCTRINE.md)
+        - Loop mechanics (scripts/)
+        - Commands (commands/)
+        - Documentation (guides/)
+        - Fleet / automation
+        - Other
+    validations:
+      required: true
