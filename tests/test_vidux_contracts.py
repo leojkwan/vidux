@@ -1920,17 +1920,17 @@ class ViduxContractTests(unittest.TestCase):
             self.assertIn(stage, text, f"vidux-manager.md missing stage: {stage}")
 
     def test_fleet_command_has_subcommands_section(self):
-        """vidux-fleet.md must have a Subcommands section."""
+        """vidux-fleet.md must have a Subcommands section (successor to vidux-recipes)."""
         text = _read(self.COMMANDS_DIR / "vidux-fleet.md")
         self.assertIn("## Subcommands", text)
 
     def test_fleet_command_has_stage_system(self):
-        """vidux-fleet.md must define the stage system."""
+        """vidux-fleet.md must define the stage system (successor to vidux-recipes)."""
         text = _read(self.COMMANDS_DIR / "vidux-fleet.md")
         self.assertIn("## Stage System", text)
 
     def test_fleet_command_mentions_automation_doctrine(self):
-        """vidux-fleet.md must reference automation doctrine concepts."""
+        """vidux-fleet.md must reference automation doctrine concepts (successor to vidux-recipes)."""
         text = _read(self.COMMANDS_DIR / "vidux-fleet.md")
         self.assertTrue(
             "no mid-zone" in text.lower() or "no mid zone" in text.lower()
