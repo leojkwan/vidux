@@ -32,7 +32,8 @@ Then run `/vidux "your project description"` in Claude Code. The first cycle gat
 Optional enforcement hooks for a target repo:
 
 ```bash
-bash scripts/install-hooks.sh /path/to/your/project
+cp hooks/pre-commit-plan-check.sh /path/to/your/project/.git/hooks/pre-commit
+cp hooks/post-commit-checkpoint.sh /path/to/your/project/.git/hooks/post-commit
 ```
 
 ## How It Works
@@ -125,11 +126,12 @@ A few hard rules that prevent the most common stateless-agent failures:
 | `LOOP.md` | Stateless cycle mechanics |
 | `ENFORCEMENT.md` | Claude Code hook configuration |
 | `INGREDIENTS.md` | Design lineage (10 patterns from 26 surveyed tools) |
-| `commands/` | `/vidux`, `/vidux-plan`, `/vidux-fleet`, `/vidux-manager`, `/vidux-dashboard` |
-| `scripts/` | Loop driver, checkpoint, gather, doctor, witness, dispatch, prune, install |
+| `commands/` | `/vidux`, `/vidux-plan`, `/vidux-fleet`, `/vidux-dashboard`, `/vidux-manager` |
+| `scripts/` | vidux-loop, vidux-checkpoint, vidux-doctor, vidux-fleet-quality, vidux-fleet-rebuild, vidux-test-all |
+| `scripts/lib/` | compat.sh, codex-db.sh, ledger-config.sh, ledger-emit.sh, ledger-query.sh, queue-jsonl.sh, resolve-plan-store.sh |
 | `hooks/` | Prompt-hook nudges for plan discipline |
-| `guides/` | Harness template, fleet ops, investigation protocol, evidence format, draft-PR flow |
-| `tests/` | 160+ contract tests |
+| `guides/` | draft-pr-flow, evidence-format, fleet-ops, harness, investigation |
+| `tests/` | 144 contract tests (scripts, commands, doctrine, SKILL.md structure) |
 | `examples/` | Worked examples (bug fix lifecycle) |
 
 ## Ecosystem
@@ -169,11 +171,11 @@ Self-healing mechanisms for automation fleets:
 ## Documentation
 
 - [Architecture](ARCHITECTURE.md) — three-layer overview with diagrams
-- [Draft PR Flow](guides/draft-pr-flow.md) — how automation lanes push code
-- [Investigation Template](guides/investigation.md) — compound task L2 format
-- [Fleet Ops](guides/fleet-ops.md) — automation fleet management
-- [Harness Authoring](guides/harness.md) — writing automation prompts
+- [Harness Setup](guides/harness.md) — writing automation prompts
 - [Evidence Format](guides/evidence-format.md) — how to structure evidence files
+- [Fleet Operations](guides/fleet-ops.md) — automation fleet management
+- [Investigation Lifecycle](guides/investigation.md) — compound task L2 format
+- [Draft PR Flow](guides/draft-pr-flow.md) — how automation lanes push code
 - [Examples](examples/) — worked examples (start with [bug fix lifecycle](examples/bug-fix-lifecycle/))
 
 ## Sibling Project
