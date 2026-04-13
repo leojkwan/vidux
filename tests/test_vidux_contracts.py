@@ -364,16 +364,16 @@ class ViduxContractTests(unittest.TestCase):
     def test_commands_exist(self):
         """All vidux commands must exist."""
         for name in [
-            "vidux.md", "vidux-plan.md", "vidux-status.md",
-            "vidux-dashboard.md", "vidux-manager.md", "vidux-recipes.md",
+            "vidux.md", "vidux-plan.md", "vidux-fleet.md",
+            "vidux-dashboard.md", "vidux-manager.md",
         ]:
             self.assertTrue((self.COMMANDS_DIR / name).exists(), f"Command missing: {name}")
 
     def test_commands_have_frontmatter(self):
         """Each command file must have YAML frontmatter with name and description."""
         for name in [
-            "vidux.md", "vidux-plan.md", "vidux-status.md",
-            "vidux-dashboard.md", "vidux-manager.md", "vidux-recipes.md",
+            "vidux.md", "vidux-plan.md", "vidux-fleet.md",
+            "vidux-dashboard.md", "vidux-manager.md",
         ]:
             text = _read(self.COMMANDS_DIR / name)
             self.assertTrue(text.startswith("---"), f"{name} missing frontmatter")
@@ -1914,23 +1914,23 @@ class ViduxContractTests(unittest.TestCase):
         for stage in ["GATHER", "PLAN", "EXECUTE", "VERIFY", "CHECKPOINT", "COMPLETE"]:
             self.assertIn(stage, text, f"vidux-manager.md missing stage: {stage}")
 
-    def test_recipes_command_has_subcommands_section(self):
-        """vidux-recipes.md must have a Subcommands section."""
-        text = _read(self.COMMANDS_DIR / "vidux-recipes.md")
+    def test_fleet_command_has_subcommands_section(self):
+        """vidux-fleet.md must have a Subcommands section (successor to vidux-recipes)."""
+        text = _read(self.COMMANDS_DIR / "vidux-fleet.md")
         self.assertIn("## Subcommands", text)
 
-    def test_recipes_command_has_stage_system(self):
-        """vidux-recipes.md must define the stage system."""
-        text = _read(self.COMMANDS_DIR / "vidux-recipes.md")
+    def test_fleet_command_has_stage_system(self):
+        """vidux-fleet.md must define the stage system (successor to vidux-recipes)."""
+        text = _read(self.COMMANDS_DIR / "vidux-fleet.md")
         self.assertIn("## Stage System", text)
 
-    def test_recipes_command_mentions_automation_doctrine(self):
-        """vidux-recipes.md must reference automation doctrine concepts."""
-        text = _read(self.COMMANDS_DIR / "vidux-recipes.md")
+    def test_fleet_command_mentions_automation_doctrine(self):
+        """vidux-fleet.md must reference automation doctrine concepts (successor to vidux-recipes)."""
+        text = _read(self.COMMANDS_DIR / "vidux-fleet.md")
         self.assertTrue(
             "no mid-zone" in text.lower() or "no mid zone" in text.lower()
             or "mid-zone" in text.lower(),
-            "vidux-recipes.md missing mid-zone doctrine reference",
+            "vidux-fleet.md missing mid-zone doctrine reference",
         )
 
     # -----------------------------------------------------------------------
