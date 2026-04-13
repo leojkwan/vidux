@@ -29,11 +29,12 @@ ln -sfn /path/to/vidux ~/.claude/skills/vidux
 
 Then run `/vidux "your project description"` in Claude Code. The first cycle gathers evidence and writes a `PLAN.md`. No code is written until the plan is ready.
 
-Optional enforcement hooks for a target repo:
+Optional enforcement hooks for a target repo (copy from `hooks/`):
 
 ```bash
 cp hooks/pre-commit-plan-check.sh /path/to/your/project/.git/hooks/pre-commit
 cp hooks/post-commit-checkpoint.sh /path/to/your/project/.git/hooks/post-commit
+cp hooks/three-strike-gate.sh /path/to/your/project/.git/hooks/
 ```
 
 ## How It Works
