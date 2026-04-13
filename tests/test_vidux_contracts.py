@@ -2137,6 +2137,7 @@ class ViduxContractTests(unittest.TestCase):
         finally:
             os.unlink(tmp)
 
+    @unittest.skipIf(os.environ.get("VIDUX_TEST_ALL_RUNNING"), "skip when called from vidux-test-all.sh to avoid infinite recursion")
     def test_test_all_json_output(self):
         """vidux-test-all.sh --json must produce valid JSON with sections array."""
         result = subprocess.run(
