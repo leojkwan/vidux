@@ -27,7 +27,7 @@ After any interruption, re-read PLAN.md and evidence/ from disk. Never trust sum
 
 Bug tickets are not line items. Before coding, map root cause, related surfaces, and impact. A fix without investigation is a guess.
 
-When 2+ tickets touch the same surface, bundle them into one investigation. The investigation produces a root cause analysis, an impact map, and a fix spec. If the fix spec is missing, the cycle is investigation only -- no code.
+When 2+ tickets touch the same surface, bundle them into one investigation. The investigation produces a root cause analysis, an impact map, and a fix spec. Investigation notes live locally in the working tree until the fix ships — they are not a separate deliverable. No investigation PR, no evidence PR, no plan-flip PR. The unit of progress is code change.
 
 ### 4. Self-extend with a brake
 
@@ -43,6 +43,8 @@ When an audit or grep produces a count or classification, **spot-check at least 
 
 After a failure, produce two artifacts: a code fix (the immediate repair) and a process fix (a hook, a test, a constraint, a plan update). The process fix is the valuable output -- it makes the system smarter for next time.
 
+**Progress is code change.** A PR that only touches `PLAN.md`, `investigations/`, `evidence/`, or `INBOX.md` without a source-code change is not progress — it's bookkeeping. Bundle plan updates into the code PR that ships the fix, or keep the notes local until a fix is ready. Standalone "flip row to [completed]", "reconcile Phase N", "audit already-delivered", or "investigation closeout" PRs are prohibited. If a cycle produces no code, it produces no PR and no commit — the notes stay on disk for the next cycle to pick up.
+
 ---
 
 ## The Cycle
@@ -52,7 +54,7 @@ Every work session follows this loop:
 ```
 READ       -> PLAN.md, INBOX.md, git log, git diff (uncommitted work?)
 ASSESS     -> Resume [in_progress] first, else first eligible [pending].
-             No evidence? Refine plan, no code. Empty plan? Research first.
+             No evidence? Gather it locally before coding. Empty plan? Research first.
 ACT        -> Execute tasks until queue empty, blocker, or context budget
 VERIFY     -> Build, test, gate
 CHECKPOINT -> Commit as `vidux: [what you did]` + Progress entry.
@@ -102,6 +104,7 @@ What we know, cited with sources.
 - [Source: codebase grep] file:line pattern
 - [Source: GitHub PR #1234] "feedback or constraint"
 - [Source: design doc] "architectural decision"
+- [Source: observed] "flicker on launch in TestFlight build 990" (user-observed behavior is first-class evidence)
 
 ## Constraints
 - ALWAYS: [things that must be true]
@@ -175,7 +178,7 @@ Parent task in L1 `PLAN.md`:
   [Evidence: Sentry def-123, 47 occurrences; grep "checkout" → 4 hits across 3 files]
 ```
 
-**Stage 1 — investigation stub, no Fix Spec yet.**
+**Stage 1 — investigation in progress, no PR opens yet.**
 
 `investigations/payment-flow.md`:
 
@@ -195,7 +198,7 @@ Parent task in L1 `PLAN.md`:
 ## Gate          (pending)
 ```
 
-L1 Task 3 STAYS `[in_progress]`. This cycle is investigation-only — no code. The agent's job is to push one `(pending)` section forward (Root Cause → Impact Map → Fix Spec → Tests → Gate) and checkpoint. Any cycle that tries to ship code while Fix Spec is still `(pending)` is a mechanism violation — catch it at VERIFY.
+L1 Task 3 STAYS `[in_progress]`. The agent works locally — reads code, pushes one `(pending)` section forward (Root Cause → Impact Map → Fix Spec → Tests → Gate). **No PR opens.** No commit lands. The investigation file sits on disk for the next cycle. The fix and the investigation doc ship together in Stage 2 as one PR.
 
 **Stage 2 — Fix Spec + Tests + Gate land. Code ships. L1 flips.**
 
@@ -210,7 +213,7 @@ The investigation file is NOT deleted on completion. It stays as the historical 
 
 **Four rules this example illustrates:**
 
-1. **No Fix Spec = no code.** The investigation IS the work until the Fix Spec section is filled. Cycles that find `(pending)` in Fix Spec may only push sections forward, not ship code.
+1. **No Fix Spec = no PR.** The investigation file lives on disk until the Fix Spec is filled AND the code ships. Cycles that find `(pending)` in Fix Spec push notes forward locally — no commit, no PR, no ceremony.
 2. **Status flows UP.** L1 completion is driven by L2 state — never mark L1 `[completed]` while L2 has any `(pending)` section.
 3. **Sub-plans are durable.** Keep `investigations/<slug>.md` after the parent task completes. Archive it via the GC rules (older than 180 days, not "task done"), not immediately.
 4. **Decision Log stays in L1.** L2 has Root Cause + Impact Map, but directional choices ("we chose idempotency over a distributed lock") belong in the parent PLAN.md Decision Log so they survive even after the investigation file is archived. L2 is the *why this bug happened*; L1 Decision Log is *why we fixed it this way*.
@@ -267,7 +270,7 @@ For complex bugs or surfaces with 2+ tickets, create `investigations/<slug>.md`:
 ## Gate                 — build passes, tests pass, visual check (for UI)
 ```
 
-If the Fix Spec is missing, the cycle is investigation only -- no code.
+If the Fix Spec is missing, notes stay local. The investigation ships with the fix, not ahead of it.
 
 ---
 

@@ -36,10 +36,10 @@ ELIF plan has [pending] tasks WITH evidence:
   → Set first [pending] to [in_progress], execute, verify, checkpoint
 
 ELIF plan has [pending] tasks WITHOUT evidence:
-  → Gather evidence, update plan with citations, checkpoint (no code)
+  → Gather evidence locally, update plan in place — no commit until code ships
 
 ELIF plan is empty or missing:
-  → Research, synthesize into initial PLAN.md, checkpoint (no code)
+  → Research locally, draft initial PLAN.md — no commit until code ships
 
 ELIF all tasks are [completed]:
   → Verify final state. Mark mission complete.

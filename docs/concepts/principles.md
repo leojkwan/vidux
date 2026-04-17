@@ -34,7 +34,7 @@ After any interruption, re-read PLAN.md and evidence/ from disk. Never trust sum
 
 Bug tickets are not line items. Before coding, map root cause, related surfaces, and impact. A fix without investigation is a guess.
 
-When 2+ tickets touch the same surface, bundle them into one investigation. The investigation produces a root cause analysis, an impact map, and a fix spec. If the fix spec is missing, the cycle is investigation only — no code.
+When 2+ tickets touch the same surface, bundle them into one investigation. The investigation produces a root cause analysis, an impact map, and a fix spec. Investigation notes live locally in the working tree until the fix ships — they are not a separate deliverable. No investigation PR, no evidence PR, no plan-flip PR. The unit of progress is code change.
 
 **Why this matters:** Surface-level fixes often miss the actual cause. An agent that jumps directly to "fix the auth bug" often patches a symptom while the root cause silently corrupts other surfaces.
 

@@ -176,9 +176,9 @@ Follow the Vidux unidirectional flow:
 
 ## Step 4: Checkpoint (30 seconds)
 
-Every cycle MUST produce a checkpoint commit, even if no code changed.
+**A cycle produces a commit only when code changed.** Investigation-only cycles keep their notes on disk — no commit, no PR. The next cycle reads `investigations/<slug>.md` and picks up where this one stopped. If only PLAN.md changed (row flips, Progress entries) bundle it into the next code commit, don't ship it standalone.
 
-**Commit message format:**
+**Commit message format (when code changed):**
 ```
 vidux: [what you did]
 

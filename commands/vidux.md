@@ -100,7 +100,7 @@ Before code, make sure the investigation contains:
 6. Regression Tests
 7. Gate
 
-If the Fix Spec is missing, this task is investigation only — fill it in, then move to the next task.
+If the Fix Spec is missing, keep notes local and move on — do not commit or open a PR for an investigation-only cycle.
 
 ### 4. ✅ VERIFY
 

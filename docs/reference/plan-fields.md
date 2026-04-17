@@ -167,7 +167,7 @@ When a task has `[Investigation: investigations/<slug>.md]`, the sub-plan follow
 <build passes, tests pass, visual check (for UI)>
 ```
 
-Sections fill in as the investigation progresses. **No `## Fix Spec` → no code** — the cycle is investigation-only until the spec lands. See [SKILL.md § Investigation Template](../../SKILL.md#investigation-template) for the full contract.
+Sections fill in as the investigation progresses. **No `## Fix Spec` → no PR** — notes stay local until the fix ships alongside them in a single code PR. See [SKILL.md § Investigation Template](../../SKILL.md#investigation-template) for the full contract.
 
 ## See Also
 
