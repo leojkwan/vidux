@@ -386,7 +386,7 @@ Scanner findings awaiting writer promotion.
 
 ### Why not write directly to PLAN.md?
 
-Scanners are read-only observers (Doctrine: role boundary). Letting scanners mutate the task queue breaks the separation between observation and execution. The inbox is a buffer that preserves that boundary while closing the feedback loop.
+Scanners are read-only scouts (Doctrine: role boundary). Letting scanners mutate the task queue breaks the separation between scanning and execution. The inbox is a buffer that preserves that boundary while closing the feedback loop. (This is the radar pattern — distinct from the deprecated observer pattern, which audited a writer's own state. Scanners feed the queue; observers reported on drift.)
 
 ---
 
