@@ -6,6 +6,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Vidux u
 
 ---
 
+## [2.12.0] — 2026-04-18
+
+ETAs go mandatory; every cycle ends with a meter. `[ETA: Xh]` tags are now required on `[pending]` and `[in_progress]` tasks — the loose "fill in over time" posture from 2.11 is gone. Every cycle (and every response to the user) now ends with a `[FREEFORM]` line + `[METER]` 20-cell 0–100% bar. Leo: *"vidux plans must have an ETA when planning and every response or automation end needs to express where its at freeform and the 0-100 meter bar, idgaf."*
+
+### Changed
+
+- **`[ETA: Xh]` tag is MANDATORY** on `[pending]` + `[in_progress]` tasks. Dropping a new task into a plan without an ETA is a plan defect — fill it in before checkpoint. Completed + blocked don't need one. 2.11.0's "missing = ∅ AI-hrs not a failure" language softened to "acceptable only on historical tasks pre-2.12.0; new tasks require ETA."
+- **Cycle-end format is `[FREEFORM]` + `[METER]`.** Added to `commands/vidux.md` CHECKPOINT section. FREEFORM = 1–3 plain-English sentences on where the work actually sits. METER = 20-cell bar, cell = 5%, mission-wide (not per-task). Coarse on purpose.
+
+### Why
+
+Planning without ETAs lets estimates stay vague forever. Making them mandatory captures the moment of honest guessing; the per-project calibration data (was the `[ETA: 2h]` guess on task N actually 4h?) accumulates naturally and gets tuned later. The FREEFORM + METER cycle-end discipline is for humans reading fleet output — the meter gives Leo a glance-level read without parsing checkpoint prose.
+
+---
+
 ## [2.11.0] — 2026-04-18
 
 Cross-repo plan visibility. New `/vidux-status` command renders a two-bucket status board of every PLAN.md on the machine, with progress bars and AI-hour ETAs. PLAN.md Tasks template grows an optional `[ETA: Xh]` tag documenting the new convention.
