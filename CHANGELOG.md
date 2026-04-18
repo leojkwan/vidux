@@ -6,6 +6,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Vidux u
 
 ---
 
+## [2.11.0] — 2026-04-18
+
+Cross-repo plan visibility. New `/vidux-status` command renders a two-bucket status board of every PLAN.md on the machine, with progress bars and AI-hour ETAs. PLAN.md Tasks template grows an optional `[ETA: Xh]` tag documenting the new convention.
+
+### Added
+
+- **`/vidux-status` command** (`commands/vidux-status.md`) — read-only scan of every PLAN.md under `~/Development/`, classified into 🎯 Tied to this chat (cwd / session / ledger matches) and 📋 Other tracked plans. Each row renders a 10-cell progress bar + remaining AI-hours + last-Progress timestamp. Never writes, never commits.
+- **`[ETA: Xh]` tag convention** on Task lines. Optional. Calibration table in SKILL.md: 0.25h trivial → 8h+ multi-phase (promote to compound). Missing tags render as `∅ AI-hrs` and back-fill over time — not a failure. ETAs are elastic; scope revisions go in `## Decision Log`.
+
+### Changed
+
+- **SKILL.md `## Tasks` template** now shows `[ETA: 0.5h]` and `[ETA: 2h]` on the example rows, with a new paragraph documenting the AI-hour convention.
+
+---
+
 ## [2.10.0] — 2026-04-18
 
 Structural refactor. The doctrine machinery shrinks; the recipes layer takes on everything tool-specific, tactical, or customizable. Cross-tool delegation (Claude ↔ Codex) is deprecated — vidux runs single-tool or not at all. Core SKILL.md becomes Part 1 only.
