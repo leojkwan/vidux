@@ -6,6 +6,25 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Vidux u
 
 ---
 
+## [2.14.0] — 2026-04-18
+
+Concrete script for `/vidux-status`. The slash command is now backed by a real Python script — deterministic, <5s end-to-end, can be called from cron / bash / other agents / CI.
+
+### Added
+
+- **`scripts/vidux-status.py`** (~230 lines, stdlib-only) — read-only scan of every `PLAN.md` under `~/Development/` (or `--root <path>`). Renders the two-bucket board (`🎯 Tied to this chat` + `📋 Other tracked plans`). Sorts by `%` desc then mtime desc. Filters empty + shipped plans by default (`--all` includes them). Flags: `--json` for machine output, `--focus <repo...>` to override cwd-based classification. Tight worktree + nested-vidux-skill-copy filter (skips `*-worktrees/`, `.claude/worktrees/`, `**/ai/skills/vidux/`).
+
+### Usage
+
+```bash
+python3 scripts/vidux-status.py
+python3 scripts/vidux-status.py --all
+python3 scripts/vidux-status.py --focus vidux resplit-web strongyes-web
+python3 scripts/vidux-status.py --json | jq '.tied[].percent'
+```
+
+---
+
 ## [2.13.0] — 2026-04-18
 
 Durable question queue + tightened marker doctrine. The `[DEFER]` tag in vidux-ship-coordinator was a passive name for an active state — replaced with `[ASK-LEO]` pointing at a new `ASK-LEO.md` queue file where questions accumulate instead of re-summarizing in memory.md every cycle. Also tightened 2.12.0's "every response ends with meter+freeform" rule — the markers are for mission-status moments (cycle ends, progress reports), not casual chat. Leo: *"why are u [METER] [FREEForm] everything?"*
