@@ -116,6 +116,9 @@ Always leave a durable checkpoint when stopping.
 - Update `## Progress` with stage breadcrumb, what changed, what is next, and any blocker.
 - Use `vidux-checkpoint.sh --status done|done_with_concerns|blocked` when the outcome is not a clean success.
 - Commit the plan/doc/code delta that represents the cycle boundary.
+- **End every cycle (and every response to the user) with two required markers:**
+  - `[FREEFORM]` — 1–3 sentences, plain English, where this work actually sits. Not a status-report template; just: what landed, what didn't, what's nagging.
+  - `[METER]` — a 20-cell 0–100 bar showing overall mission progress: `▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ 100%` full, `░░░░░░░░░░░░░░░░░░░░ 0%` empty. Cell = 5%. Round to nearest cell. This is mission-wide, not per-task. If 3 tasks landed and 1 is stuck, the meter still reflects how close the whole mission is to done. Coarse on purpose.
 
 ### 6. 🏁 COMPLETE
 
