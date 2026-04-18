@@ -6,6 +6,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Vidux u
 
 ---
 
+## [2.16.0] — 2026-04-18
+
+Audit cleanup — catches the stale "Mode A / Mode B" terminology that 2.15.0 missed in tier-3 docs (`references/` + `docs/fleet/`). 26 occurrences renamed to the `research dispatch / implementation dispatch` terminology that 2.15.0 already shipped in `guides/automation.md` and `SKILL.md`. Also fixes a stale deprecation breadcrumb and archives a completed in-flight plan.
+
+### Changed
+
+- **`Mode A / Mode B` → `research dispatch / implementation dispatch`** across 4 files: `references/automation.md` (17 occurrences), `docs/fleet/codex-lifecycle.md` (6), `docs/fleet/codex-setup.md` (1), `commands/vidux-auto.md` (2). This was the remainder left over from 2.15.0's core rename — `guides/automation.md` and `SKILL.md` were already clean, but `references/` still carried the old jargon and the `docs/fleet/` files cross-referenced it. Verified: `grep -c 'Mode A\|Mode B'` returns 0 across all 4 files post-rename.
+- **`commands/vidux-auto.md` breadcrumb accuracy fix**. The deprecation breadcrumb claimed `/vidux` has "Part 1 + Part 2 inline" — stale. Per the 2.10.0 structural split, Part 2 moved OUT of SKILL.md to `guides/automation.md`. Breadcrumb now accurately describes the current structure: single entry `/vidux`, Part 1 in SKILL.md, Part 2 in `guides/automation.md`, deep doctrine in `references/automation.md`.
+
+### Moved
+
+- **`PLAN-docs-simplify.md` → `projects/docs-simplify/PLAN.md`**. All 8 tasks `[completed]` since 2026-04-16; plan was cluttering repo root. Preserved via `git mv` (history intact) rather than deleted — the Decision Log entries (platform-agnostic core, TOML-first Codex workflow) still have reference value for future doc-simplification work.
+
+---
+
 ## [2.15.0] — 2026-04-18
 
 Doctrine cleanup: plain-English rename of L1/L2 plan nesting, cross-tool delegation removed (not deprecated — removed), vidux.config.json surfaced in core, "markers" jargon dropped. Leo: *"what are markers? … let's kill delegation cross tool concept entirely, 0 deprecation warnings i am sole user."*

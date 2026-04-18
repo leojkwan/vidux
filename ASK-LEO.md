@@ -16,10 +16,10 @@ Options:
 Answer:
 
 ## Q2 — PR #27 scope-split: accept bundle or split?
-Opened: 2026-04-18T09:45Z | Status: pending | Lane: vidux-ship-coordinator
-PR #27 branch `claude/vidux-recipes-split` now carries 3 releases stacked: 2.10.0 (refactor) + 2.11.0 (/vidux-status + [ETA: Xh]) + 2.12.0 (mandatory ETA + [FREEFORM]/[METER]) + 2.13.0 (scope TBD, see this doc's commit). PR title still reads "refactor(2.10.0)".
+Opened: 2026-04-18T09:45Z | Updated: 2026-04-18T19:15Z | Status: pending | Lane: vidux-ship-coordinator
+PR #27 branch `claude/vidux-recipes-split` now carries **7 releases stacked**: 2.10.0 (refactor) + 2.11.0 (/vidux-status + [ETA: Xh]) + 2.12.0 (mandatory ETA + [FREEFORM]/[METER]) + 2.13.0 (ASK-LEO queue + tightened marker doctrine) + 2.14.0 (scripts/vidux-status.py) + 2.15.0 (L1/L2 retired + cross-tool removed + config surfaced) + 2.16.0 (audit cleanup — Mode A/B rename + breadcrumb fix + archive). PR title still reads "refactor(2.10.0)" which has not been accurate since 2026-04-18T05:00Z.
 Options:
-  a) Accept combined — retitle #27 to cover all 4 releases, ship together after Q1 resolves
-  b) Force-push revert on `claude/vidux-recipes-split` down to 2.10.0, cherry-pick 2.11/2.12/2.13 onto fresh branch, open PR #29
+  a) Accept combined — retitle #27 to cover all 7 releases, ship together after Q1 resolves
+  b) Force-push revert on `claude/vidux-recipes-split` down to 2.10.0, cherry-pick 2.11→2.16 onto fresh branches, open 6 separate PRs
   c) Leave as-is, ship as-is with unfortunate title
 Answer:
