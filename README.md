@@ -120,36 +120,38 @@ A few hard rules that prevent the most common stateless-agent failures:
 
 | Path | What |
 |------|------|
-| `SKILL.md` | Full contract: architecture, doctrine, loop, PLAN.md template, compound tasks |
+| `SKILL.md` | Part 1 only — discipline, cycle, PLAN.md template, compound tasks (~280 lines) |
+| `guides/automation.md` | Part 2 (opt-in) — 24/7 fleet model, session-gc, lane bootstrap, delegation |
+| `guides/recipes/` | 12 opt-in recipes — CLAUDE.md rules, lane prompts, subagent delegation, Codex runtime, friction patterns |
 | `CHANGELOG.md` | Release notes — latest doctrine changes and migration notes |
 | `DOCTRINE.md` | The short doctrine (~5 min read) |
 | `LOOP.md` | Stateless cycle mechanics |
 | `ENFORCEMENT.md` | Claude Code hook configuration |
 | `INGREDIENTS.md` | Design lineage (10 patterns from 26 surveyed tools) |
-| `commands/` | `/vidux` (single entry point — discipline + automation) |
+| `commands/` | `/vidux` (single entry point — Part 1 inline, Part 2 + recipes on demand) |
 | `references/` | `automation.md` — deep doctrine (session-gc internals, Codex shim gotchas, PR lifecycle) |
 | `scripts/` | vidux-loop, vidux-checkpoint, vidux-doctor, vidux-fleet-quality, vidux-fleet-rebuild, vidux-test-all |
 | `scripts/lib/` | compat.sh, codex-db.sh, ledger-config.sh, ledger-emit.sh, ledger-query.sh, queue-jsonl.sh, resolve-plan-store.sh |
 | `hooks/` | Prompt-hook nudges for plan discipline |
-| `guides/` | draft-pr-flow, evidence-format, fleet-ops, harness, investigation, recipes |
+| `guides/` | automation, draft-pr-flow, evidence-format, fleet-ops, harness, investigation, recipes/ |
 | `tests/` | 144 contract tests (scripts, commands, doctrine, SKILL.md structure) |
 | `examples/` | Worked examples (bug fix lifecycle, fleet reference) |
 
 ## Ecosystem
 
-Vidux is the core discipline. It has **one entry point** — `/vidux` — that covers both planning and automation. Previously separate companion skills (`/vidux-plan`, `/vidux-auto`, `/vidux-claude`, `/vidux-codex`, `/vidux-fleet`, `/vidux-dashboard`, `/vidux-manager`) were merged or deprecated on 2026-04-17 to eliminate the "which command do I use?" friction.
+Vidux is the core discipline. It has **one entry point** — `/vidux` — loading Part 1 (discipline) inline. Part 2 (automation) and the recipes layer are opt-in: load `guides/automation.md` and `guides/recipes/*.md` only when the task calls for them. Previously separate companion skills (`/vidux-plan`, `/vidux-auto`, `/vidux-claude`, `/vidux-codex`, `/vidux-fleet`, `/vidux-dashboard`, `/vidux-manager`) were merged or deprecated through the 2026-04 consolidation. As of vidux 2.10.0, **`/vidux-codex` is retired** — cross-tool delegation is no longer supported; load `guides/recipes/codex-runtime.md` to run vidux natively on Codex instead.
 
 | Skill | What it does | Ships in this repo? |
 |---|---|---|
-| `/vidux` | Full plan-first cycle (Part 1) + automation patterns (Part 2) — read, assess, act, verify, checkpoint; plus lane bootstrap, delegation modes, session-gc | Yes |
+| `/vidux` | Plan-first cycle (Part 1 inline) — read, assess, act, verify, checkpoint. Part 2 automation + recipes loaded on demand | Yes |
 | `/pilot` | Universal project lead — detects stack and stage, routes into `/vidux` when needed | No (separate) |
 | `/ledger` | Append-only JSONL activity log for multi-agent coordination across tools | No (separate) |
 
-For deep automation details (session-gc internals, Codex shim registration, PR lifecycle nursing, cross-fleet coordination), `/vidux` reads [`references/automation.md`](references/automation.md) on demand — it is not loaded upfront.
+For deep automation details (session-gc internals, Codex shim registration, PR lifecycle nursing, cross-fleet coordination), `/vidux` reads [`guides/automation.md`](guides/automation.md) and [`references/automation.md`](references/automation.md) on demand — neither is loaded upfront.
 
 ## Platform Automation
 
-Vidux is platform-agnostic — the cycle works for humans, one-shot sessions, and cron-scheduled fleets. The automation layer is **Part 2** of the single `/vidux` skill (`commands/vidux.md`), with the deep doctrine in [`references/automation.md`](references/automation.md):
+Vidux is platform-agnostic — the cycle works for humans, one-shot sessions, and cron-scheduled fleets. As of 2.10.0, the automation layer lives in [`guides/automation.md`](guides/automation.md) (opt-in Part 2 content), with the deep doctrine in [`references/automation.md`](references/automation.md):
 
 - **Session management** — CronCreate lanes, session-gc, JSONL growth control
 - **Lane operations** — coordinator pattern, decision tree, 6-lane hard cap
@@ -162,7 +164,7 @@ See [guides/fleet-ops.md](guides/fleet-ops.md) and [guides/recipes.md](guides/re
 
 ## Fleet Patterns
 
-Patterns for autonomous multi-lane fleets. See `/vidux` Part 2 and [`references/automation.md`](references/automation.md) for mechanics, plus the [recipe catalog](guides/recipes.md) for 8 ready-to-deploy patterns with prompt templates.
+Patterns for autonomous multi-lane fleets. See [`guides/automation.md`](guides/automation.md) and [`references/automation.md`](references/automation.md) for mechanics, plus the [recipe catalog](guides/recipes/) for ready-to-deploy patterns with prompt templates.
 
 - **Draft-PR-first** — automation pushes go through `gh pr create --draft`, never direct-to-main ([guide](guides/draft-pr-flow.md))
 - **Progress is code change** — PRs that only touch `PLAN.md` / `investigations/` / `evidence/` / `INBOX.md` are bookkeeping, not progress. Bundle plan updates into the code PR, or keep notes local ([CHANGELOG](CHANGELOG.md#290--2026-04-17))
@@ -177,7 +179,7 @@ Three findings from running 35+ Claude lanes and Codex agents across 5 repos for
 
 **2. Ledger noise drowns signal.** The vidux-loop cron produced 395K empty `vidux_loop_start` entries in 2 days — 99.7% of all ledger volume. Fix: log once when idle, not per-PID per-fire. The ledger is only useful if real events are findable.
 
-**3. Workspace-write flips the cost model.** When Codex writes code (`--sandbox workspace-write`) and Claude only reviews the diff, per-cycle Claude cost drops from ~10K tokens to ~2-3K. The expensive part (code generation) shifts to the unlimited Codex budget. This is now Mode B in `/vidux` Part 2.
+**3. Workspace-write flips the cost model.** When Codex writes code (`--sandbox workspace-write`) and Claude only reviews the diff, per-cycle Claude cost drops from ~10K tokens to ~2-3K. The expensive part (code generation) shifts to the unlimited Codex budget. As of 2.10.0, this cross-tool variant is deprecated in favor of same-tool subagent dispatch — see [`guides/recipes/subagent-delegation.md`](guides/recipes/subagent-delegation.md).
 
 ## Documentation
 
