@@ -6,6 +6,23 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Vidux u
 
 ---
 
+## [2.15.0] — 2026-04-18
+
+Doctrine cleanup: plain-English rename of L1/L2 plan nesting, cross-tool delegation removed (not deprecated — removed), vidux.config.json surfaced in core, "markers" jargon dropped. Leo: *"what are markers? … let's kill delegation cross tool concept entirely, 0 deprecation warnings i am sole user."*
+
+### Changed
+
+- **L1/L2 plan-nesting terminology retired.** SKILL.md now calls it "parent plan + child investigation" in plain English. The concept is unchanged (one parent PLAN.md, one child `investigations/<slug>.md`, no deeper nesting) — the jargon was obscuring it. README.md's one-line nesting rule now reads: "One parent plan, one child investigation per compound task — no deeper nesting."
+- **Cross-tool delegation removed, not deprecated.** All references to Mode A / Mode B / cross-tool / primary-Claude-+-secondary-Codex scrubbed from SKILL.md, README.md, guides/automation.md. The subagent-dispatch doctrine (which was already same-tool by 2.10.0) is renamed to plain "research dispatch" + "implementation dispatch." No deprecation notices — vidux is a single-user project; backwards-compat shims aren't earning their keep.
+- **`[FREEFORM]` / `[METER]` "markers" jargon dropped.** `commands/vidux.md` CHECKPOINT section now calls them "the freeform line" and "the meter bar" — what they literally are. Rule unchanged from 2.13.0 (cycle checkpoints + mission-status replies, not casual chat).
+
+### Added
+
+- **`vidux.config.json` surfaced in core doctrine.** SKILL.md now has a brief "vidux.config.json (where plans live)" section explaining the three plan-store modes (`inline` / `local` / `external`). README.md's new "Status & Config" section shows the same for OSS readers. Previously this only lived in `commands/vidux.md`'s startup flow — SKILL.md readers never encountered it.
+- **README.md "Status & Config" section** — documents `scripts/vidux-status.py` usage and `vidux.config.json` minimal schema.
+
+---
+
 ## [2.14.0] — 2026-04-18
 
 Concrete script for `/vidux-status`. The slash command is now backed by a real Python script — deterministic, <5s end-to-end, can be called from cron / bash / other agents / CI.

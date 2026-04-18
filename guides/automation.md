@@ -76,15 +76,15 @@ If your last 3 checkpoints all ship from the same surface, force a surface switc
 
 ---
 
-## Delegation (the primary context cutter)
+## Subagent dispatch (the primary context cutter)
 
-> **Cross-tool delegation is deprecated in 2.10.0.** The pattern of primary-Claude + secondary-Codex created fragile state sync, prompt-shim gotchas, and "context loss" at the handoff. Modern vidux assumes single-tool execution: you run on Claude with Claude subagents, or you run on Codex with Codex subagents. For Codex-native setup, see `guides/recipes/codex-runtime.md`.
+Vidux runs single-tool: Claude parent with Claude subagents, or Codex parent with Codex subagents. The savings come from the subagent's fresh context budget — not from jumping runtimes.
 
-Two modes distribute work between a **parent agent** (metered, decides/reviews) and **child subagents** dispatched via `Agent()` in the same runtime. The savings come from the subagent's fresh context budget — not from hopping to a different tool.
+Two dispatch shapes distribute work between the parent (metered, decides/reviews) and a child subagent spawned via `Agent()` in the same runtime:
 
-### Mode A: Research
+### Research dispatch
 
-Parent writes a prompt, child subagent reads 30–150 KB in its own context, returns a 3-section summary (~300 tokens). Parent reads only the summary. Measured: **10–110x token savings** vs direct reads in the parent.
+Parent writes a prompt, child subagent reads 30–150 KB in its own context, returns a 3-section summary (~300 tokens). Parent reads only the summary. Measured: **10–110× token savings** vs direct reads in the parent.
 
 ```
 Parent: "30 files, needs auditing. Hand it off."
@@ -92,23 +92,7 @@ Subagent: reads, reasons, compresses to Summary + Evidence + Recommendation.
 Parent: reads ~300 tokens, applies taste, ships.
 ```
 
-### Mode B: Implementation
-
-Parent writes a 5-block spec, child subagent edits files in the working tree. Parent reviews `git diff` (~500 tokens) instead of writing 50 lines itself. Measured: **~5x further savings** on code-writing cycles.
-
-```
-Parent: "50-line fix. Here's Task + Files + Spec + Acceptance + Out-of-scope."
-Subagent: writes code.
-Parent: git diff → accept | re-prompt | git checkout . + retry.
-```
-
-### Decision tree
-
-- Substantial code writing (>10 lines, clear spec) → Mode B
-- Reading code, grinding a hard problem, research → Mode A
-- Pure planning, taste call, <10 lines of obvious writing → parent does it directly
-
-### The Mode A compression contract (paste verbatim in every Mode A prompt)
+The compression contract (paste verbatim in the subagent prompt):
 
 ```
 Output ONLY these sections, nothing else:
@@ -118,7 +102,17 @@ Output ONLY these sections, nothing else:
 Do not explain. Do not echo the task. Do not write code.
 ```
 
-### The Mode B prompt shape (five blocks, all mandatory)
+### Implementation dispatch
+
+Parent writes a 5-block spec, child subagent edits files in the working tree. Parent reviews `git diff` (~500 tokens) instead of writing 50 lines itself. Measured: **~5× further savings** on code-writing cycles.
+
+```
+Parent: "50-line fix. Here's the 5-block spec."
+Subagent: writes code.
+Parent: git diff → accept | re-prompt | git checkout . + retry.
+```
+
+The five-block prompt shape (all mandatory):
 
 ```
 1. Task: one-sentence description.
@@ -129,6 +123,12 @@ Do not explain. Do not echo the task. Do not write code.
 ```
 
 The "Out of scope" block is load-bearing. Without it, the subagent refactors adjacent code it decides "looks wrong" and the parent either accepts scope creep or rejects the whole diff.
+
+### Decision tree
+
+- Substantial code writing (>10 lines, clear spec) → implementation dispatch
+- Reading code, grinding a hard problem, research → research dispatch
+- Pure planning, taste call, <10 lines of obvious writing → parent does it directly
 
 ---
 
@@ -200,7 +200,7 @@ Load this guide when any of these are true:
 - Creating, managing, or auditing a lane
 - Debugging fleet behavior (a lane isn't firing, checkpoints look wrong)
 - Setting up session-gc
-- Designing the Mode A / Mode B split for a long-running session
+- Designing the research / implementation dispatch split for a long-running session
 
 For everything else — planning, investigating, shipping a one-off fix — SKILL.md Part 1 alone is the full tool. Don't let automation mechanics leak into ordinary plan work.
 

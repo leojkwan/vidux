@@ -116,10 +116,10 @@ Always leave a durable checkpoint when stopping.
 - Update `## Progress` with stage breadcrumb, what changed, what is next, and any blocker.
 - Use `vidux-checkpoint.sh --status done|done_with_concerns|blocked` when the outcome is not a clean success.
 - Commit the plan/doc/code delta that represents the cycle boundary.
-- **End cycle checkpoints and mission-status replies with two markers:**
-  - `[FREEFORM]` — 1–3 sentences, plain English, where this work actually sits. Not a status-report template; just: what landed, what didn't, what's nagging.
-  - `[METER]` — a 20-cell 0–100 bar showing overall mission progress: `▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ 100%` full, `░░░░░░░░░░░░░░░░░░░░ 0%` empty. Cell = 5%. Round to nearest cell. Mission-wide, coarse on purpose.
-  - **When to skip both:** casual chat, naming/design questions, quick Q&A. Ritual markers on every textual reply are noise. Use judgment: "would a reader benefit from a glance-level progress read here?" — if no, skip.
+- **End cycle checkpoints and mission-status replies with two lines:**
+  - A **freeform line** — 1–3 sentences, plain English, where this work actually sits. Not a status-report template; just: what landed, what didn't, what's nagging.
+  - A **meter bar** — 20 cells, `▓` filled / `░` empty, one cell = 5%. Round to nearest cell. Mission-wide, coarse on purpose. Example: `▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░ 90%`.
+  - **When to skip both:** casual chat, naming/design questions, quick Q&A. The two lines at the end of every textual reply become noise — use judgment. Ask yourself: "would a reader benefit from a glance-level progress read here?" If no, skip.
   - **Meter alone is fine** when you want progress signal without prose.
 
 ### 6. 🏁 COMPLETE
