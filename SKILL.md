@@ -158,68 +158,66 @@ Vidux is designed for projects that span days to months. A quarter project has:
 
 The plan LIVES -- it gets updated every cycle, not written once and followed blindly.
 
-### Compound tasks and sub-plans
+### When a task needs an investigation (the only nesting vidux allows)
 
-Not every task is atomic. Some need investigation before code. A compound task links to an investigation file:
+Some tasks are atomic — one PR, clear diff. Others are messy: unclear root cause, 3+ files in play, you need to think before you touch code. For those, the parent plan task delegates its deep work to a child investigation file:
 
 ```markdown
-- [pending] Task 3: Fix payment flow [Investigation: investigations/payment-flow.md]
-```
-
-The `[Investigation: ...]` marker tells the agent: read the sub-plan before coding. If the investigation has no fix spec yet, the cycle is investigation only. Sub-plans follow the same structure (evidence, root cause, fix spec, tests).
-
-**Nesting depth:** Max two levels (L1 plan, L2 investigation). If a surface needs deeper decomposition, split it into separate L1 plans instead.
-
-**Status propagation:** When an L2 investigation's Fix Spec is coded, tested, and gated, the parent task in L1 PLAN.md moves to `[completed]`. An L2 with no Fix Spec yet means the parent stays `[in_progress]` -- the investigation IS the work.
-
-#### Worked example: L1 compound task + L2 investigation lifecycle
-
-Parent task in L1 `PLAN.md`:
-
-```
 - [in_progress] Task 3: Fix payment flow [Investigation: investigations/payment-flow.md]
-  [Evidence: Sentry def-123, 47 occurrences; grep "checkout" → 4 hits across 3 files]
 ```
 
-**Stage 1 — investigation in progress, no PR opens yet.**
+That's the entire nesting model. One parent plan, one child investigation per compound task. No deeper nesting. If you need a third level, split into two separate parent plans instead.
 
-`investigations/payment-flow.md`:
+**How it works:**
 
+1. **You write the investigation file first.** `investigations/payment-flow.md` has seven sections, filled bottom-up:
+
+   ```
+   ## Reporter Says    — exact quote from feedback
+   ## Evidence         — files, related tickets, repro steps
+   ## Root Cause       (pending)
+   ## Impact Map       (pending)
+   ## Fix Spec         (pending)
+   ## Tests            (pending)
+   ## Gate             (pending)
+   ```
+
+2. **The parent task stays `[in_progress]`** while the investigation is active. Each cycle fills one `(pending)` section. No PR opens during investigation — the sections live on disk.
+
+3. **The fix ships with the investigation, as one commit.** When Fix Spec + Tests + Gate are all done, the code lands and the parent task flips `[completed]`:
+
+   ```
+   - [completed] Task 3: Fix payment flow [Investigation: investigations/payment-flow.md]
+     [Fix: src/checkout/submit.ts:42, src/checkout/retry.ts:18] [Shipped: <commit sha>]
+   ```
+
+4. **The investigation file stays forever.** It's the historical record of *why* the fix looks the way it does. Future agents who touch the same surface read it before acting. Archived by age (180+ days), never by "task done."
+
+**Four rules the example illustrates:**
+
+1. **No Fix Spec = no PR.** Investigation file lives on disk until the Fix Spec is filled AND the code ships.
+2. **Parent status follows child status.** Parent task can't flip `[completed]` while the investigation has any `(pending)` section.
+3. **Decision Log stays in the parent PLAN.md.** The investigation captures *why this bug happened*; the parent Decision Log captures *why we fixed it this way*.
+4. **When in doubt, don't nest.** A plain task with clear evidence doesn't need an investigation. Reserve nesting for surfaces that genuinely have a root-cause question.
+
+### vidux.config.json (where plans live)
+
+One optional config file at the repo root controls plan discovery:
+
+```json
+{
+  "plan_store": {
+    "mode": "local",
+    "path": "~/Development/vidux/projects"
+  }
+}
 ```
-## Reporter Says
-"Checkout double-charges on fast retry." — Sentry def-123, PR #4567 comment.
 
-## Evidence
-- src/checkout/submit.ts:42 — no idempotency key
-- src/checkout/retry.ts:18 — no in-flight guard
-- Sentry def-123 — 47 occurrences / 7 days
+- `mode: "inline"` — plans live in the current repo as `PLAN.md`. Default when no config is present.
+- `mode: "local"` — plans live at the configured `path` (one subdir per project). Useful when you want plans tracked in a separate git repo synced across machines.
+- `mode: "external"` — same as local but path may point outside `~/Development`.
 
-## Root Cause    (pending)
-## Impact Map    (pending)
-## Fix Spec      (pending)
-## Tests         (pending)
-## Gate          (pending)
-```
-
-L1 Task 3 STAYS `[in_progress]`. The agent works locally — reads code, pushes one `(pending)` section forward (Root Cause → Impact Map → Fix Spec → Tests → Gate). **No PR opens.** No commit lands. The investigation file sits on disk for the next cycle. The fix and the investigation doc ship together in Stage 2 as one PR.
-
-**Stage 2 — Fix Spec + Tests + Gate land. Code ships. L1 flips.**
-
-Once the Gate section confirms build + tests + visual pass, the parent task in L1 flips:
-
-```
-- [completed] Task 3: Fix payment flow [Investigation: investigations/payment-flow.md]
-  [Fix: src/checkout/submit.ts:42, src/checkout/retry.ts:18] [Shipped: <commit sha>]
-```
-
-The investigation file is NOT deleted on completion. It stays as the historical record of *why* the fix looks the way it does. Future agents who touch the same surface read it before acting.
-
-**Four rules this example illustrates:**
-
-1. **No Fix Spec = no PR.** The investigation file lives on disk until the Fix Spec is filled AND the code ships. Cycles that find `(pending)` in Fix Spec push notes forward locally — no commit, no PR, no ceremony.
-2. **Status flows UP.** L1 completion is driven by L2 state — never mark L1 `[completed]` while L2 has any `(pending)` section.
-3. **Sub-plans are durable.** Keep `investigations/<slug>.md` after the parent task completes. Archive it via the GC rules (older than 180 days, not "task done"), not immediately.
-4. **Decision Log stays in L1.** L2 has Root Cause + Impact Map, but directional choices ("we chose idempotency over a distributed lock") belong in the parent PLAN.md Decision Log so they survive even after the investigation file is archived. L2 is the *why this bug happened*; L1 Decision Log is *why we fixed it this way*.
+Agents read `vidux.config.json` at session start and resolve the authority PLAN.md from the config before anything else.
 
 ### Inbox
 
@@ -275,7 +273,7 @@ Everything above is **core vidux** — the five principles, the cycle, the PLAN.
 If your work needs more, two companion surfaces carry the rest:
 
 - **[`guides/automation.md`](guides/automation.md)** — the 24/7 fleet operating model, session-gc, lane management, subagent delegation, lane bootstrap. Load this when you run lanes on a schedule.
-- **[`guides/recipes/`](guides/recipes/)** — opt-in tactics and patterns. CLAUDE.md rules, lane prompt templates, same-tool Mode A / Mode B via `Agent()`, Codex-native runtime, evidence discipline, proactive work surfacing, visual-proof requirements, and more. Load a specific recipe on demand.
+- **[`guides/recipes/`](guides/recipes/)** — opt-in tactics and patterns. CLAUDE.md rules, lane prompt templates, subagent dispatch, evidence discipline, proactive work surfacing, visual-proof requirements, and more. Load a specific recipe on demand.
 
 Neither surface overrides core vidux. Core is opinionated machinery; automation and recipes are opt-in layers.
 
