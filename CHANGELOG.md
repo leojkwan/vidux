@@ -6,6 +6,48 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Vidux u
 
 ---
 
+## [2.10.0] — 2026-04-18
+
+Structural refactor. The doctrine machinery shrinks; the recipes layer takes on everything tool-specific, tactical, or customizable. Cross-tool delegation (Claude ↔ Codex) is deprecated — vidux runs single-tool or not at all. Core SKILL.md becomes Part 1 only.
+
+### Added
+
+- **`guides/automation.md`** — the 24/7 fleet operating model, session-gc, lane management, delegation, lane bootstrap. Previously lived as Part 2 of SKILL.md. Now an opt-in guide; load it when you need automation, not to read vidux.
+- **`guides/recipes/` directory** with 12 new recipes covering tacit knowledge, delegation patterns, and workflow friction categories from production /insights data:
+  - `claude-md-rules.md` — battle-tested CLAUDE.md rules
+  - `lane-prompt-patterns.md` — 8-block prompt structure
+  - `subagent-delegation.md` — same-tool Mode A / Mode B via `Agent()`
+  - `codex-runtime.md` — running vidux natively on Codex Desktop
+  - `user-value-triage.md` / `evidence-discipline.md` / `env-var-forensics.md` / `webfetch-fallback.md` / `proactive-surfacing.md` / `lightweight-first.md` / `visual-proof-required.md` — /insights-derived friction recipes
+  - `README.md` — recipe index
+
+### Changed
+
+- **SKILL.md shrinks to Part 1 only** (~280 lines, discipline + cycle + PLAN.md + investigations). Part 2 moved to `guides/automation.md`. The Activation section now includes a "Recipes" pointer.
+- **Cross-tool delegation deprecated.** Mode A / Mode B were Claude-primary + Codex-secondary cross-tool handoffs. That pattern created context-loss at the egress boundary, prompt-shim fragility, and state-sync surprises. Modern delegation = same-tool subagent dispatch via `Agent()`. The cross-tool era had measured wins (10–110× Mode A / ~5× Mode B) but the reliability cost exceeded the context savings at fleet scale.
+- **`/vidux-codex` skill (in `~/Development/ai`) deprecated.** Users who want vidux on Codex: see `guides/recipes/codex-runtime.md`. Users who want cross-tool delegation: pattern is retired.
+
+### Migration
+
+| Old shape | New shape |
+|---|---|
+| `SKILL.md` Part 2 | `guides/automation.md` |
+| Mode A / Mode B (Claude→Codex) | `guides/recipes/subagent-delegation.md` (same-tool via `Agent()`) |
+| Codex shim registration (inline in SKILL.md / vidux-codex skill) | `guides/recipes/codex-runtime.md` |
+| `/vidux-codex` skill | Deprecated — see `codex-runtime.md` recipe |
+
+### Versioning note
+
+This is a minor bump (2.9.0 → 2.10.0) because:
+
+- The five principles, the cycle, and the required PLAN.md sections are unchanged
+- Existing SKILL.md readers get redirected, not broken
+- Lane prompts that reference Mode A / Mode B still work (the pattern name is preserved; only the cross-tool variant is deprecated)
+
+Contract tests pass with the same baseline (133 pass / 3 pre-existing failures).
+
+---
+
 ## [2.9.0] — 2026-04-17
 
 Doctrine patch with two aims: (1) kill the fleet-scale failure mode where agents picked cheap meta-tasks over real bug fixes, and (2) shift the discipline toward **autonomous adaptive work** — fewer human-gated checkpoints, fewer required sections, fewer ceremonies the agent has to observe. The result is a smaller doctrine that trusts the agent more.
