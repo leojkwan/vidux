@@ -6,6 +6,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Vidux u
 
 ---
 
+## [2.13.0] — 2026-04-18
+
+Durable question queue + tightened marker doctrine. The `[DEFER]` tag in vidux-ship-coordinator was a passive name for an active state — replaced with `[ASK-LEO]` pointing at a new `ASK-LEO.md` queue file where questions accumulate instead of re-summarizing in memory.md every cycle. Also tightened 2.12.0's "every response ends with meter+freeform" rule — the markers are for mission-status moments (cycle ends, progress reports), not casual chat. Leo: *"why are u [METER] [FREEForm] everything?"*
+
+### Added
+
+- **`ASK-LEO.md`** at vidux repo root — durable queue of open questions from automation lanes. Each row: title + opened-ts + status + context + Answer line (inline-editable). Lanes log one-line `[ASK-LEO Q<N>]` pointers in their memory.md; the durable state lives in ASK-LEO.md. Seeds with Q1 (Greptile-bypass on vidux repo) + Q2 (PR #27 scope-split).
+- **`[ASK-LEO]` + `[ACTED]` tags** in vidux-ship-coordinator prompt §8, replacing `[DEFER]`. Distinct from `[BLOCKED]` (hard technical blocker): `[ASK-LEO]` = armed + ready, waits on one Leo answer.
+
+### Changed
+
+- **Marker rule tightened** in `commands/vidux.md` CHECKPOINT section. Full `[FREEFORM]` + `[METER]` pair applies to cycle checkpoints and mission-status replies. Casual chat, naming/design Q&A, and quick questions skip both. Meter-only is acceptable when you want progress signal without prose.
+- **No-noise rule** in vidux-ship prompt §8 now explicitly covers `[ASK-LEO]`: if the prior entry was `[ASK-LEO Q<N>]` and nothing changed, skip the entry entirely. Re-summarizing the question in memory on every cycle is the anti-pattern this release fixes.
+
+---
+
 ## [2.12.0] — 2026-04-18
 
 ETAs go mandatory; every cycle ends with a meter. `[ETA: Xh]` tags are now required on `[pending]` and `[in_progress]` tasks — the loose "fill in over time" posture from 2.11 is gone. Every cycle (and every response to the user) now ends with a `[FREEFORM]` line + `[METER]` 20-cell 0–100% bar. Leo: *"vidux plans must have an ETA when planning and every response or automation end needs to express where its at freeform and the 0-100 meter bar, idgaf."*
