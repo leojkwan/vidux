@@ -65,6 +65,8 @@ But a shipped surface that works is done — stop polishing and move to the next
 
 **The brake:** If a surface is working and tests pass, log what you noticed, move to the next task. Don't re-open completed work to "clean it up."
 
+**If evidence changes mid-cycle, the queue re-sorts.** No permission needed — note the reorder in the next Progress entry.
+
 ## Principle 5: Prove It Mechanically
 
 Never assert "it works." Run the build, run the tests, show the screenshot. Definition of done for UI work is a visual proof, never just "the build passes."

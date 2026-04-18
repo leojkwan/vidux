@@ -31,7 +31,7 @@ Lanes (persistent, never disposed)   Sessions (disposable, GC'd)
 
 | Layer | What lives here | Lifetime | GC |
 |---|---|---|---|
-| **Cold (durable)** | PLAN.md (queue + decision log), evidence/, investigations/, memory.md per lane, `.agent-ledger/activity.jsonl` | Until assignment done | Manual archive per vidux rules (completed tasks rotate to `evidence/` when PLAN.md > 200 lines) |
+| **Cold (durable)** | PLAN.md (queue + decision log), evidence/, investigations/, memory.md per lane, `.agent-ledger/activity.jsonl` | Until assignment done | Agent archives completed tasks when the plan feels heavy — no fixed threshold |
 | **Hot (disposable)** | `~/.claude/projects/*/*.jsonl` (conversation log) | One session | Automatic via `session-prune.py --gc-old` hourly |
 
 **Every cold-storage entry has a stable home and a reason to exist.** Every hot-storage byte is evictable once the session it belongs to is inactive. If you find yourself reading old JSONLs to recover state, the cold-storage contract is broken — fix the checkpoint discipline, don't revive the JSONL.
@@ -126,7 +126,7 @@ That is the entire session-gc lane. Under 50 lines of prompt. One script, one ca
 
 ### Plan-GC is NOT a separate lane
 
-The vidux GC rule — archive completed tasks when PLAN.md exceeds 200 lines — is the **coordinator's** job. Each coordinator reads its own PLAN.md at the top of every cycle and, if the threshold is hit, rolls completed tasks to `evidence/YYYY-MM-DD-completed-tasks-archive.md` before picking up new work. **One lane owns a repo's entire lifecycle: ship, fix, GC.**
+The vidux GC rule — archive completed tasks when the plan feels heavy (agent decides, no fixed threshold) — is the **coordinator's** job. Each coordinator reads its own PLAN.md at the top of every cycle and, if the plan is heavy, rolls completed tasks to `evidence/YYYY-MM-DD-completed-tasks-archive.md` before picking up new work. **One lane owns a repo's entire lifecycle: ship, fix, GC.**
 
 ---
 
@@ -187,7 +187,6 @@ If your assignment needs more than 6 lanes, the assignment is too big for one se
 - **Specialist splitting.** Do not create separate `<project>-shipper`, `<project>-product`, `<project>-creative-engine`, `<project>-a11y-sweep`, `<project>-seo-radar` lanes for the same repo. Collapse into one coordinator.
 - **Lane-per-PR.** Do not spawn a lane for each in-flight PR. The coordinator picks the next PR to work on.
 - **"Helper" lanes.** A `fleet-coordinator` that only watches other lanes is a parked car. Collapse its responsibilities into the lanes themselves.
-- **Preemptive observers.** Do not create observers "just in case." Measure drift, then add one.
 - **Resurrection lanes.** Do not create a lane to restart another lane. Sessions cycle; lanes resume from disk. The restart is implicit.
 
 ### Ghost lane detection
@@ -640,8 +639,7 @@ Every code-writing lane uses git worktrees for isolation:
 **Rules:**
 - Fresh worktree per cycle for code changes
 - Symlink `node_modules`, `.env.local`, `.env.test` from main into the worktree (CRITICAL — without this, test commands fail on env-var checks and look like code regressions)
-- Commit inside the worktree, fast-forward merge into main, delete worktree
-- Never push without explicit human authorization (cron cycles commit locally, human pushes)
+- Commit inside the worktree, push the branch, open a draft PR (draft PRs are always safe — no authorization needed). Direct-to-main or destructive operations require explicit authorization.
 
 **Investigation-only cycles** (plan updates, evidence files, no code changes) MAY skip the worktree and commit directly in main — worktree discipline isolates code changes that could break builds, not doc updates.
 
@@ -956,7 +954,6 @@ Read this reference (loaded on demand from within a `/vidux` session) when:
 - Delegating work between agents (Mode A/B).
 - Running fleet scans, audits, or prescriptions.
 - Creating or reviewing draft PRs from automation.
-- Pairing a writer lane with an observer.
 
 Do NOT activate for core plan-first work (use `/vidux` alone) or for one-off tasks that don't involve automation infrastructure.
 

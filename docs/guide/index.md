@@ -67,7 +67,7 @@ A few hard rules that prevent the most common stateless-agent failures:
 
 **Append-only logs** — `PROGRESS.md` and `memory.md` are strictly append-only. Corrections go in new entries; retroactive rewrites destroy the history future agents need.
 
-**3x stuck rule** — if the same task appears in 3+ consecutive progress entries while still in-progress, the lane exits.
+**3x stuck rule** — if the same task appears in 3+ consecutive progress entries while still in-progress, force a surface switch; the next cycle finds new evidence or the task stays blocked.
 
 ## Next Steps
 
