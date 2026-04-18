@@ -108,8 +108,8 @@ What we know, cited with sources.
 
 ## Tasks
 Ordered, with status tags and evidence citations.
-- [pending] Task 1: description [Evidence: ...]
-- [in_progress] Task 2: description [Evidence: ...]
+- [pending] Task 1: description [Evidence: ...] [ETA: 0.5h]
+- [in_progress] Task 2: description [Evidence: ...] [ETA: 2h]
 - [completed] Task 3: description [Evidence: ...]
 - [blocked] Task 4: description [Blocker: ...]
 
@@ -121,6 +121,14 @@ Status FSM: pending -> in_progress -> completed
                               \-> blocked    (terminal — a blocked task is
                                               replaced by a new task with a
                                               Decision Log entry, not revived)
+
+**`[ETA: Xh]` — AI-hour estimate (optional).** An AI-hour is how much focused
+AI-agent work a task takes end-to-end, not wall-clock time. Calibration:
+0.25h trivial / 0.5h simple fix / 1h small feature / 2h moderate / 4h e2e bug /
+8h+ multi-phase (promote to compound). ETAs are elastic — when scope moves,
+log the revision in `## Decision Log` and update the tag. `/vidux-status`
+sums pending + in_progress ETAs to show remaining AI-hours per plan. Missing
+ETAs are not a failure; they render as `∅ AI-hrs` and back-fill over time.
 
 ## Decision Log
 Intentional choices that future agents must not undo.
