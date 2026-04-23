@@ -77,6 +77,27 @@ If `gh pr create` fails (auth issue, network, no `gh` CLI):
 3. Do NOT fall back to pushing main
 4. The next cycle retries the PR creation against the existing branch
 
+### Special case: "shared commit overlaps with an existing PR"
+
+GitHub can reject `gh pr create` when the branch's HEAD commit already appears in another open PR.
+
+If you see:
+```
+shared commit overlaps with an existing PR
+```
+
+Do **not** try to force-push or rewrite history. Instead:
+
+1. Push the branch anyway (if it isn't already):
+   `git push origin HEAD:claude/<lane-name>-<task-id>`
+2. Find the PR GitHub thinks owns the commit:
+   ```bash
+   gh api -H "Accept: application/vnd.github+json" \
+     "repos/:owner/:repo/commits/$(git rev-parse HEAD)/pulls" \
+     --jq '.[0] | {number,html_url,head: .head.ref,base: .base.ref,title}'
+   ```
+3. Log the returned PR URL/number in the lane's `memory.md` as the resume point.
+
 ## What this does NOT cover
 
 - Who reviews the PR (human — always, per Q3 confirmed 2026-04-11)
@@ -95,7 +116,7 @@ After green build + test in the worktree:
 2. Draft PR: `gh pr create --draft --base main --head "claude/<lane>-<task-id>" --title "[<lane>] <summary>" --body "..."`
 3. NEVER push directly to origin/main.
 4. Sync before each cycle: `git pull origin main`
-5. Fallback: if `gh pr create` fails, push branch only, log failure. Never push main.
+5. Fallback: if `gh pr create` fails, push branch only, log failure. If error is "shared commit overlaps", locate the owning PR via `gh api .../commits/<sha>/pulls` and log that PR as the resume point. Never push main.
 ```
 
 Replace any "merge to main before stopping" instruction with "push branch + create draft PR."
