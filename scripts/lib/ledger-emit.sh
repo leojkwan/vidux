@@ -14,8 +14,9 @@
 # Events use the standard ledger JSONL schema with vidux-prefixed event names.
 
 # Source config if not already loaded
-_EMIT_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-${(%):-%x}}")" && pwd)"
+_EMIT_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=ledger-config.sh
+# shellcheck disable=SC1091
 source "${_EMIT_SCRIPT_DIR}/ledger-config.sh"
 
 # Guard against double-sourcing

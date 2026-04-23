@@ -152,4 +152,8 @@ else
   echo "Overall: $OVERALL ($FAILURES sections with issues)"
 fi
 
-exit $([[ "$OVERALL" = "pass" ]] && echo 0 || echo 1)
+if [[ "$OVERALL" = "pass" ]]; then
+  exit 0
+else
+  exit 1
+fi
