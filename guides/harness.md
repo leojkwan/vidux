@@ -1,6 +1,6 @@
 # Automation Prompt Authoring
 
-Reference for writing cron automation prompts (harnesses). Loaded by `/codex` and `/claude` when creating or updating automation prompts.
+Reference for writing cron automation prompts (harnesses). Loaded by `/vidux` (Part 2) when creating or updating automation prompts.
 
 ---
 

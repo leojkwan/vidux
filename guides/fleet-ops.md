@@ -1,6 +1,6 @@
 # Fleet Operations Reference
 
-Operations manual for running a fleet of vidux automations. Loaded by `/codex` and `/claude` when managing fleets. Core SKILL.md covers doctrine and planning; this doc covers the multi-automation coordination layer.
+Operations manual for running a fleet of vidux automations. Loaded by `/vidux` (Part 2) when managing fleets. Core SKILL.md covers doctrine and planning; this doc covers the multi-automation coordination layer.
 
 ---
 

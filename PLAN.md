@@ -62,6 +62,7 @@ Every wave boundary is reversible. Leo gates each transition.
 - [completed] 5.2.3 Observer-pair audit. strongyes lanes PASS (PR #283 open DRAFT, 10+ merged today by Leo). resplit-ios BLOCKED: `gh pr create` fails 4x with "shared commit overlaps with an existing PR" — lanes are following the draft-PR prompt but `gh` rejects when new branches share ancestry with old branches/PRs. [Done: 2026-04-14]
 
 #### Wave 3 — Full fleet
+- [completed] 5.3.0 Entrypoint language sweep (agent_id: codex/vidux-mega-plan): docs/guides must reference Vidux via `/vidux` only (no "loaded by `/codex` + `/claude`" headers). [Done: 2026-04-23]
 - [pending] 5.3.1 Remaining ~10 automations. [Depends: Wave 2 complete ✓ — but resplit `gh pr create` overlap issue must be solved first for resplit lanes]
 - [pending] 5.3.2 Validate `gh pr list` shows in-flight PR per active lane. [Depends: 5.3.1]
 
