@@ -382,6 +382,39 @@ class ViduxContractTests(unittest.TestCase):
         for name in self.CORE_COMMANDS:
             self.assertTrue((self.COMMANDS_DIR / name).exists(), f"Command missing: {name}")
 
+    def test_vidux_auto_is_not_an_active_entrypoint(self):
+        """`/vidux-auto` must not reappear outside historical records.
+
+        The repo intentionally retains historical mentions in PLAN/CHANGELOG and
+        evidence snapshots, but active user entrypoints and docs must remain
+        single-entry `/vidux`.
+        """
+        self.assertFalse(
+            (self.COMMANDS_DIR / "vidux-auto.md").exists(),
+            "Deprecated command `commands/vidux-auto.md` must not exist",
+        )
+
+        allowed_files = {
+            str(ROOT / "PLAN.md"),
+            str(ROOT / "CHANGELOG.md"),
+            str(ROOT / "ARCHIVE.md"),
+        }
+        allowed_prefixes = (str(ROOT / "evidence"),)
+
+        offenders: list[str] = []
+        for path in ROOT.rglob("*.md"):
+            path_str = str(path)
+            if path_str in allowed_files or path_str.startswith(allowed_prefixes):
+                continue
+            if "/vidux-auto" not in _read(path):
+                continue
+            offenders.append(str(path.relative_to(ROOT)))
+
+        self.assertEqual(
+            offenders, [],
+            f"Unexpected `/vidux-auto` mention(s) outside history: {offenders}",
+        )
+
     def test_commands_have_frontmatter(self):
         """Each command file must have YAML frontmatter with name and description."""
         for name in self.CORE_COMMANDS:
