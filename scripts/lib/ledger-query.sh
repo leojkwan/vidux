@@ -14,8 +14,9 @@
 # Requires jq for meaningful output.
 
 # Source config if not already loaded
-_QUERY_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-${(%):-%x}}")" && pwd)"
+_QUERY_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=ledger-config.sh
+# shellcheck disable=SC1091
 source "${_QUERY_SCRIPT_DIR}/ledger-config.sh"
 
 # Guard against double-sourcing
@@ -149,7 +150,7 @@ ledger_automation_runs() {
   command -v jq &>/dev/null || { echo '[]'; return; }
 
   local cutoff
-  cutoff=$(date -u -v-${hours}H +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || \
+  cutoff=$(date -u -v-"${hours}"H +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || \
            date -u -d "${hours} hours ago" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || echo "")
 
   jq -s -c --arg repo "$repo" --arg cutoff "$cutoff" '
@@ -334,7 +335,7 @@ ledger_conflict_check() {
   command -v jq &>/dev/null || { echo '[]'; return; }
 
   local cutoff
-  cutoff=$(date -u -v-${hours}H +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || \
+  cutoff=$(date -u -v-"${hours}"H +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || \
            date -u -d "${hours} hours ago" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || echo "")
 
   jq -s -c --arg repo "$repo" --arg cutoff "$cutoff" --argjson check_files "$files" '
