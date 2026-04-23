@@ -127,7 +127,7 @@ An AI-hour is how much focused AI-agent work a task takes end-to-end, not
 wall-clock time. Calibration: 0.25h trivial / 0.5h simple fix / 1h small
 feature / 2h moderate / 4h e2e bug / 8h+ multi-phase (promote to compound).
 ETAs are elastic — when scope moves, log the revision in `## Decision Log`
-and update the tag. `/vidux-status` sums pending + in_progress ETAs to show
+and update the tag. `python3 scripts/vidux-status.py` sums pending + in_progress ETAs to show
 remaining AI-hours per plan. Completed + blocked tasks don't need an ETA
 (they're terminal for this calibration). Adding a new `[pending]` task
 without `[ETA: Xh]` is a plan defect — fill it in before checkpoint.

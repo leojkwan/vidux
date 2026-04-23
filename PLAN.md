@@ -373,6 +373,10 @@ Remove any remaining `/vidux-auto` references from non-historical docs, prompts,
 Historical mentions stay allowed only in `PLAN.md`, `CHANGELOG.md`, `evidence/`, and archived memories.
 [Done: 2026-04-23. Deleted `commands/vidux-auto.md`. Scrubbed the remaining active docs/guides references. Updated `scripts/lib/ledger-query.sh` to anchor bimodal windows to the newest ledger entry so the contract tests stay deterministic. Gate: `python3 -m pytest -q` => 136/136 pass.]
 
+### Phase 11: Entrypoint hygiene [completed]
+
+- [completed] 11.1 Remove `/vidux-status` command; route status guidance via `/vidux`. [agent_id=codex/vidux-mega-plan] [Done: 2026-04-23]
+
 ## Decisions
 (Decision Log — intentional choices that future agents must not undo)
 - [DIRECTION] [2026-04-09] vidux-loop.sh is NOT deleted — it still works and vidux-loop.sh stays as optional tooling. But automation prompts no longer require it. The gate is now inline in the prompt.

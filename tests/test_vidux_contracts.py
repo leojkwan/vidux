@@ -392,6 +392,44 @@ class ViduxContractTests(unittest.TestCase):
             self.assertIn("name:", frontmatter, f"{name} frontmatter missing name")
             self.assertIn("description:", frontmatter, f"{name} frontmatter missing description")
 
+    def test_no_extra_commands_exist(self):
+        """commands/ must only contain the single `/vidux` entrypoint."""
+        extras = sorted(
+            p.name
+            for p in self.COMMANDS_DIR.glob("*.md")
+            if p.name not in self.CORE_COMMANDS
+        )
+        self.assertEqual(extras, [], f"Unexpected extra command(s): {extras}")
+
+    def test_no_vidux_status_command_mentions_outside_history(self):
+        """Only `/vidux` is a valid command entrypoint; /vidux-status may remain in history."""
+        allow_files = {
+            ROOT / "ARCHIVE.md",
+            ROOT / "CHANGELOG.md",
+            ROOT / "PLAN.md",
+        }
+        allow_dirs = {
+            ROOT / "evidence",
+            ROOT / "investigations",
+        }
+
+        hits: list[tuple[str, int, str]] = []
+        for path in ROOT.rglob("*.md"):
+            if path in allow_files:
+                continue
+            if any(str(path).startswith(str(d) + os.sep) for d in allow_dirs):
+                continue
+            text = _read(path)
+            if "/vidux-status" not in text:
+                continue
+            for lineno, line in enumerate(text.splitlines(), 1):
+                # Avoid false positives like `scripts/vidux-status.py` — we only
+                # care about explicit slash-command invocations.
+                if re.search(r"(?:^|[\\s`(])/vidux-status\\b", line):
+                    hits.append((str(path.relative_to(ROOT)), lineno, line.strip()))
+
+        self.assertEqual(hits, [], f"Found /vidux-status mentions outside history: {hits[:12]}")
+
     # -----------------------------------------------------------------------
     # Hooks contracts
     # -----------------------------------------------------------------------
