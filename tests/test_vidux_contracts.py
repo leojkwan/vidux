@@ -8,6 +8,7 @@ Expanded for v1: covers docs, scripts, commands, hooks, enforcement, ingredients
 Runs on stdlib unittest — zero-bootstrap, no pip install needed.
 """
 
+import datetime
 import json
 import os
 import re
@@ -371,11 +372,11 @@ class ViduxContractTests(unittest.TestCase):
 
     COMMANDS_DIR = ROOT / "commands"
 
-    # Post-2026-04-17 (commit 8c1f593): single entry point `/vidux` covers both
-    # discipline (Part 1) and automation (Part 2). `vidux-auto.md` stays as a
-    # deprecation breadcrumb for the 90-day window (removal target 2026-07-17),
-    # at which point this list collapses to just `vidux.md`.
-    CORE_COMMANDS = ["vidux.md", "vidux-auto.md"]
+    # Post-2026-04-22: explicit user direction removed the deprecated
+    # breadcrumb command after active prompts and docs were migrated.
+    # `/vidux` remains the single command entry point for both discipline and
+    # automation guidance.
+    CORE_COMMANDS = ["vidux.md"]
 
     def test_commands_exist(self):
         """All vidux commands must exist."""
@@ -1542,9 +1543,14 @@ class ViduxContractTests(unittest.TestCase):
 
     def test_ledger_bimodal_distribution_ignores_non_automation_noise(self):
         """Repo-wide bimodal stats must ignore raw codex live/stop noise without automation IDs."""
+        base = datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0) - datetime.timedelta(minutes=20)
+
+        def ts(minutes: int) -> str:
+            return (base + datetime.timedelta(minutes=minutes)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
         ledger_entries = [
             {
-                "ts": "2026-04-07T00:00:00Z",
+                "ts": ts(0),
                 "repo": "vidux",
                 "automation_id": "vidux-v230-planner",
                 "automation_name": "Vidux v2.3.0 Planner",
@@ -1553,7 +1559,7 @@ class ViduxContractTests(unittest.TestCase):
                 "summary": "run start",
             },
             {
-                "ts": "2026-04-07T00:01:00Z",
+                "ts": ts(1),
                 "repo": "vidux",
                 "automation_id": "vidux-v230-planner",
                 "automation_name": "Vidux v2.3.0 Planner",
@@ -1562,14 +1568,14 @@ class ViduxContractTests(unittest.TestCase):
                 "summary": "run end",
             },
             {
-                "ts": "2026-04-07T00:02:00Z",
+                "ts": ts(2),
                 "repo": "vidux",
                 "agent_id": "codex/noise",
                 "event": "live",
                 "summary": "noise start",
             },
             {
-                "ts": "2026-04-07T00:06:00Z",
+                "ts": ts(6),
                 "repo": "vidux",
                 "agent_id": "codex/noise",
                 "event": "stop",
@@ -1586,9 +1592,14 @@ class ViduxContractTests(unittest.TestCase):
 
     def test_ledger_bimodal_distribution_collapses_live_snapshots_into_one_run(self):
         """Multiple live snapshots from one automation agent must classify as one run."""
+        base = datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0) - datetime.timedelta(minutes=40)
+
+        def ts(minutes: int) -> str:
+            return (base + datetime.timedelta(minutes=minutes)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
         ledger_entries = [
             {
-                "ts": "2026-04-07T00:00:00Z",
+                "ts": ts(0),
                 "repo": "vidux",
                 "automation_id": "vidux-v230-planner",
                 "automation_name": "Vidux v2.3.0 Planner",
@@ -1597,7 +1608,7 @@ class ViduxContractTests(unittest.TestCase):
                 "summary": "snapshot 1",
             },
             {
-                "ts": "2026-04-07T00:03:00Z",
+                "ts": ts(3),
                 "repo": "vidux",
                 "automation_id": "vidux-v230-planner",
                 "automation_name": "Vidux v2.3.0 Planner",
@@ -1606,7 +1617,7 @@ class ViduxContractTests(unittest.TestCase):
                 "summary": "snapshot 2",
             },
             {
-                "ts": "2026-04-07T00:06:00Z",
+                "ts": ts(6),
                 "repo": "vidux",
                 "automation_id": "vidux-v230-planner",
                 "automation_name": "Vidux v2.3.0 Planner",
@@ -1615,7 +1626,7 @@ class ViduxContractTests(unittest.TestCase):
                 "summary": "snapshot 3",
             },
             {
-                "ts": "2026-04-07T00:10:00Z",
+                "ts": ts(10),
                 "repo": "vidux",
                 "automation_id": "vidux-endurance",
                 "automation_name": "vidux-endurance",
@@ -1624,7 +1635,7 @@ class ViduxContractTests(unittest.TestCase):
                 "summary": "quick 1",
             },
             {
-                "ts": "2026-04-07T00:11:00Z",
+                "ts": ts(11),
                 "repo": "vidux",
                 "automation_id": "vidux-endurance",
                 "automation_name": "vidux-endurance",
