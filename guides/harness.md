@@ -1,6 +1,6 @@
 # Automation Prompt Authoring
 
-Reference for writing cron automation prompts (harnesses). Loaded by `/codex` and `/claude` when creating or updating automation prompts.
+Reference for writing cron automation prompts (harnesses). Loaded by `/vidux` (Part 2) when creating or updating automation prompts.
 
 ---
 
@@ -24,7 +24,7 @@ Every harness follows these eight blocks, in this order. Rearranging or omitting
 
 ```
 1. MISSION        -- One line. User-visible goal. No implementation details.
-2. SKILLS         -- Load skills: $vidux, $pilot, $picasso, etc.
+2. ENTRYPOINT     -- Use `/vidux`. Load other skills as needed ($pilot, $picasso, etc.).
 3. GATE           -- Quick check or SCAN. Runs FIRST. Decides work/exit in <60 sec.
 4. AUTHORITY      -- Read order for plan files. Primary state file is #1.
 5. CROSS-LANE     -- Read sibling memory + hot-files. Dedup, yield, skip.
@@ -71,7 +71,7 @@ Gate must complete in under 60 seconds. The full cycle (scan + fix) has no time 
 | 3000-4000 chars | Audit for doctrine restatement or verbose gate logic. |
 | 4000+ chars | Almost certainly restating things skill files already provide. |
 
-**Where bloat hides:** doctrine restatement (the agent loads it via `$vidux`), verbose execution philosophy, authority listing files already loaded via skill tokens, inline explanations of why gate steps matter.
+**Where bloat hides:** doctrine restatement (the agent loads it via `/vidux`), verbose execution philosophy, authority listing files already loaded via entrypoints/skill tokens, inline explanations of why gate steps matter.
 
 **The test:** Can you delete a sentence without changing the agent's behavior? If yes, delete it.
 
@@ -81,7 +81,7 @@ Gate must complete in under 60 seconds. The full cycle (scan + fix) has no time 
 
 1. **Gating on the wrong file.** Three of six automations gated on a meta-plan marked "done." The agent saw "complete" and exited before loading a single skill.
 2. **Scanner with a writer gate.** Checks plan state, finds no tasks, exits. Never scans.
-3. **Restating doctrine.** 500-1000 chars of "plan is truth" prose the agent already knows from `$vidux`. Delete it.
+3. **Restating doctrine.** 500-1000 chars of "plan is truth" prose the agent already knows from `/vidux`. Delete it.
 4. **Vague authority.** "Read the bug tracker" forces a search. Give absolute paths.
 5. **Missing mid-zone kill.** Without "if 3+ min pass with no file write, exit," agents drift into plan-reading loops.
 6. **Missing role boundary.** Agent drifts into sibling work, creates merge conflicts.

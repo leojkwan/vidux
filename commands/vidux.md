@@ -15,7 +15,7 @@ Prefix every output block with the current stage:
 
 ## Startup
 
-1. Load the `vidux` skill.
+1. Run `/vidux` (loads the `vidux` skill).
 2. Read `vidux.config.json`.
 3. Resolve the authority store:
    - If `plan_store.mode` is `external` or `local`, resolve `plan_store.path` from config (e.g. `~/Development/vidux/projects`), then read or create `<resolved-path>/<project-name>/PLAN.md`.

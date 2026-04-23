@@ -1353,7 +1353,7 @@ class ViduxContractTests(unittest.TestCase):
                 id = "vidux-v230-planner"
                 kind = "cron"
                 status = "ACTIVE"
-                prompt = "Use [$vidux](/tmp/vidux/SKILL.md) to continuously improve Vidux itself. Build new verification, write new contract tests, and implement the fix in the same scheduled run."
+                prompt = "Use /vidux to continuously improve Vidux itself. Build new verification, write new contract tests, and implement the fix in the same scheduled run."
             """).lstrip(), encoding="utf-8")
 
             result = subprocess.run(
@@ -1392,7 +1392,7 @@ class ViduxContractTests(unittest.TestCase):
                 id = "vidux-reduce"
                 kind = "cron"
                 status = "ACTIVE"
-                prompt = "Use [$vidux](/tmp/vidux/SKILL.md) in reduce mode. Keep this run brief, stay under 2 minutes, inspect the plan, and return next_action=dispatch when real work exists."
+                prompt = "Use /vidux in reduce mode. Keep this run brief, stay under 2 minutes, inspect the plan, and return next_action=dispatch when real work exists."
             """).lstrip(), encoding="utf-8")
 
             result = subprocess.run(
@@ -1429,7 +1429,7 @@ class ViduxContractTests(unittest.TestCase):
                 id = "acme-web"
                 kind = "cron"
                 status = "ACTIVE"
-                prompt = "Use [$vidux](/tmp/vidux/SKILL.md), [$pilot](/tmp/pilot/SKILL.md), and [$figma-implement-design](/tmp/figma/SKILL.md) for the Acme web identity overhaul.\n\nREDUCE gate (run FIRST, before any other work):\n1. Run: bash /tmp/vidux-loop.sh /tmp/projects/acme-web/PLAN.md\n2. Read the JSON output. If next_action is \\\"none\\\", exit immediately.\n4. If next_action is \\\"dispatch\\\": proceed to full execution below.\nBudget: steps 1-3 must complete in under 60 seconds.\n\nAuthority\n- /tmp/projects/acme-web/PLAN.md\n\nExecution\n- Implement the next queued landing-page improvement after dispatch.\n- Use $figma-implement-design when a node is available.\n\nCheckpoint\n- Keep 3 notes max."
+                prompt = "Use /vidux, [$pilot](/tmp/pilot/SKILL.md), and [$figma-implement-design](/tmp/figma/SKILL.md) for the Acme web identity overhaul.\n\nREDUCE gate (run FIRST, before any other work):\n1. Run: bash /tmp/vidux-loop.sh /tmp/projects/acme-web/PLAN.md\n2. Read the JSON output. If next_action is \\\"none\\\", exit immediately.\n4. If next_action is \\\"dispatch\\\": proceed to full execution below.\nBudget: steps 1-3 must complete in under 60 seconds.\n\nAuthority\n- /tmp/projects/acme-web/PLAN.md\n\nExecution\n- Implement the next queued landing-page improvement after dispatch.\n- Use $figma-implement-design when a node is available.\n\nCheckpoint\n- Keep 3 notes max."
             """).lstrip(), encoding="utf-8")
 
             result = subprocess.run(

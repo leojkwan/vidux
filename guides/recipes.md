@@ -32,7 +32,7 @@ A single lane can combine triggers (e.g., scheduled nightly + fires on every new
 ### Prompt Template
 
 ```
-Use vidux as coordinator for the full automation fleet.
+Use `/vidux` as coordinator for the full automation fleet.
 
 Mission: Keep the fleet making fire, not rubbing sticks.
 
@@ -76,7 +76,7 @@ Any fleet with 3+ active lanes. Without a watcher, stuck lanes burn cycles silen
 ### Prompt Template
 
 ```
-Use vidux as PR reviewer.
+Use `/vidux` as PR reviewer.
 
 Mission: Review draft PRs from automation lanes. Post structured feedback.
 Never approve, never merge — a human promotes.
@@ -133,7 +133,7 @@ If an AI code-review bot or static-analysis service is wired to the repo, this r
 ### Prompt Template
 
 ```
-Use vidux to track draft-PR lifecycle across all repos.
+Use /vidux to track draft-PR lifecycle across all repos.
 
 Mission: No draft PR goes stale. Every reviewed PR gets promoted or closed.
 
@@ -178,7 +178,7 @@ Any fleet using draft-PR-first discipline. Without a lifecycle manager, draft PR
 ### Prompt Template
 
 ```
-Use vidux as observer for <writer-lane-name>.
+Use /vidux as observer for <writer-lane-name>.
 
 Mission: Catch what the writer can't see. Independent eyes on the same files.
 
@@ -231,7 +231,7 @@ For large plan stores (>3 KB), delegate the READ step to a secondary model via `
 ### Prompt Template
 
 ```
-Use vidux as deploy watcher.
+Use /vidux as deploy watcher.
 
 Mission: Verify deployment succeeded after merge. Exit after confirmation.
 
@@ -275,7 +275,7 @@ Any repo with automated deployments. Without an exit condition, deploy watchers 
 ### Prompt Template
 
 ```
-Use vidux for trunk health monitoring across all active repos.
+Use /vidux for trunk health monitoring across all active repos.
 
 Mission: Catch infrastructure rot before it blocks the fleet.
 
@@ -315,7 +315,7 @@ Recommend actions; let the fleet watcher or a human execute.
 ### Prompt Template
 
 ```
-Use vidux as skill refiner for ~/Development/ai/skills/.
+Use /vidux as skill refiner for ~/Development/ai/skills/.
 
 Mission: Every skill's description drives its activation rate. Polish descriptions,
 fix stale refs, ensure cross-refs are valid. Ship improvements as draft PRs.
@@ -356,7 +356,7 @@ Never bulk-edit — one skill, one PR, one review cycle.
 ### Prompt Template
 
 ```
-Use vidux to improve vidux itself.
+Use /vidux to improve vidux itself.
 
 Mission: One improvement per cycle. Read the plan, pick the highest-priority
 unfinished item, do the work, commit, push.
@@ -519,4 +519,4 @@ Cycle fails with external_blocker or context_overflow
 
 **5. Direct-to-main pushes.** All automation code changes go through draft PRs. The only exception is trivial doc fixes in the vidux repo itself (and even those get a commit message prefix).
 
-**6. Prompt bloat.** Recipe prompts should be under 30 lines. The vidux skill handles the cycle mechanics — prompts specify role, mission, and boundaries. Don't restate doctrine.
+**6. Prompt bloat.** Recipe prompts should be under 30 lines. `/vidux` handles the cycle mechanics — prompts specify role, mission, and boundaries. Don't restate doctrine.

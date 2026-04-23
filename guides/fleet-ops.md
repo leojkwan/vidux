@@ -181,7 +181,7 @@ What does the automation DO?
 
 ### With-Vidux variant (~850 chars)
 
-Use when the automation loads `$vidux` and has access to `vidux-loop.sh`. Standard variant for fleet automations.
+Use when the automation uses `/vidux` and has access to `vidux-loop.sh`. Standard variant for fleet automations.
 
 ```
 Quick check gate (run FIRST, before any other work):
@@ -421,7 +421,7 @@ Every automation harness prompt follows this eight-block structure, in order:
 
 ```
 1. MISSION        -- One line. User-visible goal. No implementation details.
-2. SKILLS         -- Load skills: $vidux, $pilot, $picasso, etc.
+2. ENTRYPOINT     -- Use `/vidux`. Load other skills as needed ($pilot, $picasso, etc.).
 3. GATE           -- Quick check or SCAN. Runs FIRST. Decides work/exit in <60 sec.
 4. AUTHORITY      -- Read order for plan files. Primary state file is #1.
 5. CROSS-LANE     -- Read sibling memory notes + hot-files. Dedup, yield, skip.
@@ -449,7 +449,7 @@ Every automation harness prompt follows this eight-block structure, in order:
 1. **Gating on the wrong plan file.** The gate reads the file where actionable work items actually live.
 2. **Scanner using a quick check gate.** Permanently dead automation. Use SCAN gate.
 3. **Circuit breaker / auto_pause deadlocks.** Ensure Progress has shipping signal keywords.
-4. **Restating doctrine in the prompt.** Agent loads doctrine via `$vidux`. Don't repeat it.
+4. **Restating doctrine in the prompt.** Agent loads doctrine via `/vidux`. Don't repeat it.
 5. **Vague authority references.** Every authority file gets an absolute path and a role label.
 6. **Missing mid-zone kill.** One line that saves entire cycles.
 7. **Missing role boundary.** Causes drift into adjacent work and merge conflicts.

@@ -311,7 +311,7 @@ Cross-reference Principle 5 ("Prove it mechanically") for verification-before-co
 2. `cron-retry-heal` — retry wrapper for `external_blocker` / `context_overflow` exits
 3. `multi-pr-dag` — coordinator pattern for dependency-ordered PR shipping
 
-### Phase 10: Further consolidation — `/vidux-auto` merged into `/vidux` Part 2 [completed]
+### Phase 10: Further consolidation — `/vidux-auto` merged into `/vidux` Part 2 [in_progress]
 
 **Goal:** Collapse the `/vidux` + `/vidux-auto` two-skill split (shipped by Phase 8) into a single `/vidux` entry point with progressive disclosure. Users shouldn't pick between discipline (`/vidux`) and automation (`/vidux-auto`) at invocation time — the skill should route internally.
 
@@ -372,6 +372,11 @@ Cross-reference Principle 5 ("Prove it mechanically") for verification-before-co
 Remove any remaining `/vidux-auto` references from non-historical docs, prompts, and tooling.
 Historical mentions stay allowed only in `PLAN.md`, `CHANGELOG.md`, `evidence/`, and archived memories.
 [Done: 2026-04-23. Deleted `commands/vidux-auto.md`. Scrubbed the remaining active docs/guides references. Updated `scripts/lib/ledger-query.sh` to anchor bimodal windows to the newest ledger entry so the contract tests stay deterministic. Gate: `python3 -m pytest -q` => 136/136 pass.]
+
+#### 10.7 — Single entrypoint wording: `/vidux` only [in_progress] [agent_id: codex/vidux-mega-plan] [ETA: 0.25h] [Depends: 10.6]
+
+Scrub prompt/docs/examples language so Vidux is referenced via `/vidux` only (no `$vidux`, no "Use vidux").
+Targets: `guides/harness.md`, `guides/fleet-ops.md`, `guides/recipes.md`, `examples/fleet-reference/*.toml`, contract fixtures in `tests/test_vidux_contracts.py`.
 
 ## Decisions
 (Decision Log — intentional choices that future agents must not undo)

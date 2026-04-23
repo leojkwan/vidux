@@ -7,7 +7,7 @@ rrule = "FREQ=HOURLY;INTERVAL=2;BYMINUTE=15"
 model = "o3"
 effort = "high"
 prompt = """
-Use [$vidux](/path/to/vidux/SKILL.md) as coordinator for myapp fleet.
+Use /vidux as coordinator for myapp fleet.
 
 Mission: Ensure the myapp automation fleet is making fire, not rubbing sticks.
 
