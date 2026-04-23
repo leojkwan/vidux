@@ -40,19 +40,27 @@ ledger_bimodal_distribution() {
   ledger_available || { echo '{"error":"ledger_unavailable"}'; return; }
   command -v jq &>/dev/null || { echo '{"error":"jq_not_installed"}'; return; }
 
-  local cutoff
-  cutoff=$(date -u -v-${hours}H +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || \
-           date -u -d "${hours} hours ago" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || echo "")
+  jq -s -c --arg repo "$repo" --arg hours "$hours" '
+    def hours_to_seconds:
+      ($hours | tonumber? // 24) * 3600;
 
-  jq -s -c --arg repo "$repo" --arg cutoff "$cutoff" '
-    # Filter by repo and time window
+    def ts_epoch:
+      (.ts // "" | fromdateiso8601?);
+
+    # Filter by repo and event type first (no time-window yet).
     [.[] | select(
       ($repo == "" or .repo == $repo) and
-      ($cutoff == "" or (.ts // "") >= $cutoff) and
       ((.automation_id // "") != "") and
       ((.event // "") == "stop" or (.event // "") == "live" or
        (.event // "") == "vidux_loop_start" or (.event // "") == "vidux_loop_end")
-    )] |
+    )] as $base |
+
+    # Time window is anchored to the most recent ledger entry (not wall clock).
+    # This keeps offline fixtures and unit tests stable.
+    ($base | map(ts_epoch) | map(select(. != null)) | max // null) as $max_epoch |
+    ($max_epoch // 0) as $anchor_epoch |
+    ($anchor_epoch - hours_to_seconds) as $cutoff_epoch |
+    [$base[] | select((ts_epoch // 0) >= $cutoff_epoch)] |
 
     # Group by automation_id, then by agent_id to recover one run per automation invocation.
     group_by(.automation_id) |

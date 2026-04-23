@@ -371,11 +371,9 @@ class ViduxContractTests(unittest.TestCase):
 
     COMMANDS_DIR = ROOT / "commands"
 
-    # Post-2026-04-17 (commit 8c1f593): single entry point `/vidux` covers both
-    # discipline (Part 1) and automation (Part 2). `vidux-auto.md` stays as a
-    # deprecation breadcrumb for the 90-day window (removal target 2026-07-17),
-    # at which point this list collapses to just `vidux.md`.
-    CORE_COMMANDS = ["vidux.md", "vidux-auto.md"]
+    # Post-2026-04-22: `/vidux` is the only command entry point. Automation
+    # doctrine lives in SKILL.md Part 2 + references/automation.md.
+    CORE_COMMANDS = ["vidux.md"]
 
     def test_commands_exist(self):
         """All vidux commands must exist."""

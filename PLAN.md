@@ -141,11 +141,11 @@ Bulk-import cruft from Codex skill installer. Zero project references in any lan
 - [Source: session bloat diagnosis 2026-04-15] The three companion skills contribute ~7% of session JSONL size (skill listings loaded per-turn). Fewer skills = less per-turn overhead.
 
 **Constraints:**
-- ALWAYS: vidux core SKILL.md stays platform-agnostic (no CronCreate specifics, no Claude Code assumptions)
-- ALWAYS: vidux-auto is a single file that works as a Claude Code skill AND as a reference doc for Cursor/Codex users
-- ALWAYS: strip ALL personal references (Leo, strongyes, resplit, leojkwan, snowcubes, Snap, Nicole, Pickles, account rotation, specific lane names). Use `<project>`, `<coordinator>`, `<writer>` generics.
-- NEVER: lose operational patterns during the merge. Every non-personal pattern from the three sources must survive in vidux-auto.
-- NEVER: duplicate content that's already in vidux core SKILL.md (observer pair description, delegation concept, investigation template)
+ALWAYS: vidux core SKILL.md stays platform-agnostic (no CronCreate specifics, no Claude Code assumptions)
+ALWAYS: vidux-auto is a single file that works as a Claude Code skill AND as a reference doc for Cursor/Codex users
+ALWAYS: strip ALL personal references (Leo, strongyes, resplit, leojkwan, snowcubes, Snap, Nicole, Pickles, account rotation, specific lane names). Use `<project>`, `<coordinator>`, `<writer>` generics.
+NEVER: lose operational patterns during the merge. Every non-personal pattern from the three sources must survive in vidux-auto.
+NEVER: duplicate content that's already in vidux core SKILL.md (observer pair description, delegation concept, investigation template)
 
 #### 8.0 — Content audit + migration map [completed]
 
@@ -253,8 +253,8 @@ New content — closes the feedback gap proven by PR #338.
 - [Source: plan review 2026-04-16] Two review agents scrutinized Phase 9 v1. Verdict: insights aggregator script + 2h cron are overkill (manual triage of 5-10 findings takes 2 min). Dedicated GC lane is overkill (fold into existing fleet-watcher). Codex config migration should be 3 highest-churn only (rest dying). Missing: agent config rules guide for OSS.
 
 **Constraints:**
-- ALWAYS: keep it simple. A CLAUDE.md rule beats a custom hook. Manual triage beats a script until it proves painful.
-- NEVER: build automation to solve a problem that occurs less than weekly.
+ALWAYS: keep it simple. A CLAUDE.md rule beats a custom hook. Manual triage beats a script until it proves painful.
+NEVER: build automation to solve a problem that occurs less than weekly.
 
 **Parallelism note:** 9.0, 9.1, 9.2 can run NOW — they do NOT depend on Phase 8 (vidux-auto merge).
 
@@ -323,9 +323,9 @@ Cross-reference Principle 5 ("Prove it mechanically") for verification-before-co
 - [Source: commit 8c1f593 2026-04-17] net -2,193 lines across 19 files (5 deleted commands + vidux-auto breadcrumb + SKILL.md Part 2 expansion + references/automation.md NEW + 13 cross-ref updates)
 
 **Constraints:**
-- ALWAYS: keep Phase 8's artifacts usable during a 90-day breadcrumb window (existing lane prompts load `/vidux-auto` — must not crash)
-- ALWAYS: preserve every operational pattern from Phase 8's vidux-auto in /vidux Part 2 or references/automation.md (no regression)
-- NEVER: delete the old `/vidux-auto` commands/skill files outright — they stay as deprecation breadcrumbs (same 90-day retention rule applied by Phase 8.8 to vidux-claude/vidux-codex/vidux-fleet)
+ALWAYS: keep Phase 8's artifacts usable while active prompts/tests still load `/vidux-auto` (must not crash)
+ALWAYS: preserve every operational pattern from Phase 8's vidux-auto in /vidux Part 2 or references/automation.md (no regression)
+ALWAYS: once active prompts/tests stop referencing `/vidux-auto`, delete the deprecated command/skill files and leave only historical mentions in PLAN.md / CHANGELOG.md / evidence (per 2026-04-22 direction)
 
 #### 10.1 — Expand SKILL.md to Part 1 + Part 2 [completed]
 
@@ -366,6 +366,12 @@ Cross-reference Principle 5 ("Prove it mechanically") for verification-before-co
 2. Pushed to origin/main cleanly (gh `git push origin main`: f552f7d..8c1f593).
 3. Sibling ai-skills repo: `~/Development/ai/skills/vidux/` is a symlink into this repo, so OSS update is automatically "installed" on Leo's machine. `skills/vidux-auto/SKILL.md` synced separately (ai commit 44c09a1).
 [Done: 2026-04-17. Verified in the same session the merge shipped.]
+
+#### 10.6 — Purge residual `/vidux-auto` mentions [completed] [Depends: 10.5] (agent: codex/vidux-mega-plan)
+
+Remove any remaining `/vidux-auto` references from non-historical docs/prompts/skills.
+Historical mentions are allowed only in PLAN.md / CHANGELOG.md / evidence / archived memories.
+[Done: 2026-04-22. Deleted commands/vidux-auto.md. Removed remaining /vidux-auto mention from docs/guide/installation.md. Updated guides/agent-config-rules.md T3 examples. Updated scripts/lib/ledger-query.sh time-window anchoring to make ledger bimodal contract tests stable. Contract tests: 136/136 pass.]
 
 ## Decisions
 (Decision Log — intentional choices that future agents must not undo)
