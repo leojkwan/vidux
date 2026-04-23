@@ -2,7 +2,7 @@
 
 Detailed automation doctrine for vidux — session management, lane operations, delegation modes, fleet ops, PR lifecycle, and platform-specific mechanics for running vidux workers on a schedule. Read this reference from `/vidux` when a task involves creating lanes, managing fleet state, or coordinating cross-session handoff.
 
-This reference contains the full doctrine merged from the former `/vidux-claude`, `/vidux-codex`, and `/vidux-fleet` companion skills. The core `/vidux` skill (SKILL.md) contains a condensed automation overview; this reference contains the full details.
+This reference contains the full doctrine that used to be split across companion automation docs. The core `/vidux` skill (SKILL.md) contains a condensed automation overview; this reference contains the full details.
 
 ---
 

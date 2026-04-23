@@ -290,7 +290,7 @@ Everything above is **core vidux** — the five principles, the cycle, the PLAN.
 
 If your work needs more, two companion surfaces carry the rest:
 
-- **[`guides/automation.md`](guides/automation.md)** — the 24/7 fleet operating model, session-gc, lane management, subagent delegation, lane bootstrap. Load this when you run lanes on a schedule.
+- **[`references/automation.md`](references/automation.md)** — deep automation doctrine: the 24/7 fleet operating model, session management, lane operations, delegation modes, and PR lifecycle. Load this when you run lanes on a schedule.
 - **[`guides/recipes/`](guides/recipes/)** — opt-in tactics and patterns. CLAUDE.md rules, lane prompt templates, subagent dispatch, evidence discipline, proactive work surfacing, visual-proof requirements, and more. Load a specific recipe on demand.
 
 **Codex automation default:** when creating a new automation from Codex, assume `Run in: Chat`. Do not default to `Worktree` or `Local` unless the user explicitly asks for repo-bound execution or the task cannot be done from chat.
@@ -305,7 +305,7 @@ Vidux activates when:
 - User says `/vidux` or describes work spanning multiple sessions
 - An existing PLAN.md governs the work
 - Pilot routes into it after detecting expedition-scale work
-- User asks to create or manage a lane/automation/cron (load `guides/automation.md` alongside)
+- User asks to create or manage a lane/automation/cron (load `references/automation.md` alongside)
 
 If the automation is being created from Codex, default it to Chat execution unless the user explicitly asks for Worktree or Local.
 
