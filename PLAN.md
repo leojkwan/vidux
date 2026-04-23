@@ -61,6 +61,7 @@ Every wave boundary is reversible. Leo gates each transition.
 - [completed] 5.2.2 Applied draft-PR pattern from `guides/draft-pr-flow.md` to all 3 lane prompts: ACT sections updated (no merge to main, push branch + draft PR), PUSH POLICY replaced with 5-step flow, fallback on `gh` failure. [Done: 2026-04-12]
 - [completed] 5.2.3 Observer-pair audit. strongyes lanes PASS (PR #283 open DRAFT, 10+ merged today by Leo). resplit-ios BLOCKED: `gh pr create` fails 4x with "shared commit overlaps with an existing PR" — lanes are following the draft-PR prompt but `gh` rejects when new branches share ancestry with old branches/PRs. [Done: 2026-04-14]
 - [completed] 5.2.4 Draft-PR overlap failure: add deterministic recovery steps to `guides/draft-pr-flow.md` for "shared commit overlaps" (resplit lane blocker). [Evidence: 5.2.3] [Done: 2026-04-23]
+- [completed] 5.2.5 Contract guard: `guides/draft-pr-flow.md` must include "shared commit overlaps" recovery steps. (agent_id: codex/vidux-mega-plan) [Done: 2026-04-23]
 
 #### Wave 3 — Full fleet
 - [pending] 5.3.1 Remaining ~10 automations. [Depends: Wave 2 complete ✓ — but resplit `gh pr create` overlap issue must be solved first for resplit lanes]

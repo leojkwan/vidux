@@ -435,6 +435,20 @@ class ViduxContractTests(unittest.TestCase):
         self.assertIn("evidence/", text, "SKILL.md missing evidence/ reference")
         self.assertIn("investigations/", text, "SKILL.md missing investigations/ reference")
 
+    def test_draft_pr_flow_documents_shared_commit_overlap_recovery(self):
+        """guides/draft-pr-flow.md must include deterministic recovery for gh overlap failure."""
+        text = _read(ROOT / "guides" / "draft-pr-flow.md")
+        self.assertIn(
+            'shared commit overlaps with an existing PR',
+            text,
+            "draft-pr-flow.md missing 'shared commit overlaps' recovery",
+        )
+        self.assertIn(
+            "repos/:owner/:repo/commits/$(git rev-parse HEAD)/pulls",
+            text,
+            "draft-pr-flow.md missing gh api commits/<sha>/pulls recovery snippet",
+        )
+
     # -----------------------------------------------------------------------
     # Cross-doc consistency
     # -----------------------------------------------------------------------
