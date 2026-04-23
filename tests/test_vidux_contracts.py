@@ -8,7 +8,6 @@ Expanded for v1: covers docs, scripts, commands, hooks, enforcement, ingredients
 Runs on stdlib unittest — zero-bootstrap, no pip install needed.
 """
 
-import datetime
 import json
 import os
 import re
@@ -1543,14 +1542,9 @@ class ViduxContractTests(unittest.TestCase):
 
     def test_ledger_bimodal_distribution_ignores_non_automation_noise(self):
         """Repo-wide bimodal stats must ignore raw codex live/stop noise without automation IDs."""
-        base = datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0) - datetime.timedelta(minutes=20)
-
-        def ts(minutes: int) -> str:
-            return (base + datetime.timedelta(minutes=minutes)).strftime("%Y-%m-%dT%H:%M:%SZ")
-
         ledger_entries = [
             {
-                "ts": ts(0),
+                "ts": "2026-04-07T00:00:00Z",
                 "repo": "vidux",
                 "automation_id": "vidux-v230-planner",
                 "automation_name": "Vidux v2.3.0 Planner",
@@ -1559,7 +1553,7 @@ class ViduxContractTests(unittest.TestCase):
                 "summary": "run start",
             },
             {
-                "ts": ts(1),
+                "ts": "2026-04-07T00:01:00Z",
                 "repo": "vidux",
                 "automation_id": "vidux-v230-planner",
                 "automation_name": "Vidux v2.3.0 Planner",
@@ -1568,14 +1562,14 @@ class ViduxContractTests(unittest.TestCase):
                 "summary": "run end",
             },
             {
-                "ts": ts(2),
+                "ts": "2026-04-07T00:02:00Z",
                 "repo": "vidux",
                 "agent_id": "codex/noise",
                 "event": "live",
                 "summary": "noise start",
             },
             {
-                "ts": ts(6),
+                "ts": "2026-04-07T00:06:00Z",
                 "repo": "vidux",
                 "agent_id": "codex/noise",
                 "event": "stop",
@@ -1592,14 +1586,9 @@ class ViduxContractTests(unittest.TestCase):
 
     def test_ledger_bimodal_distribution_collapses_live_snapshots_into_one_run(self):
         """Multiple live snapshots from one automation agent must classify as one run."""
-        base = datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0) - datetime.timedelta(minutes=40)
-
-        def ts(minutes: int) -> str:
-            return (base + datetime.timedelta(minutes=minutes)).strftime("%Y-%m-%dT%H:%M:%SZ")
-
         ledger_entries = [
             {
-                "ts": ts(0),
+                "ts": "2026-04-07T00:00:00Z",
                 "repo": "vidux",
                 "automation_id": "vidux-v230-planner",
                 "automation_name": "Vidux v2.3.0 Planner",
@@ -1608,7 +1597,7 @@ class ViduxContractTests(unittest.TestCase):
                 "summary": "snapshot 1",
             },
             {
-                "ts": ts(3),
+                "ts": "2026-04-07T00:03:00Z",
                 "repo": "vidux",
                 "automation_id": "vidux-v230-planner",
                 "automation_name": "Vidux v2.3.0 Planner",
@@ -1617,7 +1606,7 @@ class ViduxContractTests(unittest.TestCase):
                 "summary": "snapshot 2",
             },
             {
-                "ts": ts(6),
+                "ts": "2026-04-07T00:06:00Z",
                 "repo": "vidux",
                 "automation_id": "vidux-v230-planner",
                 "automation_name": "Vidux v2.3.0 Planner",
@@ -1626,7 +1615,7 @@ class ViduxContractTests(unittest.TestCase):
                 "summary": "snapshot 3",
             },
             {
-                "ts": ts(10),
+                "ts": "2026-04-07T00:10:00Z",
                 "repo": "vidux",
                 "automation_id": "vidux-endurance",
                 "automation_name": "vidux-endurance",
@@ -1635,7 +1624,7 @@ class ViduxContractTests(unittest.TestCase):
                 "summary": "quick 1",
             },
             {
-                "ts": ts(11),
+                "ts": "2026-04-07T00:11:00Z",
                 "repo": "vidux",
                 "automation_id": "vidux-endurance",
                 "automation_name": "vidux-endurance",
