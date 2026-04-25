@@ -23,6 +23,7 @@ PORT = int(os.environ.get("VIDUX_BROWSER_PORT", "7191"))
 
 BROWSER_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BROWSER_DIR / "static"
+ARTIFACTS_DIR = BROWSER_DIR / "artifacts"
 
 # Three known plan-layout conventions in Leo's fleet.
 PLAN_GLOBS = [
@@ -33,10 +34,21 @@ PLAN_GLOBS = [
 ]
 
 # Files to expose alongside PLAN.md when present.
+# Note: PLAN.md, INBOX.md, investigations/, evidence/ are core /vidux per the
+# canonical doctrine (DOCTRINE.md + guides/fleet-ops.md + guides/investigation.md
+# + guides/evidence-format.md). PROGRESS.md as a separate file and ASK-LEO.md
+# are Leo-fleet extensions; the browser surfaces them when present but does not
+# require them — a clean canonical-vidux repo without those files still works.
 SIBLING_FILES = ["PROGRESS.md", "INBOX.md", "ASK-LEO.md", "DOCTRINE.md", "README.md"]
 
 HOT_DAYS = 7
 STALE_DAYS = 30
+
+ARTIFACT_SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")
+ARTIFACT_MAX_BYTES = 1024 * 1024  # 1 MB cap on POSTed HTML
+ARTIFACT_TITLE_RE = re.compile(
+    r"<title>([^<]+)</title>|<h1[^>]*>([^<]+)</h1>", re.I
+)
 
 
 def discover_plans() -> list[dict]:
@@ -120,6 +132,64 @@ def safe_resolve(raw: str) -> Path | None:
     return p
 
 
+def safe_resolve_any(raw: str) -> Path | None:
+    """safe_resolve() OR a path under ARTIFACTS_DIR. Read-only either way."""
+    p = safe_resolve(raw)
+    if p:
+        return p
+    try:
+        candidate = Path(raw).resolve()
+    except (OSError, ValueError):
+        return None
+    try:
+        candidate.relative_to(ARTIFACTS_DIR.resolve())
+    except ValueError:
+        return None
+    if not candidate.is_file():
+        return None
+    return candidate
+
+
+def discover_artifacts() -> list[dict]:
+    """List ad-hoc HTML artifacts in ARTIFACTS_DIR, newest first."""
+    if not ARTIFACTS_DIR.is_dir():
+        return []
+    items: list[dict] = []
+    for path in ARTIFACTS_DIR.glob("*.html"):
+        if not path.is_file():
+            continue
+        try:
+            head = path.read_text(encoding="utf-8", errors="replace")[:4096]
+        except OSError:
+            head = ""
+        m = ARTIFACT_TITLE_RE.search(head)
+        title = (m.group(1) or m.group(2)).strip() if m else path.stem
+        st = path.stat()
+        age_days = (time.time() - st.st_mtime) / 86400
+        items.append({
+            "slug": path.stem,
+            "title": title[:200],
+            "path": str(path),
+            "size": st.st_size,
+            "mtime": st.st_mtime,
+            "age_days": round(age_days, 1),
+        })
+    items.sort(key=lambda a: -a["mtime"])
+    return items
+
+
+def write_artifact(slug: str, html: str) -> tuple[bool, str]:
+    """Write an artifact. Returns (ok, message)."""
+    if not ARTIFACT_SLUG_RE.match(slug):
+        return False, "slug must match [a-z0-9][a-z0-9-]{0,63}"
+    if len(html.encode("utf-8")) > ARTIFACT_MAX_BYTES:
+        return False, f"html exceeds {ARTIFACT_MAX_BYTES} bytes"
+    ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
+    path = ARTIFACTS_DIR / f"{slug}.html"
+    path.write_text(html, encoding="utf-8")
+    return True, str(path)
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "viduxBrowser/0.1"
 
@@ -140,16 +210,48 @@ class Handler(BaseHTTPRequestHandler):
             ctype = guess_content_type(name)
             self._serve_static(name, ctype)
         elif route == "/api/health":
-            self._json({"ok": True, "dev_root": str(DEV_ROOT), "port": PORT})
+            self._json({"ok": True, "dev_root": str(DEV_ROOT), "port": PORT,
+                        "artifacts_dir": str(ARTIFACTS_DIR)})
         elif route == "/api/plans":
             self._json({"plans": discover_plans(), "dev_root": str(DEV_ROOT)})
+        elif route == "/api/artifacts":
+            self._json({"artifacts": discover_artifacts(),
+                        "artifacts_dir": str(ARTIFACTS_DIR)})
         elif route == "/api/file":
             raw = (qs.get("path") or [""])[0]
-            p = safe_resolve(raw)
+            p = safe_resolve_any(raw)  # plans + artifacts
             if not p:
                 self._send(403, "forbidden")
                 return
-            self._send_text(p.read_text(encoding="utf-8", errors="replace"))
+            ctype = ("text/html; charset=utf-8" if p.suffix.lower() == ".html"
+                     else "text/markdown; charset=utf-8")
+            self._send_with_type(p.read_bytes(), ctype)
+        else:
+            self._send(404, "not found")
+
+    def do_POST(self):  # noqa: N802 — stdlib override
+        url = urlparse(self.path)
+        if url.path == "/api/artifact":
+            length = int(self.headers.get("Content-Length", "0"))
+            if length <= 0 or length > ARTIFACT_MAX_BYTES + 1024:
+                self._send(400, "missing or oversized body")
+                return
+            raw = self.rfile.read(length).decode("utf-8", errors="replace")
+            try:
+                payload = json.loads(raw)
+            except json.JSONDecodeError as e:
+                self._send(400, f"bad json: {e}")
+                return
+            slug = str(payload.get("slug", "")).strip()
+            html = payload.get("html", "")
+            if not isinstance(html, str):
+                self._send(400, "html must be a string")
+                return
+            ok, msg = write_artifact(slug, html)
+            if not ok:
+                self._send(400, msg)
+                return
+            self._json({"ok": True, "slug": slug, "path": msg})
         else:
             self._send(404, "not found")
 
@@ -170,6 +272,14 @@ class Handler(BaseHTTPRequestHandler):
         body = json.dumps(payload, indent=2).encode("utf-8")
         self.send_response(200)
         self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-cache")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _send_with_type(self, body: bytes, ctype: str):
+        self.send_response(200)
+        self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-cache")
         self.end_headers()

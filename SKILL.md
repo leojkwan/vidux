@@ -415,3 +415,40 @@ Discovery globs (covers the three conventions in use across the fleet):
 Stack: Python stdlib `http.server` + plain HTML/CSS + vanilla JS + `marked.js` from CDN. Zero pip dependencies. Bind is `127.0.0.1` only — no auth, trust the localhost boundary.
 
 Code lives at `~/Development/vidux/browser/`. See `projects/vidux-browser/PLAN.md` for design decisions and the v1/Polish roadmap (sessions panel, ledger entries, memory viewer, launchd auto-start).
+
+### Ad-hoc artifacts (anytime, anywhere in chat)
+
+The browser has a second surface beyond plan-viewing: ad-hoc HTML artifacts that any agent can drop in from any session. They appear in a top-level "ARTIFACTS" section in the sidebar (above the repo-grouped plans), decoupled from any specific plan.
+
+**Two ways to drop an artifact:**
+
+```bash
+# Option 1 — file write (works from any shell)
+cat > ~/Development/vidux/browser/artifacts/<slug>.html
+
+# Option 2 — POST endpoint (works from any session with HTTP, no shell needed)
+curl -X POST http://127.0.0.1:7191/api/artifact \
+  -H "Content-Type: application/json" \
+  -d '{"slug":"<slug>","html":"<!DOCTYPE html>..."}'
+```
+
+**Slug rules** (POST-validated): `^[a-z0-9][a-z0-9-]{0,63}$`. Lowercase, dashes only, no slashes, no `..`. Same slug overwrites.
+
+**Component CSS shim** — to inherit the paper-and-ink palette in your artifact, use these classes (defined in `static/style.css`):
+
+- `.card-grid` — auto-fill grid container, 280px min column
+- `.contact-card` — bordered card with padding; nests `<h3>`, `.meta`, `<a>`, `<p>`
+- `.pill .pill-hot/.pill-stale/.pill-cold/.pill-artifact` — status dots
+- `.lead-row` — single-row list item with name + tier
+- `.person-chip` — pill-shaped inline tag
+- `.label` — uppercase mono label (e.g., `<span class="label">hook</span>`)
+
+Artifacts render via direct `innerHTML` into the same pane that renders markdown, so anything in your `<body>` works. Trust boundary: localhost + your own filesystem; no XSS surface.
+
+**Use cases this enables:**
+- Research summaries with vendor / lead / contact cards (vs flat markdown tables)
+- Visual fleet dashboards (per-repo status grids)
+- One-off briefings to share with yourself across sessions
+- Plan-adjacent visualizations (timeline, network graph, decision tree) without bloating PLAN.md
+
+For lanes consuming this surface: drop the artifact, log the URL to memory if you want to reference it later (`http://127.0.0.1:7191/` then click into the slug in the sidebar). The artifact survives across sessions; the slug is the stable handle.

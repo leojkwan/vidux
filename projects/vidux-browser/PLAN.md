@@ -2,9 +2,16 @@
 
 ## Purpose
 
-Localhost web UI to visualize every `/vidux` plan + active session state across Leo's repo fleet at a glance. One source-of-truth surface that answers "where am I" without grepping markdown across N repos.
+Two surfaces, one tool, for any /vidux user (not Leo-specific):
 
-The plan files ARE the source of truth (per `/vidux` discipline). The browser is a **read-only viewer** that surfaces them in one place.
+1. **Plan viewer** — localhost web UI that visualizes every `PLAN.md` + canonical sibling artifacts (`INBOX.md`, `investigations/`, `evidence/`) across the user's repo fleet at a glance. Answers "where am I" without grepping markdown.
+2. **Ad-hoc artifact surface** — anytime, anywhere in any session, an agent can drop an HTML artifact into a known directory and it appears in the browser as a top-level "Artifacts" section. Decoupled from any specific plan. The artifact creator is "in chat" — agents POST or write files; the browser surfaces them.
+
+The plan files ARE the source of truth (per `/vidux` discipline). The browser is **read-only against plans**, **append-only against artifacts**.
+
+### Audience clarifier (added 2026-04-25)
+
+This is a **generic /vidux user tool**. Default schema = canonical /vidux only (PLAN.md sections, INBOX.md, investigations/, evidence/). Leo-fleet conventions (`PROGRESS.md` as separate file, `ASK-LEO.md` per `/vidux-leo` overlay) render when present but are not required. A clean-vidux-schema repo with no Leo extensions still works.
 
 ## Evidence
 
@@ -14,7 +21,17 @@ The plan files ARE the source of truth (per `/vidux` discipline). The browser is
   - `<repo>/projects/<slug>/PLAN.md` — `~/Development/vidux/` core (15 plans)
   - `<repo>/PLAN.md` — root-level (vidux, expenses-web, everything, strongyes-web)
 - [Source: this session] Leo asked "where are we" 3-5x in the last week of resumes; symptom of the visualization gap
-- [Source: vidux SKILL.md `~/Development/vidux/SKILL.md`] PLAN.md is canonical state; browser must respect that (read-only)
+- [Source: corpus read of `~/Development/vidux/` 2026-04-25] Canonical /vidux artifacts (verified across SKILL.md + DOCTRINE.md + ENFORCEMENT.md + LOOP.md + INGREDIENTS.md + guides/*.md):
+  - `PLAN.md` — sections: Purpose · Evidence · Constraints · Tasks · Decision Log · Open Questions · Surprises · Progress
+  - `INBOX.md` — Radar→Writer queue bridge per `guides/fleet-ops.md:351-388`. Append-only for scanners, read-write for writers, max 20 entries. **Canonical core, not a Leo extension.**
+  - `investigations/<slug>.md` — compound-task sub-plans per `guides/investigation.md`. Sections: Tickets · Evidence · Root Cause · Impact Map · Fix Spec · Tests · Gate
+  - `evidence/YYYY-MM-DD-<slug>.md` — formal evidence files per `guides/evidence-format.md`. Sections: Goal · Sources · Findings · Recommendations
+  - Status FSM markers: `[pending]`/`[in_progress]`/`[completed]`/`[blocked]`/`[P]`/`[Depends:]`/`[Investigation:]`/`[spawns:]`/`[Source:]`
+- [Source: `/vidux-leo` Section 3 + this-session miscall correction] Leo-fleet extensions (NOT canonical /vidux):
+  - `PROGRESS.md` as separate file — core has `## Progress` SECTION inside PLAN.md; splitting is a Leo pattern when log grows
+  - `ASK-LEO.md` — Leo-specific human-sync gate, `/vidux-leo` overlay only
+  - `RALPH.md` — separate `/ralph` skill, "queue contract absorbed into Vidux's PLAN.md task FSM" per INGREDIENTS.md:159
+- [Source: vidux SKILL.md] PLAN.md is canonical state; browser must respect that (read-only)
 - [Source: /auto Architecture row] Monolith-first → extend `~/Development/vidux/`, no new repo
 - [Source: /auto "create a new repo?" → No until Sept 2026] Lives inside `vidux/browser/`, not standalone
 
@@ -89,13 +106,34 @@ Phase 1: MVP
 - [completed] T1e Verified: 40 plans across 7 repos discovered on first run (13 hot, 25 stale, 2 cold). Visual proof — `/tmp/vidux-browser-mvp.png` (sidebar), `/tmp/vidux-browser-render.png` (markdown), `/tmp/vidux-browser-tabs.png` (PROGRESS tab). Path-traversal guards verified (HTTP 403 for `/etc/passwd` and `~/.ssh/config`).
 - [completed] T1f Bonus: sibling tabs (PLAN / PROGRESS / INBOX / ASK-LEO) shipped with MVP — was Phase 2 scope, but trivial once `plan_meta` was already surfacing siblings.
 
-Phase 2: v1
+Phase 2: v1 — plan-viewer enrichment
 - [pending] T2a Discovery upgrades — handle missing files gracefully, surface broken markdown
 - [completed] T2b PROGRESS / INBOX / ASK-LEO tabs in pane (shipped early as T1f)
 - [pending] T2c Session panel — read latest JSONL per repo from `~/.claude/projects/`, parse summary
 - [pending] T2d Auto-poll every 5s
 - [completed] T2e Status pill heuristic — "hot" ≤7d, "stale" 7-30d, "cold" >30d (shipped with MVP)
 - [completed] T2f Filter across plans (shipped with MVP — searchbox over repo/slug/purpose)
+- [pending] T2g Investigations sub-page — when a task carries `[Investigation: investigations/<slug>.md]`, render the investigation file as a linked sub-view with its 6 canonical sections
+- [pending] T2h Evidence directory viewer — `evidence/YYYY-MM-DD-<slug>.md` rendered as a chronological timeline tab per plan
+- [pending] T2i Decision Log promoted to first-class — Doctrine: agents MUST NOT contradict logged directions; surface this prominently, not buried inside PLAN.md
+- [pending] T2j Tasks rendered as structured FSM, not opaque markdown — parse `[pending]/[in_progress]/[completed]/[blocked]` + `[P]/[Depends:]/[Investigation:]` markers into queue UI with status counts in sidebar
+- [pending] T2k Cross-plan dashboard — "all in_progress across the fleet", "all blocked", "all open ASK-LEO", "all INBOX entries"
+
+Phase 3: Ad-hoc artifact surface (Leo's "anytime anywhere" ask 2026-04-25)
+- [in_progress] T3a `~/Development/vidux/browser/artifacts/` directory — convention dir, drop `.html` files here from any session
+- [in_progress] T3b `/api/artifacts` endpoint — scans the artifacts dir, returns list with `{slug, path, mtime, size, title}` (title pulled from `<title>` or first `<h1>`)
+- [in_progress] T3c Top-level "Artifacts" section in sidebar — distinct from "Plans", grouped chronologically (newest first), no repo grouping (artifacts are decoupled from any single plan)
+- [in_progress] T3d Render `.html` artifacts via direct innerHTML in pane (trust boundary: localhost, Leo's own filesystem, no XSS surface)
+- [in_progress] T3e Components CSS shim — `.contact-card`, `.card-grid`, `.lead-row`, `.person-chip` extending the paper-ink palette so dropped artifacts inherit the look
+- [in_progress] T3f Dogfood: drop a real `cube-vendors.html` artifact from this very session — render the 7 Tier A vendors as cards, prove the "anytime anywhere" loop works
+- [in_progress] T3g `/api/artifact` POST endpoint — agents POST `{slug, html}` from any session; server writes to `artifacts/<slug>.html`; browser auto-surfaces. (Even simpler shape than file-write because no shell access required.)
+
+Phase 4: Polish (formerly Phase 3)
+- [pending] T4a Memory viewer
+- [pending] T4b Ledger entries
+- [pending] T4c launchd plist
+- [pending] T4d Decision Log diff highlighter
+- [pending] T4e Components inside markdown — `:::person` shorthand syntax that renders as a card without hand-writing HTML
 
 Phase 3: Polish
 - [pending] T3a Memory viewer
