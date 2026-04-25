@@ -387,3 +387,31 @@ If the automation is being created from Codex, default it to Chat execution unle
 Vidux does NOT activate for:
 - Single-file changes with obvious cause
 - Anything that takes less than 30 minutes with a clear root cause
+
+---
+
+## Browser
+
+A localhost web UI for viewing every PLAN.md across the fleet at a glance. Read-only — the source of truth is still the markdown file in git.
+
+```
+vidux-browse              # start server, open http://127.0.0.1:7191
+vidux-browse --no-open    # start server without opening
+vidux-browse -f           # foreground (stream logs)
+```
+
+What it shows:
+- Sidebar grouped by repo, with hot/stale/cold pills (≤7d / 7-30d / >30d by mtime)
+- Selected plan rendered as markdown, with sibling tabs for `PROGRESS.md` / `INBOX.md` / `ASK-LEO.md` when present
+- Filter box to search across repo / slug / purpose
+
+Discovery globs (covers the three conventions in use across the fleet):
+
+- `<repo>/ai/plans/<slug>/PLAN.md`
+- `<repo>/vidux/<slug>/PLAN.md`
+- `<repo>/projects/<slug>/PLAN.md`
+- `<repo>/PLAN.md` (root-level)
+
+Stack: Python stdlib `http.server` + plain HTML/CSS + vanilla JS + `marked.js` from CDN. Zero pip dependencies. Bind is `127.0.0.1` only — no auth, trust the localhost boundary.
+
+Code lives at `~/Development/vidux/browser/`. See `projects/vidux-browser/PLAN.md` for design decisions and the v1/Polish roadmap (sessions panel, ledger entries, memory viewer, launchd auto-start).
