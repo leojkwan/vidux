@@ -4,10 +4,10 @@ A Codex lane is a recurring vidux cycle scheduled via a **TOML file + DB row** r
 
 ## Prerequisites
 
-- Codex Mac desktop app installed (CLI `codex` alone **cannot run automations** — it only runs `codex exec` for one-shot delegation)
+- Codex Mac desktop app installed (CLI `codex` alone **cannot run automations** — recurring work lives in the desktop app)
 - `~/.codex/config.toml` with `sandbox_mode` + `model` set
 - `sqlite3` CLI for DB operations
-- `codex-toml-verify.sh` (in `~/Development/ai/scripts/`) — run before every app reopen
+- Local vidux checkout so you can `source scripts/lib/codex-db.sh` and use the shipped helpers (`codex_verify_tomls`, `codex_sync_tomls`, `codex_safe_restart`)
 
 ## Lane Files
 
@@ -36,13 +36,15 @@ status = "ACTIVE"
 rrule = "FREQ=MINUTELY;INTERVAL=30"
 model = "gpt-5.4"
 reasoning_effort = "medium"
-execution_environment = "sandbox"
+execution_environment = "worktree"
 cwds = ["/path/to/repo"]
 created_at = 1744761600
 updated_at = 1744761600
 ```
 
-**Required fields** (verified by `codex-toml-verify.sh`): `version`, `id`, `kind`, `name`, `prompt`, `status`, `rrule`, `model`, `reasoning_effort`, `execution_environment`, `cwds`, `created_at`, `updated_at`. Missing `created_at` / `updated_at` causes silent failure (Bug #18).
+**Required fields** in the public examples and the helper-generated TOMLs (`codex_sync_tomls`) are: `version`, `id`, `kind`, `name`, `prompt`, `status`, `rrule`, `model`, `reasoning_effort`, `execution_environment`, `cwds`, `created_at`, `updated_at`. Missing `created_at` / `updated_at` causes silent failure (Bug #18).
+
+`execution_environment = "worktree"` is the current registration shape written by the shipped Codex helpers. Sandbox access still comes from `sandbox_mode` in `~/.codex/config.toml`.
 
 **Prompt field is single-line.** Escape newlines as `\n` — raw newlines in the TOML break parsing (Bug #22).
 
@@ -58,10 +60,13 @@ VALUES ('project-coordinator', 'project coordinator', '{prompt}', 'ACTIVE',
 ### 3. Verify
 
 ```bash
-~/Development/ai/scripts/codex-toml-verify.sh
+source scripts/lib/codex-db.sh
+codex_verify_tomls
 ```
 
 Exit 0 = safe to reopen. Exit 1 = fix errors before reopening.
+
+This is the repo's lightweight preflight: it confirms that active DB rows have TOML files with prompt lines before reopen. For the full shipped quit → sync → reopen path, use `codex_safe_restart`.
 
 ### 4. Full-quit and reopen the Codex app
 
@@ -125,7 +130,7 @@ When the Mac app reopens after a quit, it reads the DB, resumes all `ACTIVE` aut
 | 18 | Automation fails silently | Missing `created_at` / `updated_at` — both must be set to unix epoch |
 | 22 | TOML parse failure on multi-line prompts | Raw newlines break parsing — escape as `\n` |
 
-Run `codex-toml-verify.sh` between writing TOMLs and reopening the app to catch all five before they bite.
+Use `codex_verify_tomls` as the lightweight local preflight, or `codex_safe_restart` for the full shipped quit → sync → reopen path.
 
 ## Troubleshooting
 

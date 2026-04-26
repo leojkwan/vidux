@@ -204,7 +204,7 @@ After the cycle, append ONE line to
 ### Signal-only format
 
 ```
-- [YYYY-MM-DDThh:mm:ssZ claude coord] [TAG] {what happened}. {optional second sentence on next-cycle plan}.
+- [YYYY-MM-DDThh:mm:ssZ {runtime} {lane-role}] [TAG] {what happened}. {optional second sentence on next-cycle plan}.
 ```
 
 ### Valid tags
@@ -226,7 +226,7 @@ the last entry already said, skip the entry entirely.
 **Rules:**
 - One line, not a paragraph. The diff tells the story; memory.md orients.
 - Always tag. Untagged entries are unsearchable by future agents.
-- Include the session SHA (`8249d801`) when the lane hosts cross-session state.
+- Include the session SHA (`{session-sha}`) when the lane hosts cross-session state.
 
 ## Full Example
 
@@ -273,7 +273,7 @@ Priority: CI red > failing PR fix > eligible PR merge > resume [in_progress]
 
 ## 8. Checkpoint
 Append one line to memory.md:
-`- [YYYY-MM-DDThh:mm:ssZ claude coord] [TAG] {what}. {next-cycle hint}.`
+`- [YYYY-MM-DDThh:mm:ssZ {runtime} {lane-role}] [TAG] {what}. {next-cycle hint}.`
 Tags: SHIP / MERGED / FIX / PROMOTE / DEFER / IDLE / QC / AUDIT-N / MILESTONE.
 No "everything fine" entries.
 ```

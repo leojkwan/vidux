@@ -3,14 +3,14 @@
 Step-by-step guide to creating a Codex automation on Mac. Covers the TOML + DB + app-restart sequence that every new lane must follow.
 
 > **⚠️ The Codex CLI cannot run automations.**
-> The `codex` CLI supports `codex exec` for one-shot delegation, but recurring jobs require the **Codex Mac desktop app**. If you're on Linux, a remote server, or CI — this workflow will not work. Use Claude Code `CronCreate` instead (see [claude-lifecycle.md](claude-lifecycle.md)).
+> The `codex` CLI can run one-shot tasks, but recurring jobs require the **Codex Mac desktop app**. If you're on Linux, a remote server, or CI — this workflow will not work. Use Claude Code `CronCreate` instead (see [claude-lifecycle.md](claude-lifecycle.md)).
 
 ## Prerequisites
 
 - Codex Mac desktop app installed and signed in
 - `~/.codex/config.toml` configured with `model`, `sandbox_mode`, and trusted project paths
 - `sqlite3` CLI (preinstalled on macOS)
-- `codex-toml-verify.sh` from `~/Development/ai/scripts/` (or equivalent)
+- Local vidux checkout so you can `source scripts/lib/codex-db.sh` and use the shipped helpers (`codex_verify_tomls`, `codex_sync_tomls`, `codex_safe_restart`)
 
 Verify your environment:
 
@@ -28,7 +28,7 @@ Every new automation follows this exact sequence. Skipping steps causes the bugs
 1. Write automation.toml      → disk (UI visibility source)
 2. Insert DB row              → sqlite (runtime source)
 3. Write prompt.md + memory.md → disk (shared lane state)
-4. Run codex-toml-verify.sh   → catches bugs #18 and #22
+4. Run codex_verify_tomls     → lightweight preflight before reopen
 5. Full-quit + reopen the app → clears Electron cache (Bug #14/#15)
 ```
 
@@ -53,7 +53,7 @@ status = "ACTIVE"
 rrule = "FREQ=MINUTELY;INTERVAL=30"
 model = "gpt-5.4"
 reasoning_effort = "medium"
-execution_environment = "sandbox"
+execution_environment = "worktree"
 cwds = ["/path/to/repo"]
 created_at = 1744761600
 updated_at = 1744761600
@@ -69,7 +69,7 @@ updated_at = 1744761600
   - Daily at 09:00: `FREQ=DAILY;BYHOUR=9;BYMINUTE=0`
 - `cwds` — JSON-style array of absolute paths. Codex runs in the first path by default.
 - `created_at` / `updated_at` — **required**. Missing either causes silent failure (Bug #18). Use `date +%s` for the current unix epoch.
-- `execution_environment` — `"sandbox"` for most lanes; `"host"` for lanes that need full system access.
+- `execution_environment` — `"worktree"` for recurring vidux lanes. Sandbox access still comes from `sandbox_mode` in `~/.codex/config.toml`.
 
 ## Step 2 — Insert the DB row
 
@@ -132,19 +132,22 @@ See [prompt-template.md](../reference/prompt-template.md) for the 8-block struct
 
 ## Step 4 — Verify
 
-Run the verifier **before** reopening the app. It catches missing fields, raw newlines, and TOML-vs-DB drift:
+Run the verifier **before** reopening the app. It is the repo's lightweight preflight: it confirms that active DB rows have TOML files with prompt lines before reopen.
 
 ```bash
-~/Development/ai/scripts/codex-toml-verify.sh
+source scripts/lib/codex-db.sh
+codex_verify_tomls
 ```
 
 Expected output on success:
 
 ```
-OK: 1 TOMLs verified. Safe to reopen Codex.
+All 1/1 TOMLs verified — single-line prompts, files exist.
 ```
 
 If it fails, fix the reported issue and re-run. **Do not reopen the app with broken TOMLs** — the desktop app may silently skip or crash on them.
+
+If you want the repo's full safe path instead of the manual Step 5 flow, run `codex_safe_restart` after sourcing `scripts/lib/codex-db.sh`. That helper quits the app, regenerates TOMLs from DB rows via `codex_sync_tomls`, and reopens Codex.
 
 ## Step 5 — Full-quit and reopen the Codex app
 
@@ -169,7 +172,7 @@ Before considering the lane "live," confirm all five:
 
 - [ ] `ls ~/.codex/automations/$LANE_ID/automation.toml` — TOML file exists
 - [ ] `sqlite3 ~/.codex/sqlite/codex-dev.db "SELECT id FROM automations WHERE id='$LANE_ID';"` — DB row exists
-- [ ] `~/Development/ai/scripts/codex-toml-verify.sh` — exits 0
+- [ ] `source scripts/lib/codex-db.sh && codex_verify_tomls` — exits 0
 - [ ] Codex app shows the lane in the Automations UI
 - [ ] After the first fire, `tail -1 $LANE_DIR/memory.md` shows a cycle checkpoint
 
@@ -189,7 +192,8 @@ sqlite3 "$HOME/.codex/sqlite/codex-dev.db" \
   "UPDATE automations SET prompt='{new prompt}', updated_at=$NOW WHERE id='$LANE_ID';"
 
 # 3. Verify
-~/Development/ai/scripts/codex-toml-verify.sh
+source scripts/lib/codex-db.sh
+codex_verify_tomls
 
 # 4. Full-quit + reopen (the app caches the prompt at startup)
 osascript -e 'tell application "Codex" to quit' && sleep 3 && open -a "Codex"

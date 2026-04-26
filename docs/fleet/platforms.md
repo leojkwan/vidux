@@ -97,7 +97,7 @@ The DB and TOML must stay in sync. DB-only inserts create runnable but UI-invisi
 | 18 | Missing `created_at` / `updated_at` | Automation fails silently |
 | 22 | Raw newlines in prompt field | TOML parse failure; escape as `\n` |
 
-Run `codex-toml-verify.sh` between writing TOMLs and reopening the app to catch these.
+Run `codex_verify_tomls` (from `scripts/lib/codex-db.sh`) as the lightweight local preflight before reopen, or use `codex_safe_restart` for the full shipped quit → sync → reopen path.
 
 ## See Also
 
