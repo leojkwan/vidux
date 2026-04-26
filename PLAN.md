@@ -52,8 +52,6 @@ Every wave boundary is reversible. Leo gates each transition.
 #### Wave 0 — Plan + audit [completed]
 
 #### Wave 1 — Reference implementation [completed]
-- [completed] 5.1.1 Modified `~/.claude/automations/strongyes-coach-p0/prompt.md`: ACT section changed from "merge to main" to "push branch + draft PR". PUSH POLICY replaced: 5-step flow (push branch → `gh pr create --draft` → never direct-to-main → sync main each cycle → fallback on `gh` failure). PR body template carries lane id, plan task, resume point. [Done: 2026-04-11]
-- [completed] 5.1.2 Draft-PR mechanics validated end-to-end on vidux repo (leojkwan/vidux#4). Branch push → `gh pr create --draft` → `gh pr list` (visible, isDraft: true) → close + cleanup. coach-p0 plan was CLOSED (no work to ship), so tested directly instead. Friction: zero — `gh` CLI worked cleanly. Surprise: coach-p0 can't be the production pilot (plan closed); need a lane with active work for Wave 2. [Done: 2026-04-12]
 - [completed] 5.1.3 Wrote `guides/draft-pr-flow.md` — cloud-agnostic core doctrine: the 5-step flow, branch naming convention, PR body template, recovery via `gh pr list`, fallback on `gh` failure, adoption snippet for lane prompts. [Done: 2026-04-12]
 
 #### Wave 2 — Batch rollout (3 lanes) [completed]
@@ -374,6 +372,10 @@ Remove any remaining `/vidux-auto` references from non-historical docs, prompts,
 Historical mentions stay allowed only in `PLAN.md`, `CHANGELOG.md`, `evidence/`, and archived memories.
 [Done: 2026-04-23. Deleted `commands/vidux-auto.md`. Scrubbed the remaining active docs/guides references. Updated `scripts/lib/ledger-query.sh` to anchor bimodal windows to the newest ledger entry so the contract tests stay deterministic. Gate: `python3 -m pytest -q` => 136/136 pass.]
 
+### Phase 11: Docs dogfood validation hardening [completed]
+
+- [completed] 11.1 Repair missing VitePress documentation targets reported by claudux validate so the docs site matches the current repo surface. [Evidence: `2026-04-26 /Users/leokwan/Development/claudux-worktrees/readme-dogfood-20260426/bin/claudux validate` reported 13 broken links from `docs/.vitepress/config.ts` for `/fleet/`, `/reference/`, and `/examples/` pages.] [Done: 2026-04-26] [agent_id: codex/dogfood-vidux-20260426-1713]
+
 ## Decisions
 (Decision Log — intentional choices that future agents must not undo)
 - [DIRECTION] [2026-04-09] vidux-loop.sh is NOT deleted — it still works and vidux-loop.sh stays as optional tooling. But automation prompts no longer require it. The gate is now inline in the prompt.
@@ -458,4 +460,5 @@ Historical mentions stay allowed only in `PLAN.md`, `CHANGELOG.md`, `evidence/`,
 - [2026-04-23T01:50Z] PR nurse pass for the `/vidux-auto` purge branch. Added Phase 10.6 to record the final cleanup, anchored `ledger_bimodal_distribution` to the newest ledger event so offline fixtures stay deterministic, and cleared the repo-wide ShellCheck blockers in the CI-scanned scripts (source directives, quoting, dead locals, no-op truncation). Gate: `shellcheck` passes on the scanned scripts and `python3 -m pytest -q` passes (136/136). Next: push the branch and let PR checks rerun.
 - [2026-04-17] **Doctrine patch: kill metadata-only PRs + deprecate observer lanes.** Triggered by Leo's diagnosis of resplit-ios fleet-drift pattern — 15+ consecutive plan-flip / audit / investigation PRs while user-visible bugs sat untouched for a week. Branch `claude/vidux-kill-metadata-prs`. Edits span 9 files, net −19 lines: SKILL.md Principle 3 rewritten, Principle 5 adds "Progress is code change" rule, Evidence section adds `observed` as a first-class source type, Worked Example Stage 1 rewritten ("no PR opens yet"), Status FSM language softened, 4 echoes of "investigation only — no code" replaced. LOOP.md `Every cycle MUST produce a checkpoint commit, even if no code changed` inverted. references/automation.md Section 8 collapsed to a deprecation notice, Section 3 observer subsection rewritten, decision tree simplified (total lanes 3-7 → 2-4 for 24/7). guides/recipes.md Recipe 1 Fleet Watcher + Recipe 4 Observer Pair marked DEPRECATED. docs/concepts/cycle.md + principles.md + plan-fields.md + ARCHITECTURE.md mirror updates. Three Decision Log entries added above. PR opens next.
 - [2026-04-26 16:16 EDT] Ready-PR doctrine correction. Core `SKILL.md`, docs/templates, recipes, and automation references now say operational PRs open ready-for-review by default; draft is only WIP/missing-gate. Preserved historical `guides/draft-pr-flow.md` path but rewrote it as Ready-PR Flow. Next: publish as 2.19.0 and let downstream `vidux-leo` continue enforcing auto-merge authority.
-<!-- 1 tasks archived to ARCHIVE.md -->
+- [2026-04-26 17:25 EDT] Phase 11 shipped: added the missing docs pages for `/fleet/`, `/reference/`, and `/examples/`, rewired `docs/.vitepress/config.ts` to a fully real sidebar, and patched the remaining docs-site links away from repo-root markdown files. Verification: `/Users/leokwan/Development/claudux-worktrees/readme-dogfood-20260426/bin/claudux validate` now passes with 29 valid internal links and no duplicate heading IDs. Blocker: `npx vitepress build docs` still cannot render in this repo because `vitepress` is not installed locally, so build verification stopped at dependency resolution rather than doc content.
+<!-- 2 tasks archived to ARCHIVE.md -->
