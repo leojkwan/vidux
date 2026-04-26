@@ -27,7 +27,7 @@ Every new automation follows this exact sequence. Skipping steps causes the bugs
 ```
 1. Write automation.toml      → disk (UI visibility source)
 2. Insert DB row              → sqlite (runtime source)
-3. Write prompt.md + memory.md → disk (lane state)
+3. Write prompt.md + memory.md → disk (shared lane state)
 4. Run codex-toml-verify.sh   → catches bugs #18 and #22
 5. Full-quit + reopen the app → clears Electron cache (Bug #14/#15)
 ```
@@ -37,7 +37,7 @@ Every new automation follows this exact sequence. Skipping steps causes the bugs
 Pick a unique `id` (UUID or a slugified name) and create the lane directory:
 
 ```bash
-LANE_ID="leojkwan-coordinator"   # or a UUID
+LANE_ID="project-coordinator"   # or a UUID
 mkdir -p "$HOME/.codex/automations/$LANE_ID"
 ```
 
@@ -45,16 +45,16 @@ Write `automation.toml`:
 
 ```toml
 version = 1
-id = "leojkwan-coordinator"
+id = "project-coordinator"
 kind = "cron"
-name = "leojkwan coordinator"
-prompt = "Read ~/.claude-automations/leojkwan-coordinator/prompt.md FIRST. Execute one vidux cycle: READ → ASSESS → ACT → VERIFY → CHECKPOINT.\nHonor all constraints in the prompt file.\nAppend one line to memory.md at the end."
+name = "project coordinator"
+prompt = "Read {lane-dir}/project-coordinator/prompt.md FIRST. Execute one vidux cycle: READ → ASSESS → ACT → VERIFY → CHECKPOINT.\nHonor all constraints in the prompt file.\nAppend one line to memory.md at the end."
 status = "ACTIVE"
 rrule = "FREQ=MINUTELY;INTERVAL=30"
 model = "gpt-5.4"
 reasoning_effort = "medium"
 execution_environment = "sandbox"
-cwds = ["/Users/leokwan/Development/leojkwan"]
+cwds = ["/path/to/repo"]
 created_at = 1744761600
 updated_at = 1744761600
 ```
@@ -85,11 +85,11 @@ INSERT INTO automations (
   model, reasoning_effort, created_at, updated_at
 ) VALUES (
   '$LANE_ID',
-  'leojkwan coordinator',
+  'project coordinator',
   '$PROMPT_ESCAPED',
   'ACTIVE',
   'FREQ=MINUTELY;INTERVAL=30',
-  '["/Users/leokwan/Development/leojkwan"]',
+  '["/path/to/repo"]',
   'gpt-5.4',
   'medium',
   $NOW,
@@ -112,9 +112,10 @@ If the row is missing, the automation won't fire. If the TOML is missing, the UI
 The TOML holds the schedule. The lane's actual instructions and memory live in separate files that the prompt points at:
 
 ```bash
-# Most Leo lanes share ~/.claude-automations/<lane>/{prompt.md,memory.md}
-# across Claude and Codex. Reuse that directory if it exists.
-LANE_DIR="$HOME/.claude-automations/$LANE_ID"
+# Pick one shared lane-state root for your fleet and keep prompt + memory
+# together there. This example uses ~/.vidux/lanes/, but ~/.claude-automations/,
+# ~/.codex-automations/, or a project-scoped directory also work.
+LANE_DIR="$HOME/.vidux/lanes/$LANE_ID"
 mkdir -p "$LANE_DIR"
 
 # prompt.md — 8-block structure (Mission / Skills / Read / Gate / Assess / Act / Authority / Checkpoint)
@@ -185,7 +186,7 @@ $EDITOR "$HOME/.codex/automations/$LANE_ID/automation.toml"
 # 2. Update the DB row (both sources must match)
 NOW=$(date +%s)
 sqlite3 "$HOME/.codex/sqlite/codex-dev.db" \
-  "UPDATE automations SET prompt='<new prompt>', updated_at=$NOW WHERE id='$LANE_ID';"
+  "UPDATE automations SET prompt='{new prompt}', updated_at=$NOW WHERE id='$LANE_ID';"
 
 # 3. Verify
 ~/Development/ai/scripts/codex-toml-verify.sh
@@ -212,7 +213,7 @@ osascript -e 'tell application "Codex" to quit' && sleep 3 && open -a "Codex"
 sqlite3 "$HOME/.codex/sqlite/codex-dev.db" \
   "DELETE FROM automations WHERE id='$LANE_ID';"
 rm -rf "$HOME/.codex/automations/$LANE_ID"
-# Lane state (prompt.md + memory.md) lives in ~/.claude-automations/ — keep
+# Lane state (prompt.md + memory.md) lives in the shared lane directory — keep
 # it as a record unless the lane is truly retired.
 osascript -e 'tell application "Codex" to quit' && sleep 3 && open -a "Codex"
 ```

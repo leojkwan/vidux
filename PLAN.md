@@ -374,6 +374,13 @@ Remove any remaining `/vidux-auto` references from non-historical docs, prompts,
 Historical mentions stay allowed only in `PLAN.md`, `CHANGELOG.md`, `evidence/`, and archived memories.
 [Done: 2026-04-23. Deleted `commands/vidux-auto.md`. Scrubbed the remaining active docs/guides references. Updated `scripts/lib/ledger-query.sh` to anchor bimodal windows to the newest ledger entry so the contract tests stay deterministic. Gate: `python3 -m pytest -q` => 136/136 pass.]
 
+#### 10.7 — Dogfood refresh on public docs [in_progress] [Depends: 10.6] [Agent: codex/claudux-dogfood]
+
+1. Correct docs-site drift against current doctrine: `## Progress` is core, `PROGRESS.md` is optional overlay state when present, and `in_review` remains optional rather than required everywhere.
+2. Align the Codex docs with the live static-shim pattern: `automation.toml` + DB row register the automation, while `prompt.md` + `memory.md` live under a shared `<lane-dir>/<lane-id>/` state directory.
+3. Preserve the existing VitePress IA and nav while scrubbing stale Leo-specific example paths and review-bot names from public template pages.
+[Evidence: README.md:115, docs/guide/index.md:68, docs/concepts/plan-structure.md:58-101, docs/fleet/platforms.md:14-15, docs/fleet/codex-lifecycle.md:12-115, docs/fleet/codex-setup.md:35-216, docs/reference/prompt-template.md:22-287]
+
 ## Decisions
 (Decision Log — intentional choices that future agents must not undo)
 - [DIRECTION] [2026-04-09] vidux-loop.sh is NOT deleted — it still works and vidux-loop.sh stays as optional tooling. But automation prompts no longer require it. The gate is now inline in the prompt.

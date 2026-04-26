@@ -11,18 +11,16 @@ A Codex lane is a recurring vidux cycle scheduled via a **TOML file + DB row** r
 
 ## Lane Files
 
-Every Codex lane has three pieces that must stay in sync:
+Every Codex lane has four pieces that must stay in sync:
 
 ```
-~/.codex/automations/<id>/
-├── automation.toml   ← schedule + prompt + config (UI source)
-└── memory.md         ← append-only checkpoint log
-
-~/.codex/sqlite/codex-dev.db
-└── automations table ← runtime source (one row per lane)
+~/.codex/automations/{id}/automation.toml  ← schedule + static shim prompt (UI source)
+~/.codex/sqlite/codex-dev.db               ← runtime source (one row per lane)
+{lane-dir}/{lane-id}/prompt.md             ← real instructions, hot-editable
+{lane-dir}/{lane-id}/memory.md             ← append-only checkpoint log
 ```
 
-**Both the TOML and the DB row must exist.** DB-only inserts are runnable but invisible in the UI (Bug #16). TOML-only files are visible but never fire. The DB is what the runtime reads; the TOML is what the UI renders.
+**The TOML and DB row register the automation.** `prompt.md` and `memory.md` hold the actual lane state. DB-only inserts are runnable but invisible in the UI (Bug #16). TOML-only files are visible but never fire. The shared lane directory is what makes the next fire pick up prompt edits and checkpoint history without rewriting the registration.
 
 ## Creation
 
@@ -30,16 +28,16 @@ Every Codex lane has three pieces that must stay in sync:
 
 ```toml
 version = 1
-id = "leojkwan-coordinator"
+id = "project-coordinator"
 kind = "cron"
-name = "leojkwan coordinator"
-prompt = "Read ~/.claude-automations/leojkwan-coordinator/prompt.md FIRST...\nThen execute one vidux cycle."
+name = "project coordinator"
+prompt = "Read {lane-dir}/project-coordinator/prompt.md FIRST...\nThen execute one vidux cycle."
 status = "ACTIVE"
 rrule = "FREQ=MINUTELY;INTERVAL=30"
 model = "gpt-5.4"
 reasoning_effort = "medium"
 execution_environment = "sandbox"
-cwds = ["/Users/leokwan/Development/leojkwan"]
+cwds = ["/path/to/repo"]
 created_at = 1744761600
 updated_at = 1744761600
 ```
@@ -52,8 +50,8 @@ updated_at = 1744761600
 
 ```sql
 INSERT INTO automations (id, name, prompt, status, rrule, cwds, model, reasoning_effort, created_at, updated_at)
-VALUES ('leojkwan-coordinator', 'leojkwan coordinator', '<prompt>', 'ACTIVE',
-        'FREQ=MINUTELY;INTERVAL=30', '["/Users/leokwan/Development/leojkwan"]',
+VALUES ('project-coordinator', 'project coordinator', '{prompt}', 'ACTIVE',
+        'FREQ=MINUTELY;INTERVAL=30', '["/path/to/repo"]',
         'gpt-5.4', 'medium', 1744761600, 1744761600);
 ```
 
@@ -96,23 +94,24 @@ Codex agents run inside one of three sandboxes, set per-task or per-session in `
 |---|---|---|---|
 | `read-only` | Yes | No | Research dispatch — compressed summaries |
 | `workspace-write` | Yes | Working tree only | Implementation dispatch — code edits |
-| `danger-full-access` | Yes | Anywhere | Trusted automations only (default for Leo's fleet) |
+| `danger-full-access` | Yes | Anywhere | Trusted automations only |
 
-Research dispatch keeps Claude's token budget small; implementation dispatch lets Codex write the code while Claude reviews the diff. See [Fleet Operations](/fleet/operations) for the docs-site summary of that delegation and coordination model.
+Research dispatch keeps the parent context small; implementation dispatch hands a bounded write task to a secondary Codex agent. See [Fleet Operations](/fleet/operations) for the docs-site summary of that delegation and coordination model.
 
 ### Post-push defer
 
-Same as Claude lanes: after pushing a PR, the lane MUST NOT attempt merge in the same cycle. CI bots and code review tools (Greptile, Seer, Vercel Agent) need time to run. Merge eligibility: CI green + ≥1h since last fix-push + no unresolved P0/P1 reviews.
+Same as Claude lanes: after pushing a PR, the lane MUST NOT attempt merge in the same cycle. CI and review automation need time to run. Merge eligibility: CI green + ≥1h since last fix-push + no unresolved required findings.
 
 ## Persistence Model
 
 Codex lanes persist differently from Claude lanes:
 
 - **TOML + DB row** live on disk; they survive app quit, reboot, and account-level changes
+- **`prompt.md` + `memory.md`** live in the shared lane directory and are the durable lane state
 - **Agent sessions** live inside the desktop app process; they die when the app quits
 - **No session GC needed** — the Codex app manages its own memory internally (no growing JSONL files to prune)
 
-When the Mac app reopens after a quit, it reads the DB, resumes all `ACTIVE` automations, and fires them per their rrule. Each lane reads its own `memory.md` to pick up where it left off.
+When the Mac app reopens after a quit, it reads the DB, resumes all `ACTIVE` automations, and fires them per their rrule. Each fire reads the shared `prompt.md` and `memory.md` to pick up where the lane left off.
 
 **No auto-expire.** Codex automations run until manually stopped (`status = 'PAUSED'` or DB delete) or the app is closed permanently.
 
