@@ -6,6 +6,32 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Vidux u
 
 ---
 
+## [2.24.0] - 2026-04-27
+
+Linear codebase-project guardrails. Repo lanes can now require their Linear
+project binding to be named after the codebase it feeds.
+
+### Added
+
+- **`linear.project_name` config validation.** When set beside `project_id`,
+  the Linear adapter looks up the remote project and fails closed unless the
+  remote name matches. This prevents copied repo configs from silently routing
+  a codebase plan into a product bucket such as "UX Overhaul".
+- **Docs and example config** for codebase-owned Linear projects, including
+  the recommended `auto_promote_target: "vidux"` repo-intake shape.
+- **Regression coverage** for matching project validation, mismatch
+  fail-closed behavior, missing `project_id`, and the project lookup query.
+
+### Verified
+
+- `python3 -m unittest tests.test_linear_adapter tests.test_vidux_inbox_sync`
+- `python3 -m unittest discover -s tests`
+- `npm ci`
+- `npm run docs:build`
+- `git diff --check`
+
+---
+
 ## [2.23.0] - 2026-04-27
 
 Canonical-plan dedupe for the local Vidux browser. Legacy copied checkouts no longer hide or mis-group the active plan when the same `PLAN.md` exists under both the old and current repo names.

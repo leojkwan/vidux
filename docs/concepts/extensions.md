@@ -41,6 +41,33 @@ Adapters are **additive**. A repo's `vidux.config.json` can list multiple `inbox
 
 This means migrating from one tracker to another is a no-op — you don't migrate, you just add the new adapter alongside the old one and let teams use whichever surface fits the work.
 
+## Codebase-owned projects
+
+For repo lanes, the safest external project is named after the codebase it
+feeds: `resplit-web`, `resplit-ios`, `strongyes-web`, and so on. Product
+buckets such as "UX Overhaul" or "Infrastructure" can still exist in Linear,
+but they are planning buckets, not repo intake queues.
+
+The Linear adapter supports an explicit guardrail:
+
+```json
+{
+  "adapter": "linear",
+  "enabled": true,
+  "config": {
+    "team_id": "2f745857-a4df-4f99-93a9-6ac89f9991a2",
+    "project_id": "linear-project-uuid",
+    "project_name": "resplit-web",
+    "auto_promote_target": "vidux"
+  }
+}
+```
+
+When `project_name` is present, `fetch_inbox`, `push_task`, status sync, and
+field sync all validate the remote Linear project before doing work. A copied
+config that still points at "UX Overhaul" fails closed instead of promoting
+product-board cards into the wrong repo plan.
+
 ## Sync architecture
 
 The repo ships one sync entry point: `scripts/vidux-inbox-sync.py`. Operators can schedule separate invocations per adapter via `--only-adapter` when they want independent cadences or credentials:

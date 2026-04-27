@@ -57,6 +57,9 @@ The live config uses several sections to guide scripts and automation behavior:
 - `external_plan_roots` lists additional plan roots.
 - `inbox_sources` enables adapters such as `gh_projects`.
 - Adapter config can map task states, evidence fields, and auto-promotion targets.
+- Linear codebase intake should set both `project_id` and `project_name`; the
+  adapter validates the remote project name before reading or writing so a repo
+  cannot silently ingest the wrong Linear product bucket.
 
 The checked-in example file shows a single `gh_projects` entry, but the live `vidux.config.json` enables both shipped adapters: `gh_projects` and `linear`. Both live entries also carry `auto_promote_target` values, so the config docs should be read as "one minimal example plus one fuller real-world config," not as an exhaustive mirror of the example file alone.
 
