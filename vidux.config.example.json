@@ -46,7 +46,8 @@
           "completed": "state-done"
         },
         "blocked_label": "blocked",
-        "auto_promote_target": "vidux"
+        "auto_promote_target": "vidux",
+        "auto_promote_max_new": 25
       }
     }
   ]

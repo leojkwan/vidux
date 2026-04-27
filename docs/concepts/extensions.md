@@ -101,6 +101,11 @@ When an adapter's config sets `auto_promote_target: <plan-dir>`, novel external 
 
 Missing `auto_promote_target` paths fail closed. Vidux refuses to fall back to `INBOX.md`, because that would route external work to the first plan in the store instead of the lane that owns the board/project.
 
+Auto-promote also has a batch safety cap: by default, more than 25 novel items
+in one run fails closed before mutating `PLAN.md`. Set
+`auto_promote_max_new` to a different integer, or to `null` to disable the cap
+for a deliberate bulk import.
+
 **Round-trip dedup is required for safety.** Without it, the push half mints duplicate cards every cycle (push uses `task.id` as the mapping key while auto-promote names cards `BD-N` — a namespace mismatch that causes infinite-mint). The sync script's push reconcile must scan task lines for an existing `[Source: <adapter>:<id>]` marker before pushing.
 
 ## Self-extending lanes

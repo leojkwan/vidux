@@ -19,8 +19,14 @@ project binding to be named after the codebase it feeds.
   a codebase plan into a product bucket such as "UX Overhaul".
 - **Docs and example config** for codebase-owned Linear projects, including
   the recommended `auto_promote_target: "vidux"` repo-intake shape.
+- **Auto-promote batch safety.** Direct board-to-plan promotion now defaults
+  to `auto_promote_max_new: 25`, fails closed before appending oversized
+  batches, and recovers missing sidecar mappings from unique title matches in
+  clean worktrees.
 - **Regression coverage** for matching project validation, mismatch
-  fail-closed behavior, missing `project_id`, and the project lookup query.
+  fail-closed behavior, missing `project_id`, project lookup, pre-colon task
+  metadata parsing, title-based mapping recovery, and oversized auto-promote
+  batches.
 
 ### Verified
 

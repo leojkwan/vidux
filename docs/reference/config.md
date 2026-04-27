@@ -57,6 +57,8 @@ The live config uses several sections to guide scripts and automation behavior:
 - `external_plan_roots` lists additional plan roots.
 - `inbox_sources` enables adapters such as `gh_projects`.
 - Adapter config can map task states, evidence fields, and auto-promotion targets.
+- `auto_promote_max_new` caps direct PLAN.md appends per source. The default is
+  25; use `null` only for a deliberate bulk import.
 - Linear codebase intake should set both `project_id` and `project_name`; the
   adapter validates the remote project name before reading or writing so a repo
   cannot silently ingest the wrong Linear product bucket.

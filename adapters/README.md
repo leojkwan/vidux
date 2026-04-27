@@ -101,7 +101,8 @@ meant to feed one codebase:
       "in_review": "state-review",
       "completed": "state-done"
     },
-    "auto_promote_target": "vidux"
+    "auto_promote_target": "vidux",
+    "auto_promote_max_new": 25
   }
 }
 ```
@@ -111,6 +112,10 @@ requires the remote name to match before reading or mutating issues. This is
 the supported shape for codebase-owned repo queues. Product planning projects
 may omit `project_name`, but then the config review must treat that source as
 an intentionally unguarded product bucket.
+
+`auto_promote_max_new` protects clean worktrees whose gitignored sidecars are
+missing. If a source would append more than the cap as fresh `BD-*` tasks, the
+sync fails closed before mutating `PLAN.md`.
 
 ## Six steps to write a new adapter
 

@@ -72,7 +72,7 @@ The FirstBite Linear team id used for these project checks is
   bucket.
 - [pending] LC-8: Audit legacy product/domain projects after active movement
   and prepare an archive/keep recommendation for Leo.
-- [pending] LC-9: Fix Vidux auto-promote dedupe so a project-scoped source does
+- [completed] LC-9: Fix Vidux auto-promote dedupe so a project-scoped source does
   not append items already mapped in any sub-plan sidecar.
 - [pending] LC-10: Decide whether Vidux should read Linear's Vercel and
   Graphite integration signals for nurse/status summaries, while keeping
@@ -82,11 +82,23 @@ The FirstBite Linear team id used for these project checks is
 
 - Linear Projects are codebase intake containers for Vidux automation. Product
   structure belongs in plan paths, labels, milestones, or issue text.
-- StrongYes stays scoped by `project_id` and `project_name` now, but Linear
-  auto-promote remains off until LC-9 is fixed. A dry-run showed
-  `auto_promote_target=vidux` would duplicate 220 already-mapped issues into
-  the root StrongYes plan.
+- StrongYes stays scoped by `project_id` and `project_name` now. Linear
+  auto-promote remains off in `leojkwan/strongyes-web#937` until the Vidux
+  guardrail PR lands and StrongYes deliberately enables the capped import path.
+  The original dry-run risk was 220 duplicate root-plan tasks; the fixed
+  sidecar-present dry-run promotes 0, and a clean worktree fails closed instead
+  of appending the remaining title-drifted batch.
 - Legacy product/domain projects are not automatically archived. They may hold
   useful history and need a separate explicit archive decision.
 - Vercel and Graphite integration data can enrich nursing and status reports,
   but it must not replace the codebase project binding as the source of truth.
+
+## Progress
+
+- [2026-04-27 08:34 EDT] LC-9 guardrail added in `leojkwan/vidux#70`: parser
+  accepts pre-colon metadata such as `CE-10 [ETA: 2h]: ...`, auto-promote
+  recovers unique title matches into sidecars before appending, and oversized
+  direct-promote batches fail closed via `auto_promote_max_new` before mutating
+  `PLAN.md`. StrongYes proof: sidecar-present dry-run promoted 0; clean
+  worktree dry-run failed closed on 31 remaining title-drifted cards instead
+  of appending them.
