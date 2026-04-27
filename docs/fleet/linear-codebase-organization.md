@@ -31,6 +31,9 @@ The FirstBite Linear team id used for these project checks is
 
 - The Linear Projects UI on 2026-04-27 showed product/domain buckets as the
   visible project list instead of codebase-owned repo intake projects.
+- Linear now has Vercel and Graphite connected. Treat those as review/deploy
+  signal surfaces for the project lane, not as repo ownership proof by
+  themselves.
 - The Linear API inventory found 255 FirstBite issues during the organization
   pass.
 - Sidecar ownership tracing showed 132 active no-project issues were
@@ -71,6 +74,9 @@ The FirstBite Linear team id used for these project checks is
   and prepare an archive/keep recommendation for Leo.
 - [pending] LC-9: Fix Vidux auto-promote dedupe so a project-scoped source does
   not append items already mapped in any sub-plan sidecar.
+- [pending] LC-10: Decide whether Vidux should read Linear's Vercel and
+  Graphite integration signals for nurse/status summaries, while keeping
+  `project_id`/`project_name` as the only repo ownership contract.
 
 ## Decisions
 
@@ -82,3 +88,5 @@ The FirstBite Linear team id used for these project checks is
   the root StrongYes plan.
 - Legacy product/domain projects are not automatically archived. They may hold
   useful history and need a separate explicit archive decision.
+- Vercel and Graphite integration data can enrich nursing and status reports,
+  but it must not replace the codebase project binding as the source of truth.
