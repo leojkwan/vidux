@@ -389,9 +389,25 @@ Historical mentions stay allowed only in `PLAN.md`, `CHANGELOG.md`, `evidence/`,
 [Evidence: .claudux/index/static-analysis.json:1-12, package.json:1-11, docs/.vitepress/config.ts:1-186, docs/fleet/codex-lifecycle.md:1-123, docs/fleet/codex-setup.md:1-216, docs/reference/scripts.md:1-136]
 [Done: 2026-04-26. Kept the existing VitePress IA and config unchanged after confirming every sidebar/nav link resolves. Tightened the public README to match the current `/vidux` structure and script surfaces, and updated `docs/reference/scripts.md` with the shipped `vidux-worktree-gc.py` and `vidux-linear-reconcile.py` utilities. Gate: `npm test` PASS (156/156), `npm run docs:build` PASS after `npm ci` restored pinned dev dependencies, `git diff --check` PASS, sidebar-link audit PASS.]
 
-### Phase 11: Post-release docs maintenance [completed]
+### Phase 11: Post-2.20.0 docs dogfood [completed]
 
-#### 11.2 — Config + Codex docs drift pass [completed] [Agent: codex/claudux-dogfood-vidux-20260427-0132]
+**Goal:** Keep the public docs source-grounded after the `2.20.0` worktree-GC safety release without churning the existing VitePress IA, page ids, nav order, or deletion behavior.
+
+**Evidence:**
+- [Source: CHANGELOG.md, 2026-04-27] `2.20.0` added invocation-checkout protection and dedicated `tests/test_worktree_gc.py` coverage for `scripts/vidux-worktree-gc.py`.
+- [Source: scripts/vidux-worktree-gc.py:1-4,201-203] `--apply --yes` removes only `merged_clean` worktrees and never removes the primary or invocation checkout.
+- [Source: tests/test_worktree_gc.py:143-176] The lifecycle buckets and invocation-checkout safeguard are mechanically verified.
+- [Source: .github/workflows/ci.yml:51-64] CI now runs the worktree-GC test suite in a dedicated job.
+- [Source: /Users/leokwan/Development/claudux-worktrees/readme-dogfood-20260426/bin/claudux --help, 2026-04-27] The local dogfood CLI exposes `claudux validate`, while `claudux validate-output --help` still fails with `Unknown command: validate-output`.
+
+#### 11.1 — Post-2.20.0 worktree-GC docs guard [completed] [Agent: codex/claudux-dogfood] [Depends: 10.8]
+
+1. Re-audit only the docs surfaces touched by the worktree-GC release and current CI gates.
+2. Update only source-grounded drift; preserve the existing docs IA, `docs/.vitepress/config.ts`, page ids, nav order, and deletion behavior if they remain accurate.
+3. Re-run the docs build, repo test gate, worktree-GC tests, and local claudux validation; record the exact tool failure for the stale `validate-output` entry point if it still reproduces.
+[Done: 2026-04-27. Kept the existing VitePress IA and config unchanged after confirming 27/27 sidebar and nav links in `docs/.vitepress/config.ts` still resolve. Updated only `docs/reference/scripts.md` so the public script reference matches `2.20.0`: worktree-GC lifecycle buckets, invocation-checkout protection, and dedicated CI coverage. Gate: `npm ci` PASS, `npm run docs:build` PASS, `python3 -m unittest tests.test_worktree_gc` PASS, local `claudux validate` PASS, `git diff --check` PASS, parent `npm test` PASS (156/156), and local `claudux validate-output --help` still FAILS with `Unknown command: validate-output`.]
+
+#### 11.2 — Config + Codex docs drift pass [completed] [Agent: codex/claudux-dogfood-vidux-20260427-0132] [Depends: 11.1]
 
 1. Correct factual drift in the public config docs so the live `vidux.config.json` and adapter docs agree on shipped inbox sources and adapter status.
 2. Correct Codex registration docs anywhere they still describe timestamp fields or verification helpers in a way that contradicts the shipped helpers and current scheduler rows.
@@ -490,4 +506,5 @@ Historical mentions stay allowed only in `PLAN.md`, `CHANGELOG.md`, `evidence/`,
 - [2026-04-27 01:40 EDT] 11.2 completed. Kept the docs IA stable and fixed only current-file contradictions: `docs/reference/config.md` now matches the checked-in `vidux.config.json` and adapter docs on live `gh_projects` + `linear` support, `SKILL.md` no longer calls `linear` a stub, and the Codex setup/lifecycle/runtime docs now use the shipped `codex_verify_tomls` helper plus millisecond `created_at` / `updated_at` values that match current scheduler rows and helpers. A sibling lane wrote an unrelated `11.1` checkpoint during verify, so this branch checkpointed as `11.2` to keep the lock history unambiguous. Gate: `git diff --check` PASS, `npm test` PASS (156/156), `npm ci` PASS, `npm run docs:build` PASS.
 - [2026-04-27] 5.3.0 release QA completed. Found and fixed linked-worktree invocation safety: `--apply --yes` now protects both the primary Git worktree and the checkout passed to the script, so a lane cannot accidentally classify its own invocation worktree as removable. Bumped release to 2.20.0 with CHANGELOG coverage. Gate: `python3 -m unittest tests.test_worktree_gc` PASS, `py_compile` PASS, `git diff --check` PASS, disposable clone `python3 -m unittest discover -s tests` PASS (165/165), `npm run docs:build` PASS, JSON/gate smoke PASS.
 - [2026-04-26 20:40 EDT] 5.3.0a completed. Closed the CI coverage gap for the worktree lifecycle finalizer by adding a dedicated GitHub Actions job for `tests.test_worktree_gc`. Added a contract check that `.external-state.json` remains ignored inside tracked project directories, matching the browser sidecar doctrine. Gate: `python3 -m unittest tests.test_worktree_gc -v` PASS, targeted sidecar contract test PASS, `python3 -m pytest tests/test_vidux_contracts.py -v --tb=short` PASS (139/139), `git diff --check` PASS. Local pytest lacks `pytest-timeout`, so the CI-only `--timeout=30` flag was not run locally.
+- [2026-04-27 01:40 EDT] 11.1 completed. Post-`2.20.0` static-analysis dogfood found the docs IA stable, so the refresh stayed narrow: `docs/reference/scripts.md` now names the worktree-GC lifecycle buckets, documents that `--apply --yes` protects both the primary and invocation checkouts, and records the dedicated CI coverage. Gate: `npm ci` PASS, `npm run docs:build` PASS, `python3 -m unittest tests.test_worktree_gc` PASS, local `claudux validate` PASS, config-link audit PASS (27/27), `git diff --check` PASS, and parent `npm test` PASS (156/156). Tool note: local `claudux validate-output --help` still fails with `Unknown command: validate-output`; the working entry point is `claudux validate`.
 <!-- 3 tasks archived to ARCHIVE.md -->
