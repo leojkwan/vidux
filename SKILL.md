@@ -476,6 +476,14 @@ curl -X POST http://127.0.0.1:7191/api/artifact \
 
 **Slug rules** (POST-validated): `^[a-z0-9][a-z0-9-]{0,63}$`. Lowercase, dashes only, no slashes, no `..`. Same slug overwrites.
 
+**Write-guard contract.** Both `POST /api/artifact` and `POST /api/local-plan-note` enforce three mechanical checks server-side; each returns before touching disk:
+
+1. Client IP must be loopback (`127.0.0.1` / `::1`) — else `403 write endpoints require loopback client`
+2. `Content-Type` header must be `application/json` (charset ok) — else `415 Content-Type must be application/json`
+3. When `Origin` or `Referer` is present, its scheme+netloc must match the request's `Host` — else `403 Origin must match vidux-browse host` (missing both headers is still allowed for CLI callers)
+
+This holds regardless of bind host. `VIDUX_BROWSER_HOST=0.0.0.0` LAN-read is safe because writes never pass check 1 from another machine. Regression coverage lives in `tests/test_browser_server.py` and runs under `npm test`.
+
 **Component CSS shim** — to inherit the paper-and-ink palette in your artifact, use these classes (defined in `static/style.css`):
 
 - `.card-grid` — auto-fill grid container, 280px min column
@@ -485,7 +493,7 @@ curl -X POST http://127.0.0.1:7191/api/artifact \
 - `.person-chip` — pill-shaped inline tag
 - `.label` — uppercase mono label (e.g., `<span class="label">hook</span>`)
 
-Artifacts render via direct `innerHTML` into the same pane that renders markdown, so anything in your `<body>` works. Trust boundary: localhost + your own filesystem; no XSS surface.
+Artifacts render via direct `innerHTML` into the same pane that renders markdown, so anything in your `<body>` works. Trust boundary: only loopback clients can write; LAN peers can read the rendered HTML but cannot inject new slugs. See write-guard contract above.
 
 **Use cases this enables:**
 - Research summaries with vendor / lead / contact cards (vs flat markdown tables)
@@ -505,4 +513,4 @@ curl -X POST http://127.0.0.1:7191/api/local-plan-note \
   -d '{"plan_path":"/Users/me/Development/project/PLAN.md","source":"codex/local","agent":"codex/local","note":"Short note for the next local agent."}'
 ```
 
-This endpoint rejects non-loopback clients. Even when vidux-browse is bound to `0.0.0.0` for home-LAN reading, `POST /api/local-plan-note` must be called through `127.0.0.1` or `::1`; other Wi-Fi devices can read but cannot write plan notes.
+This endpoint applies the same three-check write-guard contract as `/api/artifact` (loopback IP + JSON `Content-Type` + same-origin when `Origin`/`Referer` present). Even when vidux-browse is bound to `0.0.0.0` for home-LAN reading, plan-notes must be posted from `127.0.0.1` or `::1`; other Wi-Fi devices read the rendered plan but cannot mutate INBOX.
