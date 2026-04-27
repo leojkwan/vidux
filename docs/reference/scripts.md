@@ -20,7 +20,7 @@ The `scripts/` directory contains the executable support layer for vidux. Most f
 | `scripts/vidux-doctor.sh` | Runtime health checks for plans, worktrees, and automation state. |
 | `scripts/vidux-test-all.sh` | Comprehensive self-test harness for contract tests and related checks. |
 | `scripts/vidux-fleet-quality.sh` | Classifies automation runs into quick, deep, mid, and normal quality buckets. |
-| `scripts/vidux-worktree-gc.py` | Read-only by default. Classifies Vidux automation worktrees and, with `--apply --yes`, removes only clean non-primary worktrees that are already merged into the base branch or tied to merged PRs. |
+| `scripts/vidux-worktree-gc.py` | Read-only by default. Classifies Vidux automation worktrees into lifecycle buckets and, with `--apply --yes`, removes only `merged_clean` worktrees. Both the primary checkout and the checkout the script is invoked from are always protected. |
 
 ## Codex maintenance scripts
 
