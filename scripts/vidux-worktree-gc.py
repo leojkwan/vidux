@@ -358,6 +358,12 @@ def main(argv: List[str]) -> int:
     removed: List[str] = []
     if args.apply:
         removed = remove_worktrees(repo, worktrees, args.delete_branches)
+        if removed:
+            raw_worktrees = load_worktrees(repo)
+            worktrees = [
+                classify_worktree(repo, raw, primary_path, prs_by_branch, args.base, warnings)
+                for raw in raw_worktrees
+            ]
 
     payload = build_payload(repo, args.base, worktrees, warnings, removed)
     if args.json:

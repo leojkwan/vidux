@@ -145,6 +145,8 @@ class WorktreeGcTests(unittest.TestCase):
         payload = json.loads(result.stdout)
 
         self.assertEqual([str((self.worktrees_dir / "merged-clean").resolve())], payload["removed"])
+        self.assertEqual(5, payload["summary"]["total"])
+        self.assertEqual(0, payload["summary"]["removable"])
         self.assertFalse((self.worktrees_dir / "merged-clean").exists())
         self.assertTrue((self.worktrees_dir / "open-pr").exists())
         self.assertTrue((self.worktrees_dir / "dirty-branch").exists())
