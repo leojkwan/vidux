@@ -43,6 +43,8 @@ The FirstBite Linear team id used for these project checks is
   `strongyes-web` with 0 API errors.
 - Post-move counts were `strongyes-web` total=220 active=220 and `vidux`
   total=35 active=4.
+- On 2026-04-27, the visible legacy product/domain projects had 0 total
+  issues and 0 active issues each before archival.
 
 ## Guardrails
 
@@ -70,8 +72,8 @@ The FirstBite Linear team id used for these project checks is
 - [pending] LC-7: Re-check Linear UI and API after the PRs merge: no active
   codebase-owned issue should live in `(no project)` or a legacy product
   bucket.
-- [pending] LC-8: Audit legacy product/domain projects after active movement
-  and prepare an archive/keep recommendation for Leo.
+- [completed] LC-8: Audit legacy product/domain projects after active movement
+  and archive the empty legacy buckets after Leo confirmation.
 - [completed] LC-9: Fix Vidux auto-promote dedupe so a project-scoped source does
   not append items already mapped in any sub-plan sidecar.
 - [pending] LC-10: Decide whether Vidux should read Linear's Vercel and
@@ -88,13 +90,22 @@ The FirstBite Linear team id used for these project checks is
   The original dry-run risk was 220 duplicate root-plan tasks; the fixed
   sidecar-present dry-run promotes 0, and a clean worktree fails closed instead
   of appending the remaining title-drifted batch.
-- Legacy product/domain projects are not automatically archived. They may hold
-  useful history and need a separate explicit archive decision.
+- Legacy product/domain projects are not automatically archived. On
+  2026-04-27 Leo confirmed cleanup after codebase projects existed, and the
+  empty legacy buckets were archived only after API verification showed 0 total
+  and 0 active issues in each.
 - Vercel and Graphite integration data can enrich nursing and status reports,
   but it must not replace the codebase project binding as the source of truth.
 
 ## Progress
 
+- [2026-04-27 08:25 EDT] LC-8 completed: archived the empty legacy Linear
+  projects `UX Overhaul (launch queue)`, `Usage-Based Pricing`,
+  `Problem Scale`, `Infrastructure`, `Game Plan`, `Creative Engine`,
+  `Creative Direction`, `Content Directorate`, `Blog Voice Retrofit`, and
+  `Blog Pipeline`. Verification before archival showed 0 total issues and
+  0 active issues for each; post-archive active project inventory contains only
+  `strongyes-web`, `resplit-web`, `resplit-ios`, and `vidux`.
 - [2026-04-27 08:34 EDT] LC-9 guardrail added in `leojkwan/vidux#70`: parser
   accepts pre-colon metadata such as `CE-10 [ETA: 2h]: ...`, auto-promote
   recovers unique title matches into sidecars before appending, and oversized
