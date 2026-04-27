@@ -66,7 +66,7 @@ class GraphQLRecorder:
 
 def _project_payload(
     *,
-    name: str = "resplit-web",
+    name: str = "repo-web",
     project_id: str = "project-uuid",
     team_id: str = "team-uuid",
 ) -> dict[str, Any]:
@@ -76,7 +76,7 @@ def _project_payload(
             "name": name,
             "teams": {
                 "nodes": [
-                    {"id": team_id, "key": "EVE", "name": "FirstBite"},
+                    {"id": team_id, "key": "APP", "name": "ExampleTeam"},
                 ],
             },
         }
@@ -175,7 +175,7 @@ class FetchInboxFiltersCanceled(unittest.TestCase):
     def test_project_name_validates_before_project_fetch(self):
         adapter = _make_adapter(
             project_id="project-uuid",
-            project_name="resplit-web",
+            project_name="repo-web",
         )
         recorder = GraphQLRecorder([_project_payload(), self._nodes()])
         adapter._graphql = recorder  # type: ignore[assignment]
@@ -193,14 +193,14 @@ class FetchInboxFiltersCanceled(unittest.TestCase):
     def test_project_name_mismatch_fails_closed(self):
         adapter = _make_adapter(
             project_id="project-uuid",
-            project_name="resplit-web",
+            project_name="repo-web",
         )
-        recorder = GraphQLRecorder(_project_payload(name="UX Overhaul"))
+        recorder = GraphQLRecorder(_project_payload(name="Launch Queue"))
         adapter._graphql = recorder  # type: ignore[assignment]
 
         with self.assertRaisesRegex(
             Exception,
-            "UX Overhaul.*expected 'resplit-web'",
+            "Launch Queue.*expected 'repo-web'",
         ):
             adapter.fetch_inbox()
 
@@ -209,9 +209,9 @@ class FetchInboxFiltersCanceled(unittest.TestCase):
     def test_project_name_mismatch_blocks_issue_create(self):
         adapter = _make_adapter(
             project_id="project-uuid",
-            project_name="resplit-web",
+            project_name="repo-web",
         )
-        recorder = GraphQLRecorder(_project_payload(name="UX Overhaul"))
+        recorder = GraphQLRecorder(_project_payload(name="Launch Queue"))
         adapter._graphql = recorder  # type: ignore[assignment]
         task = PlanTask(
             id="BD-1",
@@ -221,7 +221,7 @@ class FetchInboxFiltersCanceled(unittest.TestCase):
 
         with self.assertRaisesRegex(
             Exception,
-            "UX Overhaul.*expected 'resplit-web'",
+            "Launch Queue.*expected 'repo-web'",
         ):
             adapter.push_task(task)
 
@@ -249,7 +249,7 @@ class GraphQLQueryShape(unittest.TestCase):
 
     def test_project_name_requires_project_id(self):
         with self.assertRaisesRegex(ValueError, "project_name.*project_id"):
-            _make_adapter(project_name="resplit-web")
+            _make_adapter(project_name="repo-web")
 
     def test_project_lookup_query_reads_name_and_teams(self):
         self.assertIn("project(id: $projectId)", LinearAdapter._PROJECT_LOOKUP_QUERY)

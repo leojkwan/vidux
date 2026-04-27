@@ -46,7 +46,7 @@ surface area can layer on without breaking the 6-method contract:
 |------------------|----------------------------------------------------|-------------------|
 | **Issue**        | vidux task in PLAN.md                              | shipped (this adapter) |
 | **Sub-issue**    | bullet under a task — set `parentId` on issueCreate | configurable via `parent_id` field |
-| **Project**      | one codebase-owned repo intake queue by default (e.g. `resplit-web`) | configurable via `project_id`; add `project_name` to fail closed on wrong bindings |
+| **Project**      | one codebase-owned repo intake queue by default (e.g. `<repo-name>`) | configurable via `project_id`; add `project_name` to fail closed on wrong bindings |
 | **Initiative**   | top-level cross-cutting goal (workspace-wide)      | M:M via `InitiativeToProject` join — extension API |
 | **Cycle**        | sprint window (orthogonal to projects)             | optional — set `cycleId` in `push_fields` |
 | **Project milestone** | phase marker inside one project (Phase 0 → 1) | set `projectMilestoneId` |
@@ -94,7 +94,7 @@ meant to feed one codebase:
     "token_file": "~/.config/vidux/linear.token",
     "team_id": "team-uuid",
     "project_id": "project-uuid",
-    "project_name": "resplit-web",
+    "project_name": "repo-name",
     "state_mapping": {
       "pending": "state-backlog",
       "in_progress": "state-started",
@@ -220,7 +220,7 @@ Before shipping, verify end-to-end against the real external board:
    no duplicate INBOX.md lines).
 
 Keep the throwaway PLAN.md local (inside a gitignored `projects/<slug>/`)
-so the test items never land in Leo's public game-plan boards.
+so the test items never land in production planning boards.
 
 ## Token file conventions
 

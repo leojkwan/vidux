@@ -28,8 +28,6 @@ const sidebar = [
       { text: 'Platform Comparison', link: '/fleet/platforms' },
       { text: 'Harness Authoring', link: '/fleet/harness' },
       { text: 'Fleet Operations', link: '/fleet/operations' },
-      { text: 'Linear Codebase Organization', link: '/fleet/linear-codebase-organization' },
-      { text: 'Linear Port Audit', link: '/fleet/linear-port-audit' },
       { text: 'Recipe Catalog', link: '/fleet/recipes' },
     ],
   },

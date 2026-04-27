@@ -16,9 +16,12 @@ project binding to be named after the codebase it feeds.
 - **`linear.project_name` config validation.** When set beside `project_id`,
   the Linear adapter looks up the remote project and fails closed unless the
   remote name matches. This prevents copied repo configs from silently routing
-  a codebase plan into a product bucket such as "UX Overhaul".
+  a codebase plan into a product bucket such as "Launch Queue".
 - **Docs and example config** for codebase-owned Linear projects, including
-  the recommended `auto_promote_target: "vidux"` repo-intake shape.
+  the recommended repo-intake shape for `auto_promote_target`.
+- **Local policy overlay guidance.** Public docs now describe how teams should
+  keep concrete board ids, repo/project maps, review-tool gates, and fleet
+  cadence in an overlay skill or runbook that loads after `/vidux`.
 - **Auto-promote batch safety.** Direct board-to-plan promotion now defaults
   to `auto_promote_max_new: 25`, fails closed before appending oversized
   batches, and recovers missing sidecar mappings from unique title matches in
@@ -27,6 +30,12 @@ project binding to be named after the codebase it feeds.
   fail-closed behavior, missing `project_id`, project lookup, pre-colon task
   metadata parsing, title-based mapping recovery, and oversized auto-promote
   batches.
+
+### Removed
+
+- **Dogfood fleet audit pages from public docs navigation.** Core Vidux keeps
+  the generic adapter contract; operator-specific migration ledgers belong in
+  local overlays.
 
 ### Verified
 

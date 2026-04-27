@@ -63,7 +63,10 @@ The live config uses several sections to guide scripts and automation behavior:
   adapter validates the remote project name before reading or writing so a repo
   cannot silently ingest the wrong Linear product bucket.
 
-The checked-in example file shows a single `gh_projects` entry, but the live `vidux.config.json` enables both shipped adapters: `gh_projects` and `linear`. Both live entries also carry `auto_promote_target` values, so the config docs should be read as "one minimal example plus one fuller real-world config," not as an exhaustive mirror of the example file alone.
+A real repo may enable one or more shipped adapters, including `gh_projects`
+and `linear`, and may add `auto_promote_target` when external cards should
+land directly in a named plan instead of `INBOX.md`. Treat the example file as
+one minimal shape, not as an exhaustive mirror of every production config.
 
 ## Where config is used
 

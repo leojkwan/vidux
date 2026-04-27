@@ -148,7 +148,7 @@ def resolve_plan_dirs(config: dict[str, Any], explicit: str | None) -> list[Path
 
 # Match task lines. Supports:
 #   "- [pending] T7: description ..."              (vidux-kanban-ext style)
-#   "- [pending] **GP-M6**: description ..."       (strongyes game-plan style — bolded ID)
+#   "- [pending] **GP-M6**: description ..."       (bolded task id)
 #   "- [pending] I5: description ..."              (single-letter prefix)
 # ID must start with an uppercase letter and may contain alphanumerics, `-`, `_`, `.`
 # Optional `**...**` bold wrapping is tolerated and stripped by post-match cleanup.
@@ -783,8 +783,8 @@ def sync_plan_with_adapter(
         # Idempotency: skip the GraphQL mutation when remote already
         # matches local. This was the rate-limit-flood root cause —
         # the loop fired ~138 push_status calls per cycle on
-        # strongyes-web even when nothing changed, exhausting Linear's
-        # 3000/hr bucket in one hour. INBOX P1 2026-04-25.
+        # a busy repo even when nothing changed, exhausting Linear's
+        # hourly bucket in one hour. INBOX P1 2026-04-25.
         skipped = 0
         for task in tasks:
             ext_id = mapping.get(task.id)

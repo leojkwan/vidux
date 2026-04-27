@@ -44,9 +44,9 @@ This means migrating from one tracker to another is a no-op — you don't migrat
 ## Codebase-owned projects
 
 For repo lanes, the safest external project is named after the codebase it
-feeds: `resplit-web`, `resplit-ios`, `strongyes-web`, and so on. Product
-buckets such as "UX Overhaul" or "Infrastructure" can still exist in Linear,
-but they are planning buckets, not repo intake queues.
+feeds, such as `<repo-name>` or `<service-name>`. Product buckets such as
+"Launch Queue" or "Infrastructure" can still exist in a planning tool, but
+they are planning buckets, not repo intake queues.
 
 The Linear adapter supports an explicit guardrail:
 
@@ -55,9 +55,9 @@ The Linear adapter supports an explicit guardrail:
   "adapter": "linear",
   "enabled": true,
   "config": {
-    "team_id": "2f745857-a4df-4f99-93a9-6ac89f9991a2",
+    "team_id": "linear-team-uuid",
     "project_id": "linear-project-uuid",
-    "project_name": "resplit-web",
+    "project_name": "repo-name",
     "auto_promote_target": "vidux"
   }
 }
@@ -65,8 +65,26 @@ The Linear adapter supports an explicit guardrail:
 
 When `project_name` is present, `fetch_inbox`, `push_task`, status sync, and
 field sync all validate the remote Linear project before doing work. A copied
-config that still points at "UX Overhaul" fails closed instead of promoting
+config that still points at "Launch Queue" fails closed instead of promoting
 product-board cards into the wrong repo plan.
+
+## Local policy overlays
+
+Core vidux stays open-source and organization-neutral. If your team needs
+local policy such as "which Linear projects map to which repos", "which review
+bot blocks merge", or "which cron cadence to use overnight", put that in a
+separate overlay skill or runbook rather than hardcoding it into core.
+
+A good overlay:
+
+- Loads after `/vidux` and says it overlays core instead of replacing it.
+- Stores organization-specific project ids, repo names, review tools, and
+  merge precedents outside the public adapter docs.
+- References the generic adapter contract here instead of duplicating it.
+- Treats contradictions with core as overlay bugs.
+
+That split keeps Vidux reusable while still letting a team make its own
+opinionated operating layer.
 
 ## Sync architecture
 
@@ -110,7 +128,10 @@ for a deliberate bulk import.
 
 ## Self-extending lanes
 
-Per [`/vidux-leo`](https://github.com/leojkwan/ai/blob/main/skills/vidux-leo/SKILL.md), lanes that opt in via `Self-extending: true` in their lane prompt **claim adjacent external cards** when their queue empties or when they spot a card whose project/labels/title intersect their scope.
+Some organizations let lanes opt in to adjacent work. A lane that declares
+`Self-extending: true` in its prompt can **claim adjacent external cards** when
+its queue empties or when it spots a card whose project/labels/title intersect
+its scope.
 
 Claim discipline:
 

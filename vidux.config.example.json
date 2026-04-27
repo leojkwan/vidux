@@ -11,7 +11,7 @@
       "adapter": "gh_projects",
       "enabled": true,
       "config": {
-        "owner": "leojkwan",
+        "owner": "github-owner",
         "project_number": 3,
         "token_file": "~/.config/vidux/gh-project.token",
         "status_field_name": "Status",
