@@ -206,6 +206,21 @@ class FetchInboxFiltersCanceled(unittest.TestCase):
 
         self.assertEqual(len(recorder.calls), 1)
 
+    def test_project_without_teams_fails_closed(self):
+        adapter = _make_adapter(
+            project_id="project-uuid",
+            project_name="repo-web",
+        )
+        payload = _project_payload()
+        payload["project"]["teams"]["nodes"] = []
+        recorder = GraphQLRecorder(payload)
+        adapter._graphql = recorder  # type: ignore[assignment]
+
+        with self.assertRaisesRegex(Exception, "has no teams assigned"):
+            adapter.fetch_inbox()
+
+        self.assertEqual(len(recorder.calls), 1)
+
     def test_project_name_mismatch_blocks_issue_create(self):
         adapter = _make_adapter(
             project_id="project-uuid",

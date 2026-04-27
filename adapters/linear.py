@@ -339,7 +339,7 @@ class LinearAdapter(AdapterBase):
 
         `project_id` is opaque in config reviews. `project_name` makes the
         intended codebase-owned project explicit, so a copied config cannot
-        silently ingest or mutate a product bucket such as "UX Overhaul".
+        silently ingest or mutate a product bucket such as "Launch Queue".
         """
         if not self.project_name:
             return
@@ -371,7 +371,12 @@ class LinearAdapter(AdapterBase):
 
         teams = ((project.get("teams") or {}).get("nodes")) or []
         team_ids = {team.get("id") for team in teams}
-        if team_ids and self.team_id not in team_ids:
+        if not team_ids:
+            raise LinearError(
+                f"Linear project '{actual_name}' has no teams assigned; "
+                f"cannot validate team_id '{self.team_id}'"
+            )
+        if self.team_id not in team_ids:
             raise LinearError(
                 f"Linear project '{actual_name}' is not assigned to configured "
                 f"team_id '{self.team_id}'"
