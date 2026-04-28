@@ -177,6 +177,10 @@ _PLAN_TASK_REF = re.compile(
 _LINEAR_BODY_REF = re.compile(r"(?im)^\s*Linear:\s*(?P<identifier>[A-Z]+-\d+)\s*$")
 
 
+def _normalized_task_id(task_id: str) -> str:
+    return task_id.strip().upper()
+
+
 def _strip_code_spans(text: str) -> str:
     """Remove backtick-quoted spans before tag extraction.
 
@@ -353,10 +357,11 @@ def task_index_by_id(plan_dirs: list[Path]) -> dict[str, PlanTask | None]:
         if not plan_path.exists():
             continue
         for task in parse_plan(plan_path):
-            if task.id in index:
-                index[task.id] = None
+            task_id = _normalized_task_id(task.id)
+            if task_id in index:
+                index[task_id] = None
             else:
-                index[task.id] = task
+                index[task_id] = task
     return index
 
 
@@ -883,7 +888,7 @@ def _plan_task_ref_from_pr(pr: dict[str, Any]) -> str | None:
     match = _PLAN_TASK_REF.search(body)
     if not match:
         return None
-    return match.group("id").strip()
+    return _normalized_task_id(match.group("id"))
 
 
 def _ensure_pr_body_linear_ref(

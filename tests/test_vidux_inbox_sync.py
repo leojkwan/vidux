@@ -624,7 +624,7 @@ class InboxSyncTests(unittest.TestCase):
                         "state": "OPEN",
                         "mergedAt": None,
                         "headRefName": "codex/linear-links",
-                        "body": "Lane: codex/test | Plan task: BD-1 | ship it",
+                        "body": "Lane: codex/test | Plan task: bd-1 | ship it",
                     }
                 ]))
             if cmd[:3] == ["gh", "pr", "edit"]:
