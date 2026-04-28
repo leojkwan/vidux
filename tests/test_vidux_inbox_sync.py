@@ -208,6 +208,23 @@ class InboxSyncTests(unittest.TestCase):
         mapping = sync.adapter_state(state, adapter.name)
         self.assertEqual(mapping, {"BD-1": "lin_1"})
 
+    def test_pull_skips_completed_novel_items_for_inbox(self):
+        self.write_plan("")
+        adapter = FakeLinearAdapter(
+            [self.external_item(status=sync.VidxStatus.COMPLETED)]
+        )
+
+        summary = sync.sync_plan_with_adapter(
+            self.plan_dir,
+            adapter,
+            direction="pull",
+            dry_run=False,
+        )
+
+        self.assertEqual(summary["inbox_appended"], 0)
+        self.assertEqual(summary["completed_novel_skipped"], 1)
+        self.assertFalse((self.plan_dir / sync.INBOX_FILENAME).exists())
+
     def test_push_status_skipped_when_remote_matches_local(self):
         self.write_plan(
             "- [in_progress] Task 1: Active work [Source: linear:lin_1]"
@@ -388,6 +405,59 @@ class InboxSyncTests(unittest.TestCase):
         state = sync.load_state(lane_plan)
         mapping = sync.adapter_state(state, adapter.name)
         self.assertEqual(mapping, {"BD-1": "lin_1"})
+
+    def test_main_auto_promote_skips_completed_novel_items(self):
+        root = Path(self.tmp)
+        lane_plan = root / "plans" / "linear-lane"
+        self.write_plan_at(lane_plan, "")
+        config_path = root / "vidux.config.json"
+        config_path.write_text(
+            textwrap.dedent(
+                """\
+                {
+                  "plan_store": { "mode": "inline", "path": "plans" },
+                  "inbox_sources": [
+                    {
+                      "adapter": "linear",
+                      "enabled": true,
+                      "config": { "auto_promote_target": "plans/linear-lane" }
+                    }
+                  ]
+                }
+                """
+            ),
+            encoding="utf-8",
+        )
+        adapter = FakeLinearAdapter([
+            self.external_item(
+                title="Already shipped",
+                status=sync.VidxStatus.COMPLETED,
+            )
+        ])
+        original = sync.instantiate_adapter
+        try:
+            sync.instantiate_adapter = lambda _source: adapter
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                code = sync.main([
+                    "--config", str(config_path), "--direction", "both",
+                    "--json",
+                ])
+        finally:
+            sync.instantiate_adapter = original
+
+        self.assertEqual(code, 0)
+        self.assertEqual(adapter.pushed, [])
+        lane_text = (lane_plan / sync.PLAN_FILENAME).read_text(encoding="utf-8")
+        self.assertNotIn("Already shipped", lane_text)
+        payload = json.loads(output.getvalue())
+        auto = [
+            r for r in payload["results"]
+            if r.get("_kind") == "auto_promote"
+        ][0]
+        self.assertEqual(auto["promoted"], 0)
+        self.assertEqual(auto["completed_skipped"], 1)
+        self.assertEqual(auto["errors"], [])
 
     def test_main_auto_promote_pushes_status_for_source_mapped_tasks(self):
         root = Path(self.tmp)
