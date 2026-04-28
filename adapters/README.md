@@ -111,8 +111,8 @@ When `project_name` is present, the adapter looks up the Linear project and
 requires the remote name to match before reading or mutating issues. This is
 the supported shape for codebase-owned repo queues.
 
-The sync script also runs a local preflight before any PLAN.md or INBOX.md
-mutation:
+The Linear adapter also validates its extension-specific intake policy before
+any PLAN.md or INBOX.md mutation:
 
 - `project_id` without `project_name` fails unless
   `allow_unguarded_project: true` is set for an intentional product/planning
