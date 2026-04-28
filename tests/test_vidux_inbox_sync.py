@@ -271,6 +271,32 @@ class InboxSyncTests(unittest.TestCase):
         self.assertEqual(adapter.field_pushes, [])
         self.assertEqual(summary["errors"], [])
 
+    def test_both_pull_completed_does_not_push_stale_local_status(self):
+        self.write_plan(
+            "- [in_review] BD-1: PR landed remotely [Source: linear:lin_1]"
+        )
+        adapter = FakeLinearAdapter(
+            [self.external_item(status=sync.VidxStatus.COMPLETED)]
+        )
+
+        summary = sync.sync_plan_with_adapter(
+            self.plan_dir,
+            adapter,
+            direction="both",
+            dry_run=False,
+        )
+
+        self.assertEqual(summary["plan_flipped"], 1)
+        self.assertEqual(summary["flipped_ids"], ["BD-1"])
+        self.assertEqual(adapter.status_pushes, [])
+        plan_text = (self.plan_dir / sync.PLAN_FILENAME).read_text(
+            encoding="utf-8"
+        )
+        self.assertIn(
+            "- [completed] BD-1: PR landed remotely [Source: linear:lin_1]",
+            plan_text,
+        )
+
     def test_push_fields_fires_when_blocked_flag_diverges(self):
         self.write_plan(
             "- [blocked] Task 1: Stuck work [Source: linear:lin_1]"

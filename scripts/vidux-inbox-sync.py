@@ -776,6 +776,12 @@ def sync_plan_with_adapter(
             if item.status == VidxStatus.COMPLETED and plan_task.status != VidxStatus.COMPLETED:
                 flips[task_id] = VidxStatus.COMPLETED
         summary["plan_flipped"] = flip_plan_statuses(plan_path, flips, dry_run)
+        if summary["plan_flipped"]:
+            # Keep the push half of a same-process `--direction=both` run from
+            # re-pushing stale pre-flip statuses back to the external board.
+            for task_id, status in flips.items():
+                if task_id in tasks_by_id:
+                    tasks_by_id[task_id].status = status
         summary["flipped_ids"] = sorted(flips.keys())
 
     if direction in ("push", "both") and not do_push:
