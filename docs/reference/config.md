@@ -65,6 +65,9 @@ The live config uses several sections to guide scripts and automation behavior:
 - Linear codebase intake should set both `project_id` and `project_name`; the
   adapter validates the remote project name before reading or writing so a repo
   cannot silently ingest the wrong Linear product bucket.
+- Linear sources fail closed before sync mutation when `project_id` is missing
+  unless `allow_team_wide: true` is set, or when `project_id` is present
+  without `project_name` unless `allow_unguarded_project: true` is set.
 
 A real repo may enable one or more shipped adapters, including `gh_projects`
 and `linear`, and may add `auto_promote_target` when external cards should

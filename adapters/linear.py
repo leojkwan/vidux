@@ -67,6 +67,8 @@ class LinearAdapter(AdapterBase):
             "label_ids",            # default labels applied to every pushed issue
             "project_id",           # if set, scopes fetch_inbox AND push_task to this Linear project
             "project_name",         # expected Linear project name; validates project_id fail-closed
+            "allow_team_wide",      # explicit opt-in for no project_id
+            "allow_unguarded_project",  # explicit opt-in for project_id without project_name
         ],
     }
 

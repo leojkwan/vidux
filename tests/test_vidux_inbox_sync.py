@@ -332,7 +332,10 @@ class InboxSyncTests(unittest.TestCase):
                     {
                       "adapter": "linear",
                       "enabled": true,
-                      "config": { "auto_promote_target": "plans/linear-lane" }
+                      "config": {
+                        "allow_team_wide": true,
+                        "auto_promote_target": "plans/linear-lane"
+                      }
                     }
                   ]
                 }
@@ -382,7 +385,10 @@ class InboxSyncTests(unittest.TestCase):
                     {
                       "adapter": "linear",
                       "enabled": true,
-                      "config": { "auto_promote_target": "plans/linear-lane" }
+                      "config": {
+                        "allow_team_wide": true,
+                        "auto_promote_target": "plans/linear-lane"
+                      }
                     }
                   ]
                 }
@@ -440,7 +446,10 @@ class InboxSyncTests(unittest.TestCase):
                     {
                       "adapter": "linear",
                       "enabled": true,
-                      "config": { "auto_promote_target": "plans/linear-lane" }
+                      "config": {
+                        "allow_team_wide": true,
+                        "auto_promote_target": "plans/linear-lane"
+                      }
                     }
                   ]
                 }
@@ -491,7 +500,10 @@ class InboxSyncTests(unittest.TestCase):
                     {
                       "adapter": "linear",
                       "enabled": true,
-                      "config": { "auto_promote_target": "plans/linear-lane" }
+                      "config": {
+                        "allow_team_wide": true,
+                        "auto_promote_target": "plans/linear-lane"
+                      }
                     }
                   ]
                 }
@@ -544,7 +556,10 @@ class InboxSyncTests(unittest.TestCase):
                     {
                       "adapter": "linear",
                       "enabled": true,
-                      "config": { "auto_promote_target": "plans/missing-lane" }
+                      "config": {
+                        "allow_team_wide": true,
+                        "auto_promote_target": "plans/missing-lane"
+                      }
                     }
                   ]
                 }
@@ -567,6 +582,89 @@ class InboxSyncTests(unittest.TestCase):
         self.assertEqual(adapter.pushed, [])
         self.assertFalse((home_plan / sync.INBOX_FILENAME).exists())
         self.assertFalse((root / "plans" / "missing-lane").exists())
+
+    def test_linear_team_wide_source_requires_explicit_allowlist(self):
+        root = Path(self.tmp)
+        home_plan = root / "plans" / "home"
+        self.write_plan_at(home_plan, "- [pending] Task 1: Local task")
+        config_path = root / "vidux.config.json"
+        config_path.write_text(
+            textwrap.dedent(
+                """\
+                {
+                  "plan_store": { "mode": "inline", "path": "plans" },
+                  "inbox_sources": [
+                    {
+                      "adapter": "linear",
+                      "enabled": true,
+                      "config": { "auto_promote_target": "plans/home" }
+                    }
+                  ]
+                }
+                """
+            ),
+            encoding="utf-8",
+        )
+
+        stderr = io.StringIO()
+        with contextlib.redirect_stderr(stderr):
+            code = sync.main([
+                "--config", str(config_path), "--direction", "both",
+            ])
+
+        self.assertEqual(code, 2)
+        self.assertIn("allow_team_wide", stderr.getvalue())
+        self.assertFalse((home_plan / sync.INBOX_FILENAME).exists())
+
+    def test_linear_project_source_requires_project_name_guardrail(self):
+        root = Path(self.tmp)
+        home_plan = root / "plans" / "home"
+        self.write_plan_at(home_plan, "- [pending] Task 1: Local task")
+        config_path = root / "vidux.config.json"
+        config_path.write_text(
+            textwrap.dedent(
+                """\
+                {
+                  "plan_store": { "mode": "inline", "path": "plans" },
+                  "inbox_sources": [
+                    {
+                      "adapter": "linear",
+                      "enabled": true,
+                      "config": {
+                        "project_id": "lin_project",
+                        "auto_promote_target": "plans/home"
+                      }
+                    }
+                  ]
+                }
+                """
+            ),
+            encoding="utf-8",
+        )
+
+        stderr = io.StringIO()
+        with contextlib.redirect_stderr(stderr):
+            code = sync.main([
+                "--config", str(config_path), "--direction", "both",
+            ])
+
+        self.assertEqual(code, 2)
+        self.assertIn("project_name", stderr.getvalue())
+        self.assertFalse((home_plan / sync.INBOX_FILENAME).exists())
+
+    def test_linear_explicit_unguarded_project_allowlist_passes_preflight(self):
+        errors = sync.validate_source_guardrails([
+            {
+                "adapter": "linear",
+                "enabled": True,
+                "config": {
+                    "project_id": "lin_project",
+                    "allow_unguarded_project": True,
+                },
+            }
+        ])
+
+        self.assertEqual(errors, [])
 
 
 if __name__ == "__main__":

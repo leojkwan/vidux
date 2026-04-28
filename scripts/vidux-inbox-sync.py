@@ -673,6 +673,61 @@ def flip_plan_statuses(plan_path: Path, flips: dict[str, VidxStatus],
 # --- Adapter instantiation ---------------------------------------------------
 
 
+def validate_linear_source_guardrails(source: dict[str, Any], idx: int) -> list[str]:
+    """Return fail-closed config errors for Linear source policy.
+
+    Linear team-wide fetches are dangerous in repo lanes: one stale checkout
+    can pull every team issue into the first plan store. Project-scoped repo
+    sources are safe only when `project_name` makes the opaque UUID auditable.
+    """
+    if not source.get("enabled", False):
+        return []
+    if source.get("adapter") != "linear":
+        return []
+
+    cfg = source.get("config") or {}
+    project_id = cfg.get("project_id")
+    project_name = cfg.get("project_name")
+    allow_team_wide = cfg.get("allow_team_wide") is True
+    allow_unguarded_project = cfg.get("allow_unguarded_project") is True
+
+    prefix = f"inbox_sources[{idx}] linear"
+    errors: list[str] = []
+    if project_name and not project_id:
+        errors.append(
+            f"{prefix}: project_name requires project_id"
+        )
+    if project_id and not project_name and not allow_unguarded_project:
+        errors.append(
+            f"{prefix}: project_id requires project_name for fail-closed "
+            "repo intake; set config.allow_unguarded_project=true only for "
+            "an intentional product/planning bucket"
+        )
+    if not project_id and not allow_team_wide:
+        errors.append(
+            f"{prefix}: no project_id means team-wide Linear intake; set "
+            "config.allow_team_wide=true only when importing the whole team "
+            "is intentional"
+        )
+    if project_id and allow_team_wide:
+        errors.append(
+            f"{prefix}: allow_team_wide is only valid when project_id is absent"
+        )
+    if project_name and allow_unguarded_project:
+        errors.append(
+            f"{prefix}: allow_unguarded_project is redundant when project_name "
+            "is set"
+        )
+    return errors
+
+
+def validate_source_guardrails(sources: list[dict[str, Any]]) -> list[str]:
+    errors: list[str] = []
+    for idx, source in enumerate(sources):
+        errors.extend(validate_linear_source_guardrails(source, idx))
+    return errors
+
+
 def instantiate_adapter(source: dict[str, Any]) -> AdapterBase | None:
     if not source.get("enabled", False):
         return None
@@ -1045,6 +1100,12 @@ def main(argv: list[str] | None = None) -> int:
         else:
             print(f"{reason}; nothing to sync.")
         return 0
+
+    guardrail_errors = validate_source_guardrails(sources)
+    if guardrail_errors:
+        for err in guardrail_errors:
+            print(f"error: {err}", file=sys.stderr)
+        return 2
 
     try:
         plan_dirs = resolve_plan_dirs(config, args.plan)
