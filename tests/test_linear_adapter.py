@@ -27,6 +27,10 @@ def _make_adapter(
     *,
     project_id: str | None = None,
     project_name: str | None = None,
+    allow_team_wide: bool = False,
+    allow_unguarded_project: bool = False,
+    label_names: list[str] | None = None,
+    managed_labels: dict[str, Any] | None = None,
 ) -> LinearAdapter:
     """Build a LinearAdapter without touching disk or the network.
 
@@ -47,6 +51,14 @@ def _make_adapter(
         config["project_id"] = project_id
     if project_name is not None:
         config["project_name"] = project_name
+    if allow_team_wide:
+        config["allow_team_wide"] = True
+    if allow_unguarded_project:
+        config["allow_unguarded_project"] = True
+    if label_names is not None:
+        config["label_names"] = label_names
+    if managed_labels is not None:
+        config["managed_labels"] = managed_labels
     return LinearAdapter(config)
 
 
@@ -146,7 +158,7 @@ class FetchInboxFiltersCanceled(unittest.TestCase):
         }
 
     def test_team_query_drops_canceled_type(self):
-        adapter = _make_adapter()
+        adapter = _make_adapter(allow_team_wide=True)
         recorder = GraphQLRecorder(self._nodes())
         adapter._graphql = recorder  # type: ignore[assignment]
 
@@ -161,7 +173,10 @@ class FetchInboxFiltersCanceled(unittest.TestCase):
         self.assertEqual(len(items), 3)
 
     def test_project_query_drops_canceled_type(self):
-        adapter = _make_adapter(project_id="project-uuid")
+        adapter = _make_adapter(
+            project_id="project-uuid",
+            allow_unguarded_project=True,
+        )
         recorder = GraphQLRecorder(self._nodes())
         adapter._graphql = recorder  # type: ignore[assignment]
 
@@ -266,10 +281,230 @@ class GraphQLQueryShape(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "project_name.*project_id"):
             _make_adapter(project_name="repo-web")
 
+    def test_team_wide_source_requires_explicit_allowlist(self):
+        with self.assertRaisesRegex(ValueError, "allow_team_wide"):
+            _make_adapter()
+
+    def test_project_id_requires_project_name_or_allowlist(self):
+        with self.assertRaisesRegex(ValueError, "project_id.*project_name"):
+            _make_adapter(project_id="project-uuid")
+
+    def test_explicit_unguarded_project_allowlist_passes(self):
+        adapter = _make_adapter(
+            project_id="project-uuid",
+            allow_unguarded_project=True,
+        )
+
+        self.assertEqual(adapter.project_id, "project-uuid")
+        self.assertIsNone(adapter.project_name)
+
+    def test_allow_team_wide_rejected_with_project_id(self):
+        with self.assertRaisesRegex(ValueError, "allow_team_wide.*project_id"):
+            _make_adapter(
+                project_id="project-uuid",
+                project_name="repo-web",
+                allow_team_wide=True,
+            )
+
     def test_project_lookup_query_reads_name_and_teams(self):
         self.assertIn("project(id: $projectId)", LinearAdapter._PROJECT_LOOKUP_QUERY)
         self.assertIn("name", LinearAdapter._PROJECT_LOOKUP_QUERY)
         self.assertIn("teams(first: 20)", LinearAdapter._PROJECT_LOOKUP_QUERY)
+
+    def test_label_names_must_be_non_empty_strings(self):
+        with self.assertRaisesRegex(ValueError, "label_names"):
+            _make_adapter(allow_team_wide=True, label_names=["repo:vidux", ""])
+
+    def test_managed_labels_reject_unknown_keys(self):
+        with self.assertRaisesRegex(ValueError, "managed_labels.*unknown"):
+            _make_adapter(
+                allow_team_wide=True,
+                managed_labels={"repo": "repo:vidux", "mystery": "nope"},
+            )
+
+
+class ManagedLabels(unittest.TestCase):
+    @staticmethod
+    def _label_payload(label_id: str, name: str) -> dict[str, Any]:
+        return {"issueLabels": {"nodes": [{"id": label_id, "name": name}]}}
+
+    @staticmethod
+    def _create_payload() -> dict[str, Any]:
+        return {"issueCreate": {"success": True, "issue": {"id": "lin-issue-1"}}}
+
+    def test_push_task_applies_label_names_and_managed_repo_source_labels(self):
+        adapter = _make_adapter(
+            allow_team_wide=True,
+            label_names=["fleet"],
+            managed_labels={
+                "repo": "repo:vidux",
+                "source": "source:vidux",
+            },
+        )
+        recorder = GraphQLRecorder([
+            self._label_payload("label-fleet", "fleet"),
+            self._label_payload("label-repo", "repo:vidux"),
+            self._label_payload("label-source", "source:vidux"),
+            self._create_payload(),
+        ])
+        adapter._graphql = recorder  # type: ignore[assignment]
+        task = PlanTask(
+            id="BD-1",
+            title="Label managed issue",
+            status=VidxStatus.PENDING,
+        )
+
+        external_id = adapter.push_task(task)
+
+        self.assertEqual(external_id, "lin-issue-1")
+        issue_input = recorder.calls[-1][1]["input"]
+        self.assertEqual(
+            issue_input["labelIds"],
+            ["label-fleet", "label-repo", "label-source"],
+        )
+
+
+class PullRequestLinking(unittest.TestCase):
+    def _pr(self) -> dict[str, Any]:
+        return {
+            "number": 42,
+            "url": "https://github.com/leojkwan/repo/pull/42",
+            "title": "fix(linear): link PRs",
+            "state": "OPEN",
+            "isDraft": False,
+            "headRefName": "codex/linear-linkage",
+        }
+
+    def _issue_payload(
+        self,
+        *,
+        attachment_url: str | None = None,
+        comment_body: str | None = None,
+        labels: list[dict[str, str]] | None = None,
+    ) -> dict[str, Any]:
+        return {
+            "issue": {
+                "id": "lin-issue-1",
+                "identifier": "EVE-123",
+                "title": "Wire PR linkage",
+                "url": "https://linear.app/leojkwan/issue/EVE-123/wire-pr-linkage",
+                "labels": {"nodes": labels or []},
+                "attachments": {
+                    "nodes": (
+                        [{
+                            "id": "att-1",
+                            "title": "GitHub PR #42",
+                            "url": attachment_url,
+                        }]
+                        if attachment_url
+                        else []
+                    )
+                },
+                "comments": {
+                    "nodes": (
+                        [{"id": "comment-1", "body": comment_body}]
+                        if comment_body
+                        else []
+                    )
+                },
+            }
+        }
+
+    def test_sync_pull_request_link_creates_attachment_and_comment(self):
+        adapter = _make_adapter(allow_team_wide=True)
+        recorder = GraphQLRecorder([
+            self._issue_payload(),
+            {"attachmentCreate": {"success": True, "attachment": {"id": "att-1"}}},
+            {"commentCreate": {"success": True, "comment": {"id": "comment-1"}}},
+        ])
+        adapter._graphql = recorder  # type: ignore[assignment]
+
+        result = adapter.sync_pull_request_link("lin-issue-1", self._pr())
+
+        self.assertEqual(result["issue_identifier"], "EVE-123")
+        self.assertTrue(result["attached"])
+        self.assertTrue(result["commented"])
+        self.assertEqual(len(recorder.calls), 3)
+        self.assertIn("attachmentCreate", recorder.calls[1][0])
+        self.assertEqual(
+            recorder.calls[1][1]["input"]["url"],
+            "https://github.com/leojkwan/repo/pull/42",
+        )
+        self.assertIn("commentCreate", recorder.calls[2][0])
+        self.assertIn("Review gate: ready-for-review", recorder.calls[2][1]["input"]["body"])
+
+    def test_sync_pull_request_link_is_idempotent_when_url_already_present(self):
+        adapter = _make_adapter(allow_team_wide=True)
+        pr = self._pr()
+        recorder = GraphQLRecorder(
+            self._issue_payload(
+                attachment_url=pr["url"],
+                comment_body=f"Already linked {pr['url']}",
+            )
+        )
+        adapter._graphql = recorder  # type: ignore[assignment]
+
+        result = adapter.sync_pull_request_link("lin-issue-1", pr)
+
+        self.assertFalse(result["attached"])
+        self.assertFalse(result["commented"])
+        self.assertTrue(result["already_attached"])
+        self.assertTrue(result["already_commented"])
+        self.assertEqual(len(recorder.calls), 1)
+
+    def test_sync_pull_request_link_dry_run_plans_without_mutation(self):
+        adapter = _make_adapter(allow_team_wide=True)
+        recorder = GraphQLRecorder(self._issue_payload())
+        adapter._graphql = recorder  # type: ignore[assignment]
+
+        result = adapter.sync_pull_request_link("lin-issue-1", self._pr(), dry_run=True)
+
+        self.assertTrue(result["attached"])
+        self.assertTrue(result["commented"])
+        self.assertEqual(len(recorder.calls), 1)
+
+    def test_sync_pull_request_link_reconciles_managed_pr_labels(self):
+        adapter = _make_adapter(
+            allow_team_wide=True,
+            managed_labels={
+                "pr_state_prefix": "pr-state:",
+                "review_state_prefix": "review-state:",
+            },
+        )
+        recorder = GraphQLRecorder([
+            self._issue_payload(
+                labels=[{"id": "label-old", "name": "pr-state:draft"}]
+            ),
+            {"issueLabels": {"nodes": [{
+                "id": "label-pr-open",
+                "name": "pr-state:open",
+            }]}},
+            {"issueLabels": {"nodes": [{
+                "id": "label-review-ready",
+                "name": "review-state:ready-for-review",
+            }]}},
+            {"issueUpdate": {"success": True, "issue": {"id": "lin-issue-1"}}},
+            {"attachmentCreate": {"success": True, "attachment": {"id": "att-1"}}},
+            {"commentCreate": {"success": True, "comment": {"id": "comment-1"}}},
+        ])
+        adapter._graphql = recorder  # type: ignore[assignment]
+
+        result = adapter.sync_pull_request_link("lin-issue-1", self._pr())
+
+        self.assertEqual(
+            result["labels_added"],
+            ["pr-state:open", "review-state:ready-for-review"],
+        )
+        self.assertEqual(result["labels_removed"], ["pr-state:draft"])
+        update_call = recorder.calls[3]
+        self.assertIn("issueUpdate", update_call[0])
+        self.assertEqual(
+            update_call[1]["input"],
+            {
+                "addedLabelIds": ["label-pr-open", "label-review-ready"],
+                "removedLabelIds": ["label-old"],
+            },
+        )
 
 
 if __name__ == "__main__":

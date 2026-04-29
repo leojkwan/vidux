@@ -50,14 +50,15 @@ surface area can layer on without breaking the 6-method contract:
 | **Initiative**   | top-level cross-cutting goal (workspace-wide)      | M:M via `InitiativeToProject` join — extension API |
 | **Cycle**        | sprint window (orthogonal to projects)             | optional — set `cycleId` in `push_fields` |
 | **Project milestone** | phase marker inside one project (Phase 0 → 1) | set `projectMilestoneId` |
-| **Comment**      | discussion thread on an issue                      | `commentCreate` mutation — not in core contract |
-| **Label**        | tag (workspace OR team scoped)                     | `default_label_ids` in adapter config + auto-managed `blocked` label |
+| **Attachment**   | GitHub PR URL linked to an issue                   | `sync_pull_request_link` extension method |
+| **Comment**      | discussion thread on an issue                      | `sync_pull_request_link` extension method |
+| **Label**        | tag (workspace OR team scoped)                     | `label_ids` / `label_names`, `managed_labels`, and auto-managed `blocked` label |
 | **Webhook**      | push notification for issue/comment changes        | future extension — would replace polling fetch_inbox |
 
 The 6-method contract stays unchanged. New capabilities ride on top via
 adapter-specific config (e.g. `project_id`, `cycle_id`) or out-of-band
-extension methods (e.g. `add_comment`, `register_webhook`) that core vidux
-never calls.
+extension methods (e.g. `sync_pull_request_link`, `register_webhook`) that
+core vidux discovers by capability rather than hardcoding into the contract.
 
 ## Contract
 
@@ -101,6 +102,12 @@ meant to feed one codebase:
       "in_review": "state-review",
       "completed": "state-done"
     },
+    "managed_labels": {
+      "repo": "repo:repo-name",
+      "source": "source:vidux",
+      "pr_state_prefix": "pr-state:",
+      "review_state_prefix": "review-state:"
+    },
     "auto_promote_target": "vidux",
     "auto_promote_max_new": 25
   }
@@ -109,9 +116,19 @@ meant to feed one codebase:
 
 When `project_name` is present, the adapter looks up the Linear project and
 requires the remote name to match before reading or mutating issues. This is
-the supported shape for codebase-owned repo queues. Product planning projects
-may omit `project_name`, but then the config review must treat that source as
-an intentionally unguarded product bucket.
+the supported shape for codebase-owned repo queues.
+
+The Linear adapter also validates its extension-specific intake policy before
+any PLAN.md or INBOX.md mutation:
+
+- `project_id` without `project_name` fails unless
+  `allow_unguarded_project: true` is set for an intentional product/planning
+  bucket.
+- No `project_id` means team-wide intake and fails unless
+  `allow_team_wide: true` is set.
+
+Those allowlist flags should be rare. They exist for deliberate planning
+lanes, not repo-owned codebase intake.
 
 `auto_promote_max_new` protects clean worktrees whose gitignored sidecars are
 missing. If a source would append more than the cap as fresh `BD-*` tasks, the
@@ -121,6 +138,59 @@ With `auto_promote_target`, sync does not create new external issues from
 local-only PLAN rows. It still reconciles status for tasks already linked by a
 `[Source: <adapter>:<id>]` marker so imported cards can move to completed on
 the external board.
+
+## Linear labels
+
+Linear label automation is opt-in and extension-owned. Core vidux does not
+define a global taxonomy; the Linear adapter reads label rules from the
+adapter config and creates team-scoped labels by name when needed.
+
+Static defaults:
+
+- `label_ids`: existing Linear label UUIDs to apply to every pushed issue.
+- `label_names`: Linear label names to look up or create and apply to every
+  pushed issue.
+
+Managed taxonomy:
+
+```json
+"managed_labels": {
+  "repo": "repo:vidux",
+  "source": "source:vidux",
+  "pr_state_prefix": "pr-state:",
+  "review_state_prefix": "review-state:"
+}
+```
+
+`repo` and `source` are applied to new issues and to issues touched by PR
+linkage. During PR linkage, the adapter also applies exactly one
+`pr_state_prefix` label (`pr-state:open`, `pr-state:merged`, or
+`pr-state:closed`) and one `review_state_prefix` label
+(`review-state:draft`, `review-state:ready-for-review`, or
+`review-state:merged`). Labels with those configured prefixes are
+auto-managed: stale values are removed when a PR's state changes. All other
+Linear labels remain human-owned. The existing `blocked_label` stays
+auto-managed through `push_fields({"_blocked": true})`.
+
+## Linear PR linkage
+
+`scripts/vidux-inbox-sync.py --include-prs --only-adapter linear` links PRs to
+Linear when the PR body names a plan task and that task has a Linear source
+marker:
+
+```text
+Lane: codex/example | Plan task: BD-1 | Implements the fix
+```
+
+```markdown
+- [in_review] BD-1: Implements the fix [Source: linear:<issue-id>]
+```
+
+For each match, the Linear adapter idempotently creates a GitHub PR attachment
+on the issue and posts a comment with PR number, branch, status, review gate,
+and URL. The sync also ensures the GitHub PR body carries `Linear: EVE-N` so
+reviewers and audit scripts can find the Linear issue without reading the
+sidecar.
 
 ## Six steps to write a new adapter
 
